@@ -47,10 +47,10 @@ export function Hero() {
 
             <Reveal delay={0.1}>
               <p className="mt-6 max-w-xl text-pretty text-lg leading-relaxed text-ink-500">
-                Je bent begonnen omdat je graag met honden werkt. DogWare
-                automatiseert planning, klantbeheer, betalingen, webshop,
-                communicatie, medewerkers en administratie. Zodat jij weer kunt
-                doen wat je het liefste doet.{" "}
+                DogWare is niet zomaar software die je erbij neemt. Het is je{" "}
+                <span className="font-semibold text-ink">complete bedrijf op één plek</span>{" "}
+                — website, planning, klanten en administratie die vanzelf
+                samenwerken. Zodat jij weer kunt doen waarvoor je ooit begon.{" "}
                 <span className="font-semibold text-ink">Werken met honden.</span>
               </p>
             </Reveal>
@@ -69,19 +69,30 @@ export function Hero() {
             </Reveal>
 
             <Reveal delay={0.2}>
-              <div className="mt-8 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-ink-500">
-                <span className="inline-flex items-center gap-1.5">
+              <div className="mt-9">
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    "Website",
+                    "Planning",
+                    "Klanten",
+                    "Facturen",
+                    "Agenda",
+                    "Betalingen",
+                    "E-mail",
+                    "Klantportaal",
+                  ].map((f) => (
+                    <span
+                      key={f}
+                      className="rounded-full bg-white/70 px-3 py-1 text-[13px] font-semibold text-ink-700 ring-1 ring-ink/5"
+                    >
+                      {f}
+                    </span>
+                  ))}
+                </div>
+                <p className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-sage-600">
                   <CheckCircle2 className="h-4 w-4 text-sage" />
-                  Geen losse systemen
-                </span>
-                <span className="inline-flex items-center gap-1.5">
-                  <CheckCircle2 className="h-4 w-4 text-sage" />
-                  Alles automatisch
-                </span>
-                <span className="inline-flex items-center gap-1.5">
-                  <CheckCircle2 className="h-4 w-4 text-sage" />
-                  Eén centrale omgeving
-                </span>
+                  Alles werkt automatisch samen
+                </p>
               </div>
             </Reveal>
           </div>
