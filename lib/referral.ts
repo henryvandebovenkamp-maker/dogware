@@ -3,7 +3,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { cookies } from "next/headers";
 import { and, eq, gt } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
-import type { Partner } from "@/lib/db/schema";
+import type { Partner, PartnerStatus } from "@/lib/db/schema";
 import { signValue, verifySignedValue } from "@/lib/auth/crypto";
 
 /**
@@ -16,6 +16,18 @@ import { signValue, verifySignedValue } from "@/lib/auth/crypto";
 
 export const ATTRIBUTION_DAYS = Number(process.env.ATTRIBUTION_DAYS ?? 30);
 export const ATTRIBUTION_MODEL = "LAST_VALID_REFERRAL" as const;
+
+/**
+ * Statussen waarbij een partnerlink "leeft": bezoek registreren, welkom tonen
+ * én attribueren. Een net uitgenodigde partner (INVITED) telt mee — de link
+ * hoort meteen te werken. PAUSED/BLOCKED/ENDED (gepauzeerd/geblokkeerd/
+ * beëindigd) doen bewust niets: geen attributie, geen korting, geen commissie.
+ */
+const REFERRAL_ACTIVE_STATUSES: PartnerStatus[] = ["ACTIVE", "INVITED"];
+
+export function partnerCanRefer(status: PartnerStatus): boolean {
+  return REFERRAL_ACTIVE_STATUSES.includes(status);
+}
 
 const REF_COOKIE = "dw_ref";
 const VISITOR_COOKIE = "dw_vid";
@@ -199,7 +211,7 @@ export async function getValidAttribution(): Promise<Attribution | null> {
       .from(schema.partners)
       .where(eq(schema.partners.id, p))
       .limit(1);
-    if (!partner || partner.status !== "ACTIVE") return null;
+    if (!partner || !partnerCanRefer(partner.status)) return null;
 
     return { partnerId: partner.id, referralCode: c, clickId: k ?? null };
   } catch {

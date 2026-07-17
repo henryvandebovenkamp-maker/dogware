@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { findPartnerByCode, recordReferralVisit } from "@/lib/referral";
+import { findPartnerByCode, partnerCanRefer, recordReferralVisit } from "@/lib/referral";
 import { safeInternalPath } from "@/lib/roles";
 
 /**
@@ -18,9 +18,9 @@ export async function GET(
 
   try {
     const partner = await findPartnerByCode(code);
-    // Alleen actieve en gepauzeerde partners registreren bezoeken;
-    // attributie zelf gebeurt uitsluitend voor ACTIVE (server-side).
-    if (partner && (partner.status === "ACTIVE" || partner.status === "PAUSED")) {
+    // Een net uitgenodigde of actieve partner laat de link direct werken;
+    // gepauzeerde/geblokkeerde/beëindigde partners doen bewust niets.
+    if (partner && partnerCanRefer(partner.status)) {
       await recordReferralVisit(partner, {
         landingPage: `/p/${partner.referralCode}`,
         userAgent: request.headers.get("user-agent"),
