@@ -3,6 +3,7 @@ import { SiteFooter } from "@/components/site-footer";
 import { Hero } from "@/components/sections/hero";
 import { AudienceStrip } from "@/components/sections/audience-strip";
 import { Problem } from "@/components/sections/problem";
+import { Story } from "@/components/sections/story";
 import { Vision } from "@/components/sections/vision";
 import { Solution } from "@/components/sections/solution";
 import { Ecosystem } from "@/components/sections/ecosystem";
@@ -25,6 +26,7 @@ export default function Home() {
         <Hero />
         <AudienceStrip />
         <Problem />
+        <Story />
         <Vision />
         <Solution />
         <Ecosystem />

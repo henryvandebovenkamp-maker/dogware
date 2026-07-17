@@ -1,6 +1,7 @@
 import { ArrowRight, PlayCircle, Bell, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui";
 import { DashboardMock } from "@/components/dashboard-mock";
+import { Avatar } from "@/components/photo";
 import { Reveal } from "@/components/reveal";
 
 export function Hero() {
@@ -56,7 +57,7 @@ export function Hero() {
 
             <Reveal delay={0.15}>
               <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
-                <Button href="#demo" variant="primary" size="lg">
+                <Button href="/demo" variant="primary" size="lg">
                   Vraag een demo aan
                   <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
                 </Button>
@@ -114,6 +115,23 @@ export function Hero() {
                     <p className="text-[10px] text-ink-300">Puppycursus · automatisch verwerkt</p>
                   </div>
                 </div>
+              </div>
+
+              {/* Zwevende kaart: gebouwd door hondenmensen */}
+              <div className="absolute -left-2 -bottom-5 hidden animate-float-slower rounded-2xl bg-white p-3 shadow-lift ring-1 ring-ink/5 sm:block">
+                <a href="#verhaal" className="flex items-center gap-2.5">
+                  <Avatar
+                    file="henry-avatar.jpg"
+                    alt="Henry van de Bovenkamp"
+                    fallback="🐾"
+                    position="object-[30%_center]"
+                    className="h-9 w-9"
+                  />
+                  <div>
+                    <p className="text-[11px] font-bold text-ink">Gebouwd door hondenmensen</p>
+                    <p className="text-[10px] text-ink-300">Henry · oprichter — lees het verhaal</p>
+                  </div>
+                </a>
               </div>
             </div>
           </Reveal>

@@ -1,7 +1,10 @@
 import { Star, Quote } from "lucide-react";
 import { Container, SectionHeading } from "@/components/ui";
+import { Avatar } from "@/components/photo";
 import { RevealStagger, RevealItem } from "@/components/reveal";
 
+// Plaats echte foto's in /public/photos met de bestandsnaam uit `photo`;
+// zolang die ontbreekt wordt de emoji getoond.
 const TESTIMONIALS = [
   {
     quote:
@@ -9,6 +12,7 @@ const TESTIMONIALS = [
     name: "Sanne Bakker",
     role: "Hondenschool De Vrije Loop",
     emoji: "🐕",
+    photo: "testimonial-sanne.jpg",
   },
   {
     quote:
@@ -16,6 +20,7 @@ const TESTIMONIALS = [
     name: "Marco de Wit",
     role: "Uitlaatservice Vier Poten",
     emoji: "🦮",
+    photo: "testimonial-marco.jpg",
   },
   {
     quote:
@@ -23,6 +28,7 @@ const TESTIMONIALS = [
     name: "Linda Vermeer",
     role: "Trimsalon Pluis & Poot",
     emoji: "✂️",
+    photo: "testimonial-linda.jpg",
   },
   {
     quote:
@@ -30,6 +36,7 @@ const TESTIMONIALS = [
     name: "Joost Hendriks",
     role: "Gedragstherapie Kalm & Co",
     emoji: "🐶",
+    photo: "testimonial-joost.jpg",
   },
 ];
 
@@ -57,9 +64,7 @@ export function Testimonials() {
                   “{t.quote}”
                 </blockquote>
                 <figcaption className="mt-6 flex items-center gap-3">
-                  <span className="flex h-11 w-11 items-center justify-center rounded-full bg-cream-100 text-xl ring-1 ring-ink/5">
-                    {t.emoji}
-                  </span>
+                  <Avatar file={t.photo} alt={t.name} fallback={t.emoji} />
                   <span>
                     <span className="block text-sm font-bold text-ink">{t.name}</span>
                     <span className="block text-[13px] text-ink-500">{t.role}</span>
