@@ -1,52 +1,104 @@
+import QRCode from "qrcode";
 import { requirePartner } from "@/lib/auth/session";
-import { getPartnerForUser } from "@/lib/partner-data";
+import { referralLinkFor } from "@/lib/referral";
+import { euro, getPartnerForUser } from "@/lib/partner-data";
+import { decryptField } from "@/lib/crypto-field";
+import { ProfileForm } from "@/components/partner/profile-form";
+import { ReferralCard } from "@/components/partner/referral-card";
+import type { ProfileInput } from "@/app/actions/partner-profile";
 
 export const metadata = { title: "Profiel" };
-
-function Rij({ label, value }: { label: string; value?: string | null }) {
-  return (
-    <div className="flex justify-between gap-4 py-2.5">
-      <dt className="text-[13px] font-semibold text-ink-500">{label}</dt>
-      <dd className="text-right text-[13px] font-bold text-ink">
-        {value?.trim() || "—"}
-      </dd>
-    </div>
-  );
-}
 
 export default async function ProfielPage() {
   const user = await requirePartner();
   const partner = await getPartnerForUser(user.id);
 
+  if (!partner) {
+    return (
+      <p className="py-16 text-center text-sm text-ink-500">
+        Je partnerprofiel wordt nog ingericht. Neem contact op met DogWare.
+      </p>
+    );
+  }
+
+  const link = referralLinkFor(partner.referralCode);
+  const qrDataUrl = await QRCode.toDataURL(link, {
+    width: 320,
+    margin: 1,
+    color: { dark: "#1c150f", light: "#ffffff" },
+  });
+
+  // Naam eventueel afleiden uit user.naam als voor-/achternaam nog leeg zijn
+  const [afgeleidVoor, ...afgeleidAchter] = user.naam.split(" ");
+  const initial: ProfileInput = {
+    voornaam: partner.voornaam ?? afgeleidVoor ?? "",
+    achternaam: partner.achternaam ?? afgeleidAchter.join(" "),
+    bedrijfsnaam: partner.bedrijfsnaam ?? "",
+    telefoon: partner.telefoon ?? "",
+    website: partner.website ?? "",
+    avatarUrl: partner.avatarUrl ?? "",
+    rekeninghouder: partner.rekeninghouder ?? "",
+    iban: decryptField(partner.ibanEnc),
+    bic: decryptField(partner.bicEnc),
+    land: partner.land ?? "Nederland",
+    factuurType: partner.factuurType ?? "particulier",
+    kvkNummer: partner.kvkNummer ?? "",
+    btwNummer: partner.btwNummer ?? "",
+  };
+
   return (
-    <div className="mx-auto max-w-lg">
-      <h1 className="text-2xl font-extrabold tracking-tight text-ink">Profiel</h1>
-      <p className="mt-1 text-sm text-ink-500">
-        Jouw gegevens zoals bekend bij DogWare. Klopt er iets niet? Laat het ons
-        weten, dan passen we het aan.
-      </p>
+    <div className="mx-auto max-w-2xl">
+      {/* Warme introductie */}
+      <div>
+        <h1 className="text-2xl font-extrabold tracking-tight text-ink">
+          Jouw partnerprofiel
+        </h1>
+        <p className="mt-2 text-pretty text-[15px] leading-relaxed text-ink-500">
+          Fijn dat je partner bent van DogWare! Vul hieronder je gegevens aan
+          zodat wij je commissie eenvoudig kunnen uitbetalen wanneer één van
+          jouw referrals klant wordt.
+        </p>
+      </div>
 
-      <dl className="mt-6 divide-y divide-cream-100 rounded-2xl bg-white px-5 py-2 shadow-soft ring-1 ring-ink/5">
-        <Rij label="Naam" value={user.naam} />
-        <Rij label="E-mailadres" value={user.email} />
-        <Rij label="Bedrijf" value={partner?.bedrijfsnaam} />
-        <Rij label="Telefoon" value={partner?.telefoon} />
-        <Rij label="Website" value={partner?.website} />
-        <Rij label="Referralcode" value={partner?.referralCode} />
-        <Rij
-          label="Partner sinds"
-          value={partner?.activatedAt?.toLocaleDateString("nl-NL", {
-            day: "numeric",
-            month: "long",
-            year: "numeric",
-          })}
-        />
-      </dl>
+      {/* Referral-kaart */}
+      <div className="mt-6">
+        <ReferralCard link={link} code={partner.referralCode} qrDataUrl={qrDataUrl} />
+      </div>
 
-      <p className="mt-5 text-[13px] text-ink-300">
-        DogWare is volledig wachtwoordloos: je logt altijd in met een veilige
-        link of eenmalige code per e-mail.
-      </p>
+      {/* Partnerinformatie */}
+      <div className="mt-4 grid grid-cols-3 gap-3">
+        <Info label="Partner sinds" value={
+          (partner.activatedAt ?? partner.createdAt).toLocaleDateString("nl-NL", { month: "short", year: "numeric" })
+        } />
+        <Info label="Status" value={partner.status === "ACTIVE" ? "Actief" : partner.status} tone={partner.status === "ACTIVE" ? "sage" : "ink"} />
+        <Info label="Commissie" value={`${euro(partner.commissionCents)}`} sub="per website" tone="brand" />
+      </div>
+
+      {/* Formulier */}
+      <div className="mt-6">
+        <ProfileForm email={user.email} initial={initial} />
+      </div>
+    </div>
+  );
+}
+
+function Info({
+  label,
+  value,
+  sub,
+  tone = "ink",
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  tone?: "ink" | "sage" | "brand";
+}) {
+  const toneClass = tone === "brand" ? "text-brand" : tone === "sage" ? "text-sage-600" : "text-ink";
+  return (
+    <div className="rounded-2xl bg-white p-4 text-center shadow-soft ring-1 ring-ink/5">
+      <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-300">{label}</p>
+      <p className={`mt-1 text-[15px] font-extrabold ${toneClass}`}>{value}</p>
+      {sub && <p className="text-[10px] text-ink-300">{sub}</p>}
     </div>
   );
 }

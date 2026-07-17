@@ -138,13 +138,26 @@ export const partners = pgTable(
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "restrict" }),
+    // Profiel — door de partner zelf aangevuld
+    voornaam: text("voornaam"),
+    achternaam: text("achternaam"),
+    avatarUrl: text("avatar_url"),
     /** Optioneel — we vragen bij aanmaken alleen naam + e-mail */
     bedrijfsnaam: text("bedrijfsnaam"),
     telefoon: text("telefoon"),
     website: text("website"),
     adres: text("adres"),
-    kvkNummer: text("kvk_nummer"), // voorbereid voor later
-    btwNummer: text("btw_nummer"), // voorbereid voor later
+
+    // Uitbetalingen — IBAN/BIC versleuteld opgeslagen (enc:...)
+    rekeninghouder: text("rekeninghouder"),
+    ibanEnc: text("iban_enc"),
+    bicEnc: text("bic_enc"),
+    land: text("land"),
+
+    // Facturatie
+    factuurType: text("factuur_type").$type<"particulier" | "zakelijk">(),
+    kvkNummer: text("kvk_nummer"),
+    btwNummer: text("btw_nummer"),
     /** Publieke referralcode — hoofdletterongevoelig, uniek */
     referralCode: text("referral_code").notNull(),
     /** Beloning per verkochte website, in centen (server-side, aanpasbaar) */

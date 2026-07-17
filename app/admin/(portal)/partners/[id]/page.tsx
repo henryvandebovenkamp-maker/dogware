@@ -4,10 +4,22 @@ import { and, count, countDistinct, desc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { referralLinkFor } from "@/lib/referral";
 import { euro } from "@/lib/partner-data";
+import { decryptField } from "@/lib/crypto-field";
 import { LeadStatusBadge } from "../../leads/status-badge";
 import { PartnerAdminActions } from "./partner-actions";
 
 export const metadata = { title: "Partner" };
+
+function PayRow({ label, value, mono = false }: { label: string; value?: string | null; mono?: boolean }) {
+  return (
+    <div className="flex justify-between gap-3 py-0.5">
+      <dt className="text-[13px] text-ink-500">{label}</dt>
+      <dd className={`text-right text-[13px] font-bold text-ink ${mono ? "font-mono" : ""}`}>
+        {value?.trim() || "—"}
+      </dd>
+    </div>
+  );
+}
 
 export default async function PartnerDetailPage({
   params,
@@ -146,6 +158,41 @@ export default async function PartnerDetailPage({
             </ul>
           )}
         </div>
+      </div>
+
+      {/* Uitbetaalgegevens — ingevuld door de partner zelf */}
+      <div className="mt-5 rounded-2xl bg-white p-5 shadow-soft ring-1 ring-ink/5">
+        <h2 className="mb-3 text-sm font-extrabold text-ink">Uitbetaalgegevens</h2>
+        {!partner.ibanEnc && !partner.rekeninghouder ? (
+          <p className="text-[13px] text-ink-300">
+            De partner heeft de uitbetaalgegevens nog niet ingevuld.
+          </p>
+        ) : (
+          <dl className="grid gap-x-6 gap-y-1.5 sm:grid-cols-2">
+            <PayRow label="Rekeninghouder" value={partner.rekeninghouder} />
+            <PayRow label="IBAN" value={partner.ibanEnc ? decryptField(partner.ibanEnc) : null} mono />
+            <PayRow label="BIC" value={partner.bicEnc ? decryptField(partner.bicEnc) : null} mono />
+            <PayRow label="Land" value={partner.land} />
+            <PayRow
+              label="Facturatie"
+              value={partner.factuurType === "zakelijk" ? "Zakelijk" : partner.factuurType === "particulier" ? "Particulier" : null}
+            />
+            {partner.factuurType === "zakelijk" && (
+              <>
+                <PayRow label="KvK-nummer" value={partner.kvkNummer} />
+                <PayRow label="BTW-nummer" value={partner.btwNummer} />
+              </>
+            )}
+          </dl>
+        )}
+        {(partner.telefoon || partner.website) && (
+          <div className="mt-3 border-t border-cream-100 pt-3">
+            <dl className="grid gap-x-6 gap-y-1.5 sm:grid-cols-2">
+              <PayRow label="Telefoon" value={partner.telefoon} />
+              <PayRow label="Website" value={partner.website} />
+            </dl>
+          </div>
+        )}
       </div>
 
       {/* Beheeracties */}
