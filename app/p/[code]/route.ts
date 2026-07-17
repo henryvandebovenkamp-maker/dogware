@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { findPartnerByCode, recordReferralVisit } from "@/lib/referral";
+import { safeInternalPath } from "@/lib/roles";
 
 /**
  * Publieke partnerlink: https://dogware.../p/DW-XXXXXX
@@ -11,7 +12,9 @@ export async function GET(
   { params }: { params: Promise<{ code: string }> },
 ) {
   const { code } = await params;
-  const demoUrl = new URL("/demo", request.url);
+  // Terugkeerpad: alleen veilige interne paden, standaard de demo-aanvraag.
+  const next = safeInternalPath(request.nextUrl.searchParams.get("next")) ?? "/demo";
+  const demoUrl = new URL(next, request.url);
 
   try {
     const partner = await findPartnerByCode(code);

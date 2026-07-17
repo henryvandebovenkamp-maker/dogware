@@ -56,3 +56,14 @@ export const branding = {
 export function absoluteUrl(path: string): string {
   return `${branding.siteUrl}${path}`;
 }
+
+/**
+ * De vaste voordelen voor een nieuwe klant die via een persoonlijke
+ * partnerlink binnenkomt. Eén bron van waarheid, zodat de welkomstmelding,
+ * de bevestiging en (later) de daadwerkelijke korting hetzelfde tonen.
+ * Een partner kan hier in de toekomst van afwijken via newCustomerPerks.
+ */
+export const REFERRAL_BENEFITS = [
+  "10% korting op de opstartkosten",
+  "Je eerste maand van het abonnement gratis",
+] as const;

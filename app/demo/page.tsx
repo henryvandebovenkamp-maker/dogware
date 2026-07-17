@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import { Logo } from "@/components/brand";
 import { DemoExperience } from "@/components/demo/experience";
 import { getValidAttribution } from "@/lib/referral";
+import { REFERRAL_BENEFITS } from "@/lib/branding";
 import { getDb, schema } from "@/lib/db";
 
 export const metadata: Metadata = {
@@ -36,7 +37,12 @@ export default async function DemoPage({
   // Naam + voordelen gaan als prop mee de centrale demo-flow in, zodat de
   // ervaring identiek is aan een normale aanvraag — alleen met een
   // persoonlijke introductie bovenaan.
-  let partnerIntro: { name: string | null; perks: string[] } | null = null;
+  let partnerIntro: {
+    name: string | null;
+    firstName: string | null;
+    avatarUrl: string | null;
+    perks: string[];
+  } | null = null;
   const attribution = await getValidAttribution();
   if (attribution) {
     const db = getDb();
@@ -44,7 +50,10 @@ export default async function DemoPage({
       const rows = await db
         .select({
           perks: schema.partners.newCustomerPerks,
+          voornaam: schema.partners.voornaam,
+          achternaam: schema.partners.achternaam,
           bedrijfsnaam: schema.partners.bedrijfsnaam,
+          avatarUrl: schema.partners.avatarUrl,
           naam: schema.users.naam,
         })
         .from(schema.partners)
@@ -52,7 +61,18 @@ export default async function DemoPage({
         .where(eq(schema.partners.id, attribution.partnerId))
         .limit(1);
       const p = rows[0];
-      if (p) partnerIntro = { name: p.bedrijfsnaam ?? p.naam ?? null, perks: p.perks };
+      if (p) {
+        const volledigeNaam =
+          [p.voornaam, p.achternaam].filter(Boolean).join(" ").trim() || null;
+        partnerIntro = {
+          // Weergavenaam: bedrijfsnaam als die er is, anders de persoonsnaam.
+          name: p.bedrijfsnaam ?? volledigeNaam ?? p.naam ?? null,
+          firstName: p.voornaam ?? p.naam?.split(" ")[0] ?? null,
+          avatarUrl: p.avatarUrl ?? null,
+          // De vaste DogWare-voordelen, tenzij de partner eigen tekst instelde.
+          perks: p.perks.length > 0 ? p.perks : [...REFERRAL_BENEFITS],
+        };
+      }
     }
   }
 

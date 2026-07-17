@@ -90,7 +90,12 @@ export function DemoExperience({
 }: {
   uploadEnabled?: boolean;
   /** Alleen gevuld bij binnenkomst via een partner/affiliate. */
-  partner?: { name: string | null; perks: string[] } | null;
+  partner?: {
+    name: string | null;
+    firstName?: string | null;
+    avatarUrl?: string | null;
+    perks: string[];
+  } | null;
 }) {
   const [step, setStep] = useState<StepId>("naam");
   const [bedrijfsnaam, setBedrijfsnaam] = useState("");
@@ -296,6 +301,20 @@ export function DemoExperience({
           <LivePreview state={previewState} hero />
         </motion.div>
 
+        {partner && (
+          <p className="mx-auto mt-6 max-w-lg text-center text-[14px] leading-relaxed text-ink-500">
+            Je aanvraag is binnengekomen via{" "}
+            <span className="font-semibold text-ink">
+              {partner.firstName || partner.name}
+            </span>
+            . Je voordelen —{" "}
+            {partner.perks.length > 0
+              ? partner.perks.join(" en ").toLowerCase()
+              : "je korting en gratis eerste maand"}{" "}
+            — zijn geregistreerd.
+          </p>
+        )}
+
         <p className="mt-8 text-center text-[13px] text-ink-300">
           Check je inbox — de bevestiging is al onderweg.
         </p>
@@ -309,7 +328,12 @@ export function DemoExperience({
       {/* Persoonlijke introductie bij binnenkomst via een partner.
           Alleen tijdens de vragen; de finale is voor iedereen identiek. */}
       {partner && (
-        <PartnerWelcome perks={partner.perks} partnerName={partner.name} />
+        <PartnerWelcome
+          perks={partner.perks}
+          partnerName={partner.name}
+          firstName={partner.firstName}
+          avatarUrl={partner.avatarUrl}
+        />
       )}
 
       <div className="grid items-start gap-10 lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-14">
