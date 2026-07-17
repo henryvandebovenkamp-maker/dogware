@@ -342,10 +342,16 @@ export const leads = pgTable(
     // Bron van de aanvraag
     source: text("source").$type<LeadSource>().notNull().default("website"),
 
-    // Demo Journey — stage + voorbeeldwebsite-opzet
+    // Demo Journey — stage + handmatig geplaatste voorbeeldlinks
     stage: text("stage").$type<JourneyStage>().notNull().default("aangevraagd"),
-    demoTemplate: text("demo_template"),
+    /** Voorbeeldwebsite-URL (handmatig geplakt door de beheerder) */
     demoDomain: text("demo_domain"),
+    /** Demoportaal-URL */
+    demoPortalUrl: text("demo_portal_url"),
+    /** E-mailadres waarmee de klant inlogt (passwordless) */
+    demoLoginEmail: text("demo_login_email"),
+    // Behouden voor bestaande data (niet meer gebruikt):
+    demoTemplate: text("demo_template"),
     demoPrimaryColor: text("demo_primary_color"),
     demoSecondaryColor: text("demo_secondary_color"),
     /** Gekoppeld demo-klantaccount (passwordless magic login) */

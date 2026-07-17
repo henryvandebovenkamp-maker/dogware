@@ -1,19 +1,16 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import {
-  addTask,
   changeStage,
-  saveDemoSetup,
+  saveDemoLinks,
   sendDemo,
-  toggleTask,
   type JourneyActionState,
 } from "@/app/actions/journey";
-import { JOURNEY_STAGES, type JourneyStage, type JourneyTask } from "@/lib/db/schema";
+import { JOURNEY_STAGES, type JourneyStage } from "@/lib/db/schema";
 import { STAGE_META } from "@/lib/journey-stages";
 
 const IDLE: JourneyActionState = { status: "idle" };
-const TEMPLATES = ["Hondenschool", "Uitlaatservice", "Dierenarts", "Trimsalon", "Dierenopvang", "Anders"];
 
 function Feedback({ state }: { state: JourneyActionState }) {
   if (state.status === "idle" || !state.message) return null;
@@ -24,103 +21,127 @@ function Feedback({ state }: { state: JourneyActionState }) {
   );
 }
 
-/* ---------- Voorbeeldwebsite klaarzetten ---------- */
-export function DemoSetupForm({
+function CopyButton({ value, label }: { value: string; label: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      type="button"
+      disabled={!value}
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(value);
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1800);
+        } catch {
+          /* stil */
+        }
+      }}
+      className="rounded-full bg-cream-100 px-4 py-2 text-[12px] font-bold text-ink-700 transition hover:bg-cream-200 disabled:cursor-not-allowed disabled:opacity-40"
+    >
+      {copied ? "Gekopieerd" : label}
+    </button>
+  );
+}
+
+/**
+ * Extreem eenvoudig "Voorbeeld versturen"-scherm:
+ * drie velden, kopieerknoppen en één verstuurknop. Meer niet.
+ */
+export function DemoPanel({
   leadId,
-  template,
-  domein,
-  primair,
-  secundair,
+  website,
+  portaal,
+  loginEmail,
+  klantEmail,
+  alSent,
 }: {
   leadId: string;
-  template: string | null;
-  domein: string | null;
-  primair: string | null;
-  secundair: string | null;
+  website: string;
+  portaal: string;
+  loginEmail: string;
+  klantEmail: string;
+  alSent: boolean;
 }) {
-  const [state, action, pending] = useActionState(saveDemoSetup, IDLE);
+  const [saveState, saveAction, saving] = useActionState(saveDemoLinks, IDLE);
+  const [sendState, sendAction, sending] = useActionState(sendDemo, IDLE);
+
+  // Gecontroleerde velden zodat de kopieerknoppen de actuele waarde pakken
+  const [w, setW] = useState(website);
+  const [p, setP] = useState(portaal);
+  const [e, setE] = useState(loginEmail || klantEmail);
+
   return (
-    <form action={action} className="space-y-3">
-      <input type="hidden" name="leadId" value={leadId} />
-      <div className="grid gap-3 sm:grid-cols-2">
-        <label className="text-[12px] font-semibold text-ink-700">
-          Template
-          <select
-            name="template"
-            defaultValue={template ?? ""}
-            className="mt-1 w-full rounded-lg border border-cream-200 bg-white px-3 py-2 text-[13px] font-normal text-ink outline-none focus:border-brand"
-          >
-            <option value="">— kies —</option>
-            {TEMPLATES.map((t) => (
-              <option key={t}>{t}</option>
-            ))}
-          </select>
-        </label>
-        <label className="text-[12px] font-semibold text-ink-700">
-          Domein / subdomein
-          <input
-            name="domein"
-            defaultValue={domein ?? ""}
-            placeholder="voorbeeld.dogware.nl"
-            className="mt-1 w-full rounded-lg border border-cream-200 bg-white px-3 py-2 text-[13px] font-normal text-ink outline-none placeholder:text-ink-300 focus:border-brand"
-          />
-        </label>
-      </div>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <label className="text-[12px] font-semibold text-ink-700">
-          Primaire kleur
-          <input
-            name="primair"
-            defaultValue={primair ?? ""}
-            placeholder="#e0562a"
-            className="mt-1 w-full rounded-lg border border-cream-200 bg-white px-3 py-2 text-[13px] font-normal text-ink outline-none placeholder:text-ink-300 focus:border-brand"
-          />
-        </label>
-        <label className="text-[12px] font-semibold text-ink-700">
-          Secundaire kleur
-          <input
-            name="secundair"
-            defaultValue={secundair ?? ""}
-            placeholder="#3f6b53"
-            className="mt-1 w-full rounded-lg border border-cream-200 bg-white px-3 py-2 text-[13px] font-normal text-ink outline-none placeholder:text-ink-300 focus:border-brand"
-          />
-        </label>
-      </div>
-      <button
-        type="submit"
-        disabled={pending}
-        className="rounded-full bg-ink px-4 py-2 text-[12px] font-bold text-cream hover:bg-ink-700 disabled:opacity-60"
-      >
-        {pending ? "Opslaan…" : "Voorbeeldwebsite opslaan"}
-      </button>
-      <Feedback state={state} />
-    </form>
+    <div className="space-y-4">
+      <form action={saveAction} className="space-y-3">
+        <input type="hidden" name="leadId" value={leadId} />
+        <Field label="Voorbeeldwebsite URL" name="website" value={w} onChange={setW} placeholder="https://voorbeeld.example.nl" />
+        <Field label="Demoportaal URL" name="portaal" value={p} onChange={setP} placeholder="https://portaal.example.nl" />
+        <Field label="Login e-mailadres" name="loginEmail" value={e} onChange={setE} placeholder={klantEmail} type="email" />
+
+        <div className="flex flex-wrap gap-2">
+          <CopyButton value={w} label="Kopieer website-link" />
+          <CopyButton value={p} label="Kopieer portaal-link" />
+          <CopyButton value={e} label="Kopieer login" />
+        </div>
+
+        <button
+          type="submit"
+          disabled={saving}
+          className="rounded-full bg-ink px-4 py-2 text-[12px] font-bold text-cream hover:bg-ink-700 disabled:opacity-60"
+        >
+          {saving ? "Opslaan…" : "Links opslaan"}
+        </button>
+        <Feedback state={saveState} />
+      </form>
+
+      <form action={sendAction} className="border-t border-cream-100 pt-4">
+        <input type="hidden" name="leadId" value={leadId} />
+        <input type="hidden" name="website" value={w} />
+        <input type="hidden" name="loginEmail" value={e} />
+        <button
+          type="submit"
+          disabled={sending}
+          className="w-full rounded-full bg-brand px-5 py-3 text-[14px] font-bold text-white shadow-glow transition-all hover:-translate-y-0.5 hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:translate-y-0"
+        >
+          {sending ? "Versturen…" : alSent ? "Voorbeeld opnieuw versturen" : "Verstuur e-mail"}
+        </button>
+        <Feedback state={sendState} />
+      </form>
+    </div>
   );
 }
 
-/* ---------- Demo versturen ---------- */
-export function SendDemoButton({ leadId, alSent }: { leadId: string; alSent: boolean }) {
-  const [state, action, pending] = useActionState(sendDemo, IDLE);
+function Field({
+  label,
+  name,
+  value,
+  onChange,
+  placeholder,
+  type = "text",
+}: {
+  label: string;
+  name: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  type?: string;
+}) {
   return (
-    <form action={action}>
-      <input type="hidden" name="leadId" value={leadId} />
-      <button
-        type="submit"
-        disabled={pending}
-        className="w-full rounded-full bg-brand px-5 py-3 text-[14px] font-bold text-white shadow-glow transition-all hover:-translate-y-0.5 hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:translate-y-0"
-      >
-        {pending ? "Versturen…" : alSent ? "Demo opnieuw versturen" : "Demo versturen"}
-      </button>
-      <p className="mt-2 text-[11px] text-ink-300">
-        Maakt een passwordless demo-account aan en stuurt een warme,
-        persoonlijke mail met magic login.
-      </p>
-      <Feedback state={state} />
-    </form>
+    <label className="block text-[12px] font-semibold text-ink-700">
+      {label}
+      <input
+        name={name}
+        type={type}
+        value={value}
+        onChange={(ev) => onChange(ev.target.value)}
+        placeholder={placeholder}
+        className="mt-1 w-full rounded-lg border border-cream-200 bg-white px-3 py-2 text-[13px] font-normal text-ink outline-none placeholder:text-ink-300 focus:border-brand"
+      />
+    </label>
   );
 }
 
-/* ---------- Stage handmatig aanpassen ---------- */
+/** Stage handmatig aanpassen — compact. */
 export function StageControl({ leadId, current }: { leadId: string; current: JourneyStage }) {
   const [state, action, pending] = useActionState(changeStage, IDLE);
   return (
@@ -142,63 +163,9 @@ export function StageControl({ leadId, current }: { leadId: string; current: Jou
         disabled={pending}
         className="rounded-full bg-ink px-4 py-2 text-[12px] font-bold text-cream hover:bg-ink-700 disabled:opacity-60"
       >
-        {pending ? "…" : "Status zetten"}
+        {pending ? "…" : "Stap zetten"}
       </button>
       <Feedback state={state} />
     </form>
-  );
-}
-
-/* ---------- Interne taken ---------- */
-export function TaskList({ leadId, tasks }: { leadId: string; tasks: JourneyTask[] }) {
-  const [, action, pending] = useActionState(addTask, IDLE);
-  return (
-    <div>
-      <ul className="space-y-1.5">
-        {tasks.length === 0 && (
-          <li className="text-[13px] text-ink-300">Nog geen taken.</li>
-        )}
-        {tasks.map((t) => (
-          <li key={t.id} className="flex items-center gap-2.5">
-            <form action={toggleTask}>
-              <input type="hidden" name="taskId" value={t.id} />
-              <input type="hidden" name="leadId" value={leadId} />
-              <input type="hidden" name="done" value={(!t.done).toString()} />
-              <button
-                type="submit"
-                aria-label={t.done ? "Markeer als open" : "Markeer als gedaan"}
-                className={`flex h-5 w-5 items-center justify-center rounded-md border transition ${
-                  t.done ? "border-sage bg-sage text-white" : "border-cream-200 bg-white hover:border-brand"
-                }`}
-              >
-                {t.done && (
-                  <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none">
-                    <path d="M5 12.5l4.5 4.5L19 7.5" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                )}
-              </button>
-            </form>
-            <span className={`text-[13px] ${t.done ? "text-ink-300 line-through" : "text-ink-700"}`}>
-              {t.label}
-            </span>
-          </li>
-        ))}
-      </ul>
-      <form action={action} className="mt-3 flex gap-2">
-        <input type="hidden" name="leadId" value={leadId} />
-        <input
-          name="label"
-          placeholder="Nieuwe taak…"
-          className="flex-1 rounded-lg border border-cream-200 bg-white px-3 py-1.5 text-[13px] text-ink outline-none placeholder:text-ink-300 focus:border-brand"
-        />
-        <button
-          type="submit"
-          disabled={pending}
-          className="rounded-lg bg-cream-100 px-3 py-1.5 text-[12px] font-bold text-ink-700 hover:bg-cream-200 disabled:opacity-60"
-        >
-          +
-        </button>
-      </form>
-    </div>
   );
 }
