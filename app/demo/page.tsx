@@ -1,16 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { headers } from "next/headers";
+import { redirect } from "next/navigation";
+import { eq } from "drizzle-orm";
 import { Logo } from "@/components/brand";
 import { DemoExperience } from "@/components/demo/experience";
 import { PartnerWelcome } from "@/components/demo/partner-welcome";
-import {
-  findPartnerByCode,
-  getValidAttribution,
-  recordReferralVisit,
-} from "@/lib/referral";
+import { getValidAttribution } from "@/lib/referral";
 import { getDb, schema } from "@/lib/db";
-import { eq } from "drizzle-orm";
 
 export const metadata: Metadata = {
   title: "Bouw jouw DogWare",
@@ -22,6 +18,10 @@ export const metadata: Metadata = {
  * Wie via een partnerlink binnenkomt — /demo?ref=CODE of via /p/CODE —
  * wordt server-side gekoppeld en krijgt een warm welkom met de voordelen
  * die de partner voor hem heeft klaarstaan.
+ *
+ * Registreren van de klik (cookie zetten) mag alleen in een Route Handler,
+ * dus ?ref= stuurt eerst even door naar /p/CODE — dat registreert de klik en
+ * stuurt terug naar /demo. Vanaf hier lezen we alleen nog de koppeling.
  */
 export default async function DemoPage({
   searchParams,
@@ -29,20 +29,11 @@ export default async function DemoPage({
   searchParams: Promise<{ ref?: string }>;
 }) {
   const { ref } = await searchParams;
-
-  // 1. Verse referral via ?ref= registreren (bots/dubbel worden gefilterd)
   if (ref) {
-    const partner = await findPartnerByCode(ref);
-    if (partner && (partner.status === "ACTIVE" || partner.status === "PAUSED")) {
-      const h = await headers();
-      await recordReferralVisit(partner, {
-        landingPage: "/demo",
-        userAgent: h.get("user-agent"),
-      });
-    }
+    redirect(`/p/${encodeURIComponent(ref)}`);
   }
 
-  // 2. Actieve koppeling ophalen (ook na /p/CODE-redirect via de cookie)
+  // Actieve koppeling ophalen (via de cookie die /p/CODE heeft gezet)
   let welcomePerks: string[] | null = null;
   const attribution = await getValidAttribution();
   if (attribution) {
