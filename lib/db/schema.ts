@@ -216,6 +216,54 @@ export const activityLog = pgTable(
 );
 
 /* =========================================================================
+ * Formulierconcepten (autosave) — één generiek model voor alle formulieren
+ * ========================================================================= */
+
+export const DRAFT_STATUSES = [
+  "IN_PROGRESS",
+  "SUBMITTED",
+  "EXPIRED",
+  "ABANDONED",
+] as const;
+export type DraftStatus = (typeof DRAFT_STATUSES)[number];
+
+export const formDrafts = pgTable(
+  "form_drafts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    /** Bijv. "demo-intake", "partner-new", "profiel" */
+    formType: text("form_type").notNull(),
+    status: text("status").$type<DraftStatus>().notNull().default("IN_PROGRESS"),
+    /** Optimistic concurrency: elke save verhoogt dit */
+    version: integer("version").notNull().default(0),
+    currentStep: text("current_step"),
+    /** De (deels ingevulde) formulierinhoud — nooit gevoelige tokens/secrets */
+    payload: jsonb("payload").$type<Record<string, unknown>>().notNull().default({}),
+
+    /** Ingelogde eigenaar (null bij openbare bezoeker) */
+    userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
+    /** Openbare bezoeker: alleen de HASH van het drafttoken, nooit leesbaar */
+    anonymousTokenHash: text("anonymous_token_hash"),
+
+    lastSavedAt: timestamp("last_saved_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("drafts_user_idx").on(t.userId, t.formType),
+    uniqueIndex("drafts_anon_idx").on(t.anonymousTokenHash),
+    index("drafts_status_idx").on(t.status, t.expiresAt),
+    index("drafts_type_idx").on(t.formType, t.lastSavedAt),
+  ],
+);
+
+export type FormDraft = typeof formDrafts.$inferSelect;
+
+/* =========================================================================
  * Leads (demo-aanvragen) — één bron van waarheid
  * ========================================================================= */
 

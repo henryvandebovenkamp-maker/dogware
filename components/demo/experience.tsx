@@ -3,6 +3,9 @@
 import { AnimatePresence, motion } from "motion/react";
 import { useMemo, useState, useTransition } from "react";
 import { submitIntake } from "@/app/actions/intake";
+import { useAutosave } from "@/lib/drafts/use-autosave";
+import { SaveIndicator } from "@/components/drafts/save-indicator";
+import { RestoreBanner } from "@/components/drafts/restore-banner";
 import {
   DISCOVERY,
   ENERGY,
@@ -94,6 +97,78 @@ export function DemoExperience() {
   const [plaats, setPlaats] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const [restoreApplied, setRestoreApplied] = useState(false);
+
+  // Autosave gaat aan zodra er ergens inhoud is — afgeleid, geen effect nodig.
+  const interacted =
+    Boolean(bedrijfsnaam) ||
+    services.length > 0 ||
+    Boolean(discovery) ||
+    Boolean(naam) ||
+    Boolean(email) ||
+    Boolean(plaats) ||
+    Boolean(droom) ||
+    Boolean(siteUrl) ||
+    Boolean(siteGoed) ||
+    Boolean(siteMist) ||
+    energy.length > 0 ||
+    modules.length > 0;
+
+  // Volledige, herstelbare momentopname van het formulier voor autosave.
+  const draftValue = useMemo(
+    () => ({
+      step,
+      bedrijfsnaam,
+      services,
+      discovery,
+      siteUrl,
+      siteGoed,
+      siteMist,
+      energy,
+      modules,
+      droom,
+      naam,
+      email,
+      plaats,
+    }),
+    [step, bedrijfsnaam, services, discovery, siteUrl, siteGoed, siteMist, energy, modules, droom, naam, email, plaats],
+  );
+
+  const {
+    status: saveStatus,
+    lastSavedAt,
+    restored,
+    dismissRestored,
+    discardDraft,
+    flushNow,
+    markSubmitted,
+  } = useAutosave({
+    formType: "demo-intake",
+    value: draftValue,
+    step,
+    enabled: interacted,
+  });
+
+  // Herstel een teruggevonden concept precies zoals het was.
+  function applyRestored() {
+    if (!restored) return;
+    const p = restored.payload as Partial<typeof draftValue>;
+    if (p.bedrijfsnaam !== undefined) setBedrijfsnaam(p.bedrijfsnaam);
+    if (p.services) setServices(p.services);
+    if (p.discovery !== undefined) setDiscovery(p.discovery);
+    if (p.siteUrl !== undefined) setSiteUrl(p.siteUrl);
+    if (p.siteGoed !== undefined) setSiteGoed(p.siteGoed);
+    if (p.siteMist !== undefined) setSiteMist(p.siteMist);
+    if (p.energy) setEnergy(p.energy);
+    if (p.modules) setModules(p.modules);
+    if (p.droom !== undefined) setDroom(p.droom);
+    if (p.naam !== undefined) setNaam(p.naam);
+    if (p.email !== undefined) setEmail(p.email);
+    if (p.plaats !== undefined) setPlaats(p.plaats);
+    if (p.step && p.step !== "finale") setStep(p.step);
+    setRestoreApplied(true);
+    dismissRestored();
+  }
 
   const stepIndex: Record<Exclude<StepId, "finale">, number> = {
     naam: 0,
@@ -130,8 +205,12 @@ export function DemoExperience() {
       setError("Dat e-mailadres lijkt nog niet helemaal te kloppen.");
       return;
     }
+    if (pending) return; // dubbele submit voorkomen
     setError(null);
     startTransition(async () => {
+      // 1. Forceer een laatste autosave zodat niets verloren gaat.
+      await flushNow();
+
       const gekozenDiscovery = DISCOVERY.find((d) => d.key === discovery);
       const result = await submitIntake({
         ...EMPTY_INTAKE,
@@ -149,6 +228,8 @@ export function DemoExperience() {
         droomscenario: droom.trim(),
       });
       if (result.status === "success") {
+        // Concept afronden en lokaal vangnet opruimen.
+        await markSubmitted();
         setStep("finale");
       } else {
         setError(result.message ?? "Er ging iets mis. Probeer het nog eens.");
@@ -213,7 +294,20 @@ export function DemoExperience() {
     <div className="grid items-start gap-10 lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-14">
       {/* Vragenkant */}
       <div className="flex min-h-[26rem] flex-col">
-        <StepRoute labels={ROUTE_LABELS} current={stepIndex[step]} />
+        <div className="flex items-center justify-between gap-4">
+          <StepRoute labels={ROUTE_LABELS} current={stepIndex[step]} />
+          <SaveIndicator
+            status={saveStatus}
+            lastSavedAt={lastSavedAt}
+            onRetry={flushNow}
+          />
+        </div>
+
+        {restored && !restoreApplied && (
+          <div className="mt-6">
+            <RestoreBanner onResume={applyRestored} onDiscard={discardDraft} />
+          </div>
+        )}
 
         <div className="mt-12 flex-1">
           <AnimatePresence mode="wait">
