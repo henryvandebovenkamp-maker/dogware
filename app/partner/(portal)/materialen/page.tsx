@@ -1,6 +1,7 @@
 import Image from "next/image";
 import { requirePartner } from "@/lib/auth/session";
 import { branding } from "@/lib/branding";
+import { referralLinkFor } from "@/lib/referral";
 import { getPartnerForUser } from "@/lib/partner-data";
 import { ShareLink } from "@/components/partner/share-link";
 
@@ -9,7 +10,7 @@ export const metadata = { title: "Materialen" };
 export default async function MaterialenPage() {
   const user = await requirePartner();
   const partner = await getPartnerForUser(user.id);
-  const link = partner ? `${branding.siteUrl}/p/${partner.referralCode}` : branding.siteUrl;
+  const link = partner ? referralLinkFor(partner.referralCode) : branding.siteUrl;
 
   return (
     <div>

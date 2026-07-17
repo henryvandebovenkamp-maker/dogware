@@ -6,40 +6,6 @@ import { createPartner, type PartnerActionState } from "@/app/actions/partners";
 
 const IDLE: PartnerActionState = { status: "idle" };
 
-function Field({
-  label,
-  name,
-  type = "text",
-  required = false,
-  placeholder,
-  hint,
-}: {
-  label: string;
-  name: string;
-  type?: string;
-  required?: boolean;
-  placeholder?: string;
-  hint?: string;
-}) {
-  return (
-    <div>
-      <label htmlFor={name} className="mb-1.5 block text-[13px] font-semibold text-ink-700">
-        {label}
-        {required && <span className="text-brand"> *</span>}
-      </label>
-      <input
-        id={name}
-        name={name}
-        type={type}
-        required={required}
-        placeholder={placeholder}
-        className="w-full rounded-xl border border-cream-200 bg-white px-4 py-2.5 text-[14px] text-ink outline-none transition placeholder:text-ink-300 focus:border-brand focus:ring-2 focus:ring-brand/20"
-      />
-      {hint && <p className="mt-1 text-[11px] text-ink-300">{hint}</p>}
-    </div>
-  );
-}
-
 export function NewPartnerForm() {
   const [state, action, pending] = useActionState(createPartner, IDLE);
 
@@ -58,7 +24,7 @@ export function NewPartnerForm() {
             href="/admin/partners/new"
             className="rounded-full px-5 py-2.5 text-sm font-semibold text-ink-500 ring-1 ring-ink/10 hover:ring-ink/25"
           >
-            Nog één toevoegen
+            Nog iemand uitnodigen
           </Link>
         </div>
       </div>
@@ -66,36 +32,66 @@ export function NewPartnerForm() {
   }
 
   return (
-    <form action={action} className="space-y-4">
+    <form action={action} className="space-y-5">
+      {/* Alleen naam + e-mail */}
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Naam contactpersoon" name="naam" required placeholder="Sanne Bakker" />
-        <Field label="Bedrijfsnaam" name="bedrijfsnaam" required placeholder="Hondenschool De Vrije Loop" />
-      </div>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="E-mailadres" name="email" type="email" required placeholder="sanne@bedrijf.nl" />
-        <Field label="Telefoonnummer" name="telefoon" placeholder="06 12 34 56 78" />
-      </div>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Website" name="website" placeholder="www.bedrijf.nl" />
-        <Field label="Adres" name="adres" placeholder="Straat 1, Plaats" />
-      </div>
-      <Field
-        label="Eigen referralcode (optioneel)"
-        name="referralCode"
-        placeholder="HONDENSCHOOL-JANSEN"
-        hint="Leeg laten voor een automatisch gegenereerde code (DW-XXXXXX). Niet hoofdlettergevoelig."
-      />
-      <div>
-        <label htmlFor="notitie" className="mb-1.5 block text-[13px] font-semibold text-ink-700">
-          Interne notitie
+        <label className="text-[13px] font-semibold text-ink-700">
+          Naam <span className="text-brand">*</span>
+          <input
+            name="naam"
+            required
+            placeholder="Sanne Bakker"
+            className="mt-1 w-full rounded-xl border border-cream-200 bg-white px-4 py-2.5 text-[14px] font-normal text-ink outline-none placeholder:text-ink-300 focus:border-brand focus:ring-2 focus:ring-brand/20"
+          />
         </label>
-        <textarea
-          id="notitie"
-          name="notitie"
-          rows={2}
-          placeholder="Alleen zichtbaar voor beheer"
-          className="w-full resize-y rounded-xl border border-cream-200 bg-white px-4 py-2.5 text-[14px] text-ink outline-none transition placeholder:text-ink-300 focus:border-brand focus:ring-2 focus:ring-brand/20"
-        />
+        <label className="text-[13px] font-semibold text-ink-700">
+          E-mailadres <span className="text-brand">*</span>
+          <input
+            name="email"
+            type="email"
+            required
+            placeholder="sanne@voorbeeld.nl"
+            className="mt-1 w-full rounded-xl border border-cream-200 bg-white px-4 py-2.5 text-[14px] font-normal text-ink outline-none placeholder:text-ink-300 focus:border-brand focus:ring-2 focus:ring-brand/20"
+          />
+        </label>
+      </div>
+
+      <div className="rounded-2xl bg-cream/60 p-4">
+        <p className="text-[12px] font-bold uppercase tracking-wide text-ink-300">
+          Beloning voor de partner
+        </p>
+        <label className="mt-2 block text-[13px] font-semibold text-ink-700">
+          Bedrag per verkochte website (€)
+          <div className="mt-1 flex items-center gap-2">
+            <span className="text-ink-500">€</span>
+            <input
+              name="beloning"
+              type="number"
+              min={0}
+              step={50}
+              defaultValue={500}
+              className="w-32 rounded-xl border border-cream-200 bg-white px-4 py-2.5 text-[14px] font-normal text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
+            />
+          </div>
+        </label>
+      </div>
+
+      <div className="rounded-2xl bg-cream/60 p-4">
+        <p className="text-[12px] font-bold uppercase tracking-wide text-ink-300">
+          Voordeel voor de nieuwe klant
+        </p>
+        <label className="mt-2 block text-[13px] font-semibold text-ink-700">
+          Eén voordeel per regel
+          <textarea
+            name="perks"
+            rows={3}
+            defaultValue={"10% korting op jouw nieuwe website\nDe eerste maand abonnement cadeau"}
+            className="mt-1 w-full resize-y rounded-xl border border-cream-200 bg-white px-4 py-2.5 text-[14px] font-normal text-ink outline-none placeholder:text-ink-300 focus:border-brand focus:ring-2 focus:ring-brand/20"
+          />
+        </label>
+        <p className="mt-1 text-[11px] text-ink-300">
+          Deze voordelen ziet de bezoeker die via deze partner binnenkomt.
+        </p>
       </div>
 
       {state.status === "error" && (
@@ -107,8 +103,12 @@ export function NewPartnerForm() {
         disabled={pending}
         className="w-full rounded-full bg-brand px-6 py-3 text-[15px] font-bold text-white shadow-glow transition-all hover:-translate-y-0.5 hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:translate-y-0"
       >
-        {pending ? "Aanmaken en uitnodigen…" : "Maak partner aan en verstuur uitnodiging"}
+        {pending ? "Partner activeren…" : "Partner activeren"}
       </button>
+      <p className="text-center text-[11px] text-ink-300">
+        We maken meteen een account + persoonlijke link aan en sturen een warme
+        uitnodiging.
+      </p>
     </form>
   );
 }

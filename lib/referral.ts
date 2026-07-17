@@ -29,12 +29,18 @@ const BOT_UA =
 
 const CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // zonder 0/O/1/I/L
 
-/** Genereer een onvoorspelbare code als DW-A7K4P2. */
+/** Genereer een onvoorspelbare, schone code (bijv. A7K4P2X9). Opgeslagen in hoofdletters. */
 export function generateReferralCode(): string {
-  const bytes = randomBytes(6);
+  const bytes = randomBytes(9);
   let code = "";
-  for (let i = 0; i < 6; i++) code += CODE_ALPHABET[bytes[i] % CODE_ALPHABET.length];
-  return `DW-${code}`;
+  for (let i = 0; i < 9; i++) code += CODE_ALPHABET[bytes[i] % CODE_ALPHABET.length];
+  return code;
+}
+
+/** De persoonlijke uitnodigingslink van een partner: dogware.nl/demo?ref=... */
+export function referralLinkFor(code: string): string {
+  const base = process.env.NEXT_PUBLIC_SITE_URL ?? "https://dogware.vercel.app";
+  return `${base}/demo?ref=${code.toLowerCase()}`;
 }
 
 /** Normaliseer invoer: niet hoofdlettergevoelig, alleen veilige tekens. */

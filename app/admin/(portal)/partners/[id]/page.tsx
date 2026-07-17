@@ -2,7 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { and, count, countDistinct, desc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
-import { branding } from "@/lib/branding";
+import { referralLinkFor } from "@/lib/referral";
+import { euro } from "@/lib/partner-data";
 import { LeadStatusBadge } from "../../leads/status-badge";
 import { PartnerAdminActions } from "./partner-actions";
 
@@ -60,7 +61,7 @@ export default async function PartnerDetailPage({
       .limit(15),
   ]);
 
-  const referralLink = `${branding.siteUrl}/p/${partner.referralCode}`;
+  const referralLink = referralLinkFor(partner.referralCode);
   const conversie =
     clickStats.uniek > 0 ? Math.round((leads.length / Number(clickStats.uniek)) * 100) : 0;
 
@@ -73,7 +74,7 @@ export default async function PartnerDetailPage({
       <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-extrabold tracking-tight text-ink">
-            {partner.bedrijfsnaam}
+            {partner.bedrijfsnaam ?? user.naam}
           </h1>
           <p className="mt-1 text-sm text-ink-500">
             {user.naam} · {user.email}
@@ -116,6 +117,35 @@ export default async function PartnerDetailPage({
         <p className="mt-1 break-all font-mono text-sm font-semibold text-brand">
           {referralLink}
         </p>
+      </div>
+
+      {/* Beloning & klantvoordelen */}
+      <div className="mt-5 grid gap-4 sm:grid-cols-2">
+        <div className="rounded-2xl bg-white p-5 shadow-soft ring-1 ring-ink/5">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-300">
+            Beloning
+          </p>
+          <p className="mt-1 text-lg font-extrabold text-ink">
+            {euro(partner.commissionCents)}{" "}
+            <span className="text-[13px] font-semibold text-ink-500">per verkochte website</span>
+          </p>
+        </div>
+        <div className="rounded-2xl bg-white p-5 shadow-soft ring-1 ring-ink/5">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-300">
+            Voordeel voor de nieuwe klant
+          </p>
+          {partner.newCustomerPerks.length === 0 ? (
+            <p className="mt-1 text-[13px] text-ink-300">Geen voordelen ingesteld.</p>
+          ) : (
+            <ul className="mt-1 space-y-0.5">
+              {partner.newCustomerPerks.map((perk) => (
+                <li key={perk} className="text-[13px] font-semibold text-ink-700">
+                  ✓ {perk}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       </div>
 
       {/* Beheeracties */}

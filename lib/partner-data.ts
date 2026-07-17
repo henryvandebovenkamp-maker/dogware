@@ -75,10 +75,56 @@ export async function getPartnerLeads(partnerId: string) {
       bedrijfsnaam: schema.leads.bedrijfsnaam,
       plaats: schema.leads.plaats,
       status: schema.leads.status,
+      stage: schema.leads.stage,
       referralCodeSnapshot: schema.leads.referralCodeSnapshot,
     })
     .from(schema.leads)
     .where(eq(schema.leads.affiliatePartnerId, partnerId))
     .orderBy(desc(schema.leads.createdAt));
   return rows;
+}
+
+/**
+ * Commissie-overzicht — volledig server-side berekend.
+ * Een verkoop = een journey die 'gestart' (project gestart) heeft bereikt.
+ * Gereserveerd = akkoord gegeven maar nog niet gestart.
+ * In behandeling = er loopt een gesprek/voorstel.
+ */
+export async function getPartnerCommission(
+  partnerId: string,
+  commissionCents: number,
+) {
+  const db = getDb();
+  if (!db) {
+    return { verkocht: 0, verdiendCents: 0, gereserveerd: 0, inBehandeling: 0 };
+  }
+  const rows = await db
+    .select({ stage: schema.leads.stage })
+    .from(schema.leads)
+    .where(eq(schema.leads.affiliatePartnerId, partnerId));
+
+  let verkocht = 0;
+  let gereserveerd = 0;
+  let inBehandeling = 0;
+  for (const r of rows) {
+    if (r.stage === "gestart") verkocht += 1;
+    else if (r.stage === "akkoord") gereserveerd += 1;
+    else if (r.stage === "offerte" || r.stage === "afspraak") inBehandeling += 1;
+  }
+  return {
+    verkocht,
+    verdiendCents: verkocht * commissionCents,
+    gereserveerd,
+    inBehandeling,
+  };
+}
+
+/** Bedrag in centen als nette euro-tekst. */
+export function euro(cents: number): string {
+  return new Intl.NumberFormat("nl-NL", {
+    style: "currency",
+    currency: "EUR",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(cents / 100);
 }

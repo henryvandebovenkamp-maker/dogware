@@ -11,6 +11,7 @@ import {
 } from "@/lib/auth/challenge";
 import { createSession, destroySession } from "@/lib/auth/session";
 import { consumeToken } from "@/lib/auth/tokens";
+import { referralLinkFor } from "@/lib/referral";
 import { logActivity } from "@/lib/audit";
 import { sendPartnerActivated } from "@/lib/email/send";
 
@@ -150,7 +151,7 @@ export async function acceptInvite(
     await sendPartnerActivated(
       user.email,
       user.naam,
-      `${branding.siteUrl}/p/${partner.referralCode}`,
+      referralLinkFor(partner.referralCode),
       `${branding.siteUrl}/partner`,
     );
   }

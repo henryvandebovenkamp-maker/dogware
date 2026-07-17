@@ -36,35 +36,33 @@ export async function createPartner(
   const db = getDb();
   if (!db) return { status: "error", message: "Database niet geconfigureerd." };
 
+  // Alleen naam + e-mail nodig. Beloning en klantvoordelen zijn optioneel.
   const naam = String(formData.get("naam") ?? "").trim();
-  const bedrijfsnaam = String(formData.get("bedrijfsnaam") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
-  const telefoon = String(formData.get("telefoon") ?? "").trim();
-  const website = String(formData.get("website") ?? "").trim();
-  const adres = String(formData.get("adres") ?? "").trim();
-  const notitie = String(formData.get("notitie") ?? "").trim();
-  const eigenCode = String(formData.get("referralCode") ?? "").trim();
+  const beloningEuro = Number(String(formData.get("beloning") ?? "500").replace(",", "."));
+  const perks = String(formData.get("perks") ?? "")
+    .split("\n")
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .slice(0, 5);
 
-  if (!naam || !bedrijfsnaam || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return {
-      status: "error",
-      message: "Vul minimaal naam, bedrijfsnaam en een geldig e-mailadres in.",
-    };
+  if (!naam || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { status: "error", message: "Vul een naam en een geldig e-mailadres in." };
   }
 
-  // Referralcode: eigen keuze of gegenereerd — altijd genormaliseerd en uniek
-  let referralCode: string;
-  if (eigenCode) {
-    const normalized = normalizeReferralCode(eigenCode);
-    if (!normalized) {
-      return {
-        status: "error",
-        message:
-          "Eigen referralcode mag alleen letters, cijfers en streepjes bevatten (4–40 tekens).",
-      };
-    }
-    referralCode = normalized;
-  } else {
+  const commissionCents = Number.isFinite(beloningEuro)
+    ? Math.max(0, Math.round(beloningEuro * 100))
+    : 50000;
+
+  // Unieke code automatisch genereren (nooit handmatig)
+  let referralCode = generateReferralCode();
+  for (let i = 0; i < 5; i++) {
+    const [inUse] = await db
+      .select({ id: schema.partners.id })
+      .from(schema.partners)
+      .where(eq(schema.partners.referralCode, referralCode))
+      .limit(1);
+    if (!inUse) break;
     referralCode = generateReferralCode();
   }
 
@@ -76,14 +74,6 @@ export async function createPartner(
   if (existingUser) {
     return { status: "error", message: "Er bestaat al een account met dit e-mailadres." };
   }
-  const [existingCode] = await db
-    .select({ id: schema.partners.id })
-    .from(schema.partners)
-    .where(eq(schema.partners.referralCode, referralCode))
-    .limit(1);
-  if (existingCode) {
-    return { status: "error", message: "Deze referralcode is al in gebruik." };
-  }
 
   const [user] = await db
     .insert(schema.users)
@@ -94,12 +84,9 @@ export async function createPartner(
     .insert(schema.partners)
     .values({
       userId: user.id,
-      bedrijfsnaam,
-      telefoon: telefoon || null,
-      website: website || null,
-      adres: adres || null,
-      notitie: notitie || null,
       referralCode,
+      commissionCents,
+      newCustomerPerks: perks,
       status: "INVITED",
       invitedAt: new Date(),
     })
@@ -110,7 +97,7 @@ export async function createPartner(
     action: "PARTNER_CREATED",
     objectType: "partner",
     objectId: partner.id,
-    newValue: { bedrijfsnaam, email, referralCode },
+    newValue: { naam, email, referralCode, commissionCents },
   });
 
   const token = await issueToken(user.id, "INVITE");

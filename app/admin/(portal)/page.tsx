@@ -150,7 +150,7 @@ export default async function AdminDashboard() {
                   >
                     <span className="min-w-0">
                       <span className="block truncate text-[13px] font-bold text-ink">
-                        {partner.bedrijfsnaam}
+                        {partner.bedrijfsnaam ?? user.naam}
                       </span>
                       <span className="block text-[11px] text-ink-300">
                         {user.naam} · {partner.referralCode}

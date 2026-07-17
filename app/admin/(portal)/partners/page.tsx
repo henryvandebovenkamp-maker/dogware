@@ -54,7 +54,7 @@ export default async function PartnersPage({
   const filtered = partners.filter(({ partner, user }) => {
     if (status && partner.status !== status) return false;
     if (!term) return true;
-    return [partner.bedrijfsnaam, user.naam, user.email, partner.referralCode]
+    return [partner.bedrijfsnaam ?? user.naam, user.naam, user.email, partner.referralCode]
       .join(" ")
       .toLowerCase()
       .includes(term);
@@ -129,7 +129,7 @@ export default async function PartnersPage({
               >
                 <span className="min-w-0">
                   <span className="block truncate font-extrabold text-ink">
-                    {partner.bedrijfsnaam}
+                    {partner.bedrijfsnaam ?? user.naam}
                   </span>
                   <span className="block truncate text-[13px] text-ink-500">
                     {user.naam} · {user.email} ·{" "}

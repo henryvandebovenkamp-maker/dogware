@@ -138,14 +138,19 @@ export const partners = pgTable(
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "restrict" }),
-    bedrijfsnaam: text("bedrijfsnaam").notNull(),
+    /** Optioneel — we vragen bij aanmaken alleen naam + e-mail */
+    bedrijfsnaam: text("bedrijfsnaam"),
     telefoon: text("telefoon"),
     website: text("website"),
     adres: text("adres"),
     kvkNummer: text("kvk_nummer"), // voorbereid voor later
     btwNummer: text("btw_nummer"), // voorbereid voor later
-    /** Publieke referralcode — altijd hoofdletters, uniek */
+    /** Publieke referralcode — hoofdletterongevoelig, uniek */
     referralCode: text("referral_code").notNull(),
+    /** Beloning per verkochte website, in centen (server-side, aanpasbaar) */
+    commissionCents: integer("commission_cents").notNull().default(50000),
+    /** Voordelen voor de nieuwe klant die via deze partner binnenkomt */
+    newCustomerPerks: jsonb("new_customer_perks").$type<string[]>().notNull().default([]),
     status: text("status").$type<PartnerStatus>().notNull().default("INVITED"),
     notitie: text("notitie"),
     invitedAt: timestamp("invited_at", { withTimezone: true }),
