@@ -5,6 +5,7 @@ import { and, eq, gt } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import type { User, UserRole } from "@/lib/db/schema";
 import { generateToken, hashToken } from "./crypto";
+import { ROLE_HOME } from "@/lib/roles";
 
 const SESSION_COOKIE = "dw_session";
 
@@ -17,9 +18,9 @@ const SESSION_DAYS: Record<UserRole, number> = {
 
 /** Bestemming per rol na inloggen — altijd server-side bepaald, nooit via de client. */
 export const ROLE_DESTINATIONS: Record<UserRole, string> = {
-  SUPER_ADMIN: "/admin",
-  AFFILIATE_PARTNER: "/partner",
-  CUSTOMER: "/account",
+  SUPER_ADMIN: ROLE_HOME.SUPER_ADMIN.href,
+  AFFILIATE_PARTNER: ROLE_HOME.AFFILIATE_PARTNER.href,
+  CUSTOMER: ROLE_HOME.CUSTOMER.href,
 };
 
 /* ---------- Sessiebeheer ---------- */

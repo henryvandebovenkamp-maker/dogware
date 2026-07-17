@@ -1,6 +1,6 @@
 "use server";
 
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
@@ -45,6 +45,22 @@ export async function requestLogin(
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   if (!email) {
     return { status: "error", message: "Vul je e-mailadres in." };
+  }
+
+  // Veilige terugkeer-URL bewaren voor na de login (kortdurende cookie).
+  const { safeInternalPath } = await import("@/lib/roles");
+  const next = safeInternalPath(String(formData.get("next") ?? ""));
+  const jar = await cookies();
+  if (next) {
+    jar.set("dw_login_next", next, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: 900,
+    });
+  } else {
+    jar.delete("dw_login_next");
   }
 
   const ua = (await headers()).get("user-agent");

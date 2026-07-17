@@ -35,7 +35,7 @@ function SubmitButton({
  * 1. e-mailadres → inlogmail met Magic Link + Magic Code
  * 2. code invoeren (of de link in de mail aanklikken)
  */
-export function LoginForm() {
+export function LoginForm({ next }: { next?: string }) {
   const [reqState, reqAction, reqPending] = useActionState(requestLogin, IDLE);
   const [codeState, codeAction, codePending] = useActionState(loginWithCode, IDLE);
   const [cooldown, setCooldown] = useState(0);
@@ -111,9 +111,10 @@ export function LoginForm() {
       }}
       className="space-y-4"
     >
+      {next && <input type="hidden" name="next" value={next} />}
       <p className="text-[13px] leading-relaxed text-ink-500">
         Vul je e-mailadres in. Je ontvangt direct een veilige inloglink en een
-        eenmalige code — zonder wachtwoord.
+        eenmalige code, zonder wachtwoord.
       </p>
       <AuthField
         label="E-mailadres"

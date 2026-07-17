@@ -299,7 +299,18 @@ async function completeLogin(
     objectId: user.id,
   });
 
-  // Bestemming altijd server-side uit de rol — nooit uit een frontendparameter
+  // Bestemming: standaard de eigen omgeving van de rol. Een eerder bewaarde,
+  // veilige terugkeer-URL wordt alleen gebruikt als de rol er toegang toe heeft.
   const { ROLE_DESTINATIONS } = await import("./session");
-  return { ok: true, user, destination: ROLE_DESTINATIONS[user.role] };
+  const { roleMayAccess, safeInternalPath } = await import("@/lib/roles");
+  const { cookies } = await import("next/headers");
+  let destination = ROLE_DESTINATIONS[user.role];
+  const jar = await cookies();
+  const next = safeInternalPath(jar.get("dw_login_next")?.value);
+  if (next && roleMayAccess(user.role, next)) {
+    destination = next;
+  }
+  jar.delete("dw_login_next");
+
+  return { ok: true, user, destination };
 }
