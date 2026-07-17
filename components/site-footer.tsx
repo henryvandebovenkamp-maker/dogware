@@ -28,7 +28,7 @@ const COLS = [
     links: [
       { label: "Waarom DogWare", href: "#verschil" },
       { label: "Demo aanvragen", href: "/demo" },
-      { label: "Inloggen", href: "#demo" },
+      { label: "Partner inloggen", href: "/partner/login" },
       { label: "Contact", href: "/demo" },
     ],
   },
@@ -69,11 +69,14 @@ export function SiteFooter() {
         <div className="mt-12 flex flex-col items-center justify-between gap-3 border-t border-cream-200 pt-6 text-sm text-ink-300 sm:flex-row">
           <p>© {new Date().getFullYear()} DogWare. Werk met honden. Wij regelen de rest.</p>
           <div className="flex gap-5">
-            <Link href="#" className="transition-colors hover:text-ink">
+            <Link href="/privacy" className="transition-colors hover:text-ink">
               Privacy
             </Link>
-            <Link href="#" className="transition-colors hover:text-ink">
+            <Link href="/voorwaarden" className="transition-colors hover:text-ink">
               Voorwaarden
+            </Link>
+            <Link href="/cookies" className="transition-colors hover:text-ink">
+              Cookies
             </Link>
           </div>
         </div>

@@ -31,7 +31,7 @@ export const branding = {
   ],
 
   /** Productie-URL; lokaal/preview overschrijfbaar via NEXT_PUBLIC_SITE_URL */
-  siteUrl: process.env.NEXT_PUBLIC_SITE_URL ?? "https://dogware.vercel.app",
+  siteUrl: process.env.NEXT_PUBLIC_SITE_URL ?? "https://dogware.nl",
 
   /** Merk-kleuren (gelijk aan de tokens in globals.css) */
   colors: {

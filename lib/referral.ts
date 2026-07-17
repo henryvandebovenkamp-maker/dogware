@@ -39,7 +39,7 @@ export function generateReferralCode(): string {
 
 /** De persoonlijke uitnodigingslink van een partner: dogware.nl/demo?ref=... */
 export function referralLinkFor(code: string): string {
-  const base = process.env.NEXT_PUBLIC_SITE_URL ?? "https://dogware.vercel.app";
+  const base = process.env.NEXT_PUBLIC_SITE_URL ?? "https://dogware.nl";
   return `${base}/demo?ref=${code.toLowerCase()}`;
 }
 
