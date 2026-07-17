@@ -52,7 +52,7 @@ export function PartnerInviteEmail({
         </Text>
       </Section>
       <Text style={paragraph}>
-        Activeer je plek met één klik — geen wachtwoord nodig, voortaan log je
+        Activeer je plek met één klik. Je hebt geen wachtwoord nodig; voortaan log je
         in met een veilige link:
       </Text>
       <Section style={{ textAlign: "center", padding: "12px 0 4px" }}>
@@ -75,7 +75,10 @@ export function PartnerInviteEmail({
         {opnieuw && "Je eerdere link is hiermee vervallen. "}
         Verwachtte je dit niet? Dan mag je deze mail rustig negeren.
       </Text>
-      <Signature />
+      <Signature
+        groet="Hartelijke groet,"
+        regel="Met dezelfde passie voor dieren als jij."
+      />
     </EmailLayout>
   );
 }

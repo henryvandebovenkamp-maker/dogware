@@ -18,7 +18,7 @@ export function MagicLoginEmail({
 
   return (
     <EmailLayout
-      preview={`Je inlogcode is ${nette} — of log direct in met één klik`}
+      preview={`Je inlogcode is ${nette}, of log direct in met één klik`}
       heading={`Log veilig in, ${naam}`}
     >
       <Text style={paragraph}>

@@ -13,7 +13,7 @@ export function PartnerActivatedEmail({
 }) {
   return (
     <EmailLayout
-      preview="Je partneraccount is actief — hier is je persoonlijke link"
+      preview="Je partneraccount is actief. Hier is je persoonlijke link"
       heading={`Je account is actief, ${naam}!`}
     >
       <Text style={paragraph}>

@@ -1,5 +1,5 @@
 import { Text } from "@react-email/components";
-import { EmailLayout, paragraph, strong } from "./base";
+import { EmailLayout, Signature, paragraph, strong } from "./base";
 
 /** Bevestiging aan de aanvrager: we hebben je demo-aanvraag ontvangen. */
 export function DemoConfirmationEmail({ naam }: { naam: string }) {
@@ -18,16 +18,10 @@ export function DemoConfirmationEmail({ naam }: { naam: string }) {
         jouw bedrijf.
       </Text>
       <Text style={paragraph}>
-        Tot snel — en tot die tijd: doe waar je goed in bent. Werk met honden,
-        wij regelen de rest.
+        Tot snel. En doe tot die tijd waar je goed in bent: werken met honden.
+        De rest regelen wij.
       </Text>
-      <Text style={{ ...paragraph, margin: "20px 0 0" }}>
-        Hartelijke groet,
-        <br />
-        <span style={strong}>Henry van de Bovenkamp</span>
-        <br />
-        Oprichter van DogWare
-      </Text>
+      <Signature groet="Hartelijke groet," />
     </EmailLayout>
   );
 }

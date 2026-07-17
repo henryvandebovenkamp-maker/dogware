@@ -81,7 +81,7 @@ export function EmailLayout({
           >
             <Img
               src={absoluteUrl(branding.logo.email)}
-              alt={`${branding.name} — ${branding.slogan}`}
+              alt={`${branding.name}. ${branding.slogan}`}
               width="192"
               height="96"
             />
@@ -115,7 +115,7 @@ export function EmailLayout({
             >
               Gemaakt met liefde voor honden en hun mensen. 🐾
               <br />
-              {branding.name} — {branding.slogan}.
+              {branding.name}. {branding.slogan}.
             </Text>
           </Section>
         </Container>
@@ -138,17 +138,34 @@ export const strong = {
   fontWeight: 700,
 } as const;
 
-/** Warme, persoonlijke ondertekening van Henry — voor klant-mails. */
-export function Signature() {
+/**
+ * Persoonlijke ondertekening van Henry. Één centrale plek zodat elke mail
+ * dezelfde, natuurlijke afsluiting krijgt.
+ *
+ * @param groet   De aanhef van de afsluiting (past bij de toon van de mail).
+ * @param regel   Optionele korte, warme slotregel boven de groet. Alleen
+ *                gebruiken als die de mail echt versterkt.
+ */
+export function Signature({
+  groet = "Met vriendelijke groet,",
+  regel,
+}: {
+  groet?: string;
+  regel?: string;
+} = {}) {
   return (
-    <Text style={{ ...paragraph, margin: "20px 0 0" }}>
-      Een hartelijke groet,
-      <br />
-      <span style={strong}>Henry</span>
-      <br />
-      <span style={{ fontSize: 13, color: emailColors.inkSoft }}>
-        DogWare — en zelf ook hondenmens
-      </span>
-    </Text>
+    <>
+      {regel && (
+        <Text style={{ ...paragraph, margin: "18px 0 0" }}>{regel}</Text>
+      )}
+      <Text style={{ ...paragraph, margin: regel ? "12px 0 0" : "20px 0 0" }}>
+        {groet}
+        <br />
+        <br />
+        <span style={strong}>Henry van de Bovenkamp</span>
+        <br />
+        <span style={{ fontSize: 13, color: emailColors.inkSoft }}>DogWare</span>
+      </Text>
+    </>
   );
 }

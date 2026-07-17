@@ -24,7 +24,7 @@ const COPY: Record<
     cta: "Bekijk je voorstel",
   },
   "deposit-ready": {
-    heading: (n) => `Mooi, ${n} — we kunnen beginnen`,
+    heading: (n) => `Mooi, ${n}, we kunnen beginnen`,
     body: (v) => [
       "Bedankt voor je akkoord! Om te starten met bouwen vragen we de eerste termijn.",
       `De eerste termijn is ${v.amount}. Zodra dit binnen is, gaan we voor je aan de slag.`,
@@ -32,7 +32,7 @@ const COPY: Record<
     cta: "Betaal de eerste termijn",
   },
   "deposit-received": {
-    heading: (n) => `Gelukt, ${n} — we gaan bouwen!`,
+    heading: (n) => `Gelukt, ${n}! We gaan bouwen.`,
     body: (v) => [
       `We hebben je eerste termijn van ${v.amount} ontvangen. Dank je wel!`,
       "Vanaf nu bouwen wij jouw DogWare-omgeving. Je hoort van ons zodra er iets te zien is.",
@@ -54,7 +54,7 @@ const COPY: Record<
   "final-received": {
     heading: (n) => `Helemaal rond, ${n} 🐾`,
     body: (v) => [
-      `We hebben de laatste termijn van ${v.amount} ontvangen. Je project is volledig betaald — gefeliciteerd!`,
+      `We hebben de laatste termijn van ${v.amount} ontvangen. Je project is volledig betaald. Gefeliciteerd!`,
       "Binnenkort regelen we samen je maandabonnement, zodat alles blijft draaien.",
     ],
   },
@@ -111,9 +111,21 @@ export function CommerceEmail({
         </Section>
       )}
       <Text style={{ ...paragraph, fontSize: 13 }}>
-        Vragen? Reageer gerust op deze mail — je krijgt <span style={strong}>mij</span> aan de lijn.
+        Vragen? Reageer gerust op deze mail, dan krijg je <span style={strong}>mij</span> aan de lijn.
       </Text>
-      <Signature />
+      <Signature groet={SIGN[type].groet} regel={SIGN[type].regel} />
     </EmailLayout>
   );
 }
+
+/** Afsluiting afgestemd op de toon per mailtype. */
+const SIGN: Record<CommerceMailType, { groet: string; regel?: string }> = {
+  "proposal-sent": { groet: "Hartelijke groet,", regel: "Ik denk graag met je mee." },
+  "deposit-ready": { groet: "Met vriendelijke groet," },
+  "deposit-received": { groet: "Hartelijke groet," },
+  "delivery-ready": { groet: "Hartelijke groet,", regel: "Wat leuk om je dit te laten zien." },
+  "final-ready": { groet: "Met vriendelijke groet," },
+  "final-received": { groet: "Hartelijke groet,", regel: "Meer tijd voor de dieren. Daar doen we het voor." },
+  "subscription-started": { groet: "Hartelijke groet," },
+  "charge-failed": { groet: "Met vriendelijke groet," },
+};

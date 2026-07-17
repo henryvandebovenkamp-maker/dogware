@@ -25,7 +25,7 @@ export function DemoReadyEmail({
         Wat leuk dat je een demo aanvroeg voor{" "}
         <span style={strong}>{bedrijfsnaam}</span>. Ik heb er geen standaard
         presentatie van gemaakt, maar een <span style={strong}>voorbeeld dat
-        past bij jouw bedrijf</span> — helemaal klaar om te bekijken.
+        past bij jouw bedrijf</span>, helemaal klaar om te bekijken.
       </Text>
 
       {demoUrl && (
@@ -50,7 +50,7 @@ export function DemoReadyEmail({
         Je kunt zowel de <span style={strong}>website</span> bekijken als een
         kijkje nemen in de <span style={strong}>beheeromgeving</span>, zodat je
         precies ziet hoe het straks voor jou werkt. Inloggen kan zonder
-        wachtwoord — met één klik:
+        wachtwoord, met één klik:
       </Text>
       <Section style={{ textAlign: "center", padding: "8px 0" }}>
         <Button
@@ -72,10 +72,10 @@ export function DemoReadyEmail({
 
       <Text style={paragraph}>
         Benieuwd wat je ervan vindt! Reageer gerust op deze mail met je
-        wensen of opmerkingen — of laat weten wanneer het jou uitkomt voor een
+        wensen of opmerkingen, of laat weten wanneer het jou uitkomt voor een
         korte persoonlijke afspraak. Ik denk graag met je mee.
       </Text>
-      <Signature />
+      <Signature groet="Hartelijke groet," />
     </EmailLayout>
   );
 }

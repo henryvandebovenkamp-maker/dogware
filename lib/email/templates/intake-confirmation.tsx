@@ -24,8 +24,11 @@ export function IntakeConfirmationEmail({ naam }: { naam: string }) {
         </span>{" "}
         Je zit nergens aan vast.
       </Text>
-      <Text style={paragraph}>Tot snel! En geniet van je honden. 🐾</Text>
-      <Signature />
+      <Text style={paragraph}>Tot snel! En geniet ondertussen van je honden. 🐾</Text>
+      <Signature
+        groet="Hartelijke groet,"
+        regel="Ik kijk ernaar uit je te laten zien wat DogWare voor jouw bedrijf kan betekenen."
+      />
     </EmailLayout>
   );
 }
