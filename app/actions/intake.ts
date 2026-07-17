@@ -1,7 +1,10 @@
 "use server";
 
+import { and, eq, gt } from "drizzle-orm";
 import { branding } from "@/lib/branding";
 import { getDb, schema } from "@/lib/db";
+import { ATTRIBUTION_MODEL, getValidAttribution } from "@/lib/referral";
+import { logActivity } from "@/lib/audit";
 import {
   sendIntakeConfirmation,
   sendIntakeNotification,
@@ -63,11 +66,29 @@ export async function submitIntake(raw: IntakeData): Promise<IntakeState> {
     return { status: "error", message: "Kies minimaal één dienst." };
   }
 
+  // Attributie: uitsluitend server-side bepaald via de ondertekende
+  // first-party cookie — nooit via invoer uit de browser.
+  const attribution = await getValidAttribution();
+
   // 1. Opslaan in de database (indien geconfigureerd — anders alleen mail).
   let leadUrl: string | undefined;
   const db = getDb();
   if (db) {
     try {
+      // Dubbelklik-bescherming: zelfde e-mailadres binnen 2 minuten = zelfde
+      // aanvraag; stilletjes succes teruggeven, niets dubbel versturen.
+      const [recent] = await db
+        .select({ id: schema.leads.id })
+        .from(schema.leads)
+        .where(
+          and(
+            eq(schema.leads.email, data.email),
+            gt(schema.leads.createdAt, new Date(Date.now() - 2 * 60_000)),
+          ),
+        )
+        .limit(1);
+      if (recent) return { status: "success" };
+
       const [lead] = await db
         .insert(schema.leads)
         .values({
@@ -91,10 +112,28 @@ export async function submitIntake(raw: IntakeData): Promise<IntakeState> {
           uploads: data.uploads,
           functies: data.functies,
           opmerkingen: data.opmerkingen || null,
+          // Partnerattributie — leeg bij organische aanvraag
+          affiliatePartnerId: attribution?.partnerId ?? null,
+          referralCodeSnapshot: attribution?.referralCode ?? null,
+          referralClickId: attribution?.clickId ?? null,
+          attributionModel: attribution ? ATTRIBUTION_MODEL : null,
+          attributedAt: attribution ? new Date() : null,
         })
         .returning({ id: schema.leads.id });
       if (lead) {
         leadUrl = `${branding.siteUrl}/admin/leads/${lead.id}`;
+        if (attribution) {
+          await logActivity({
+            action: "LEAD_ATTRIBUTED",
+            objectType: "lead",
+            objectId: lead.id,
+            newValue: {
+              partnerId: attribution.partnerId,
+              referralCode: attribution.referralCode,
+              model: ATTRIBUTION_MODEL,
+            },
+          });
+        }
       }
     } catch (err) {
       // Database-fout mag de aanvraag niet blokkeren — mail is het vangnet.
@@ -109,7 +148,18 @@ export async function submitIntake(raw: IntakeData): Promise<IntakeState> {
   }
 
   // 2. Interne notificatie is leidend: als die lukt, is de aanvraag binnen.
-  const notification = await sendIntakeNotification(data, leadUrl);
+  let viaPartner: string | undefined;
+  if (attribution && db) {
+    const [p] = await db
+      .select({ bedrijfsnaam: schema.partners.bedrijfsnaam })
+      .from(schema.partners)
+      .where(eq(schema.partners.id, attribution.partnerId))
+      .limit(1);
+    viaPartner = p
+      ? `${p.bedrijfsnaam} (${attribution.referralCode})`
+      : attribution.referralCode;
+  }
+  const notification = await sendIntakeNotification(data, leadUrl, viaPartner);
   if (!notification.ok && !leadUrl) {
     return {
       status: "error",

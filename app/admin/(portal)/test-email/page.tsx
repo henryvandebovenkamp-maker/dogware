@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
 import { Mail } from "lucide-react";
 import { isEmailConfigured } from "@/lib/email/service";
-import { isTestEmailAllowed } from "./auth";
 import { TestEmailForm } from "./test-form";
 
 export const metadata: Metadata = {
@@ -10,18 +8,11 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export default async function TestEmailPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ token?: string }>;
-}) {
-  const { token } = await searchParams;
-  if (!isTestEmailAllowed(token)) notFound();
-
+export default function TestEmailPage() {
   const configured = isEmailConfigured();
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-cream px-5 py-16">
+    <main className="flex items-center justify-center px-5 py-8">
       <div className="w-full max-w-md rounded-3xl bg-white p-7 shadow-lift ring-1 ring-ink/5 sm:p-8">
         <div className="mb-6 flex items-center gap-3">
           <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand text-white">
@@ -43,7 +34,7 @@ export default async function TestEmailPage({
           </div>
         )}
 
-        <TestEmailForm token={token} />
+        <TestEmailForm />
       </div>
     </main>
   );

@@ -4,9 +4,9 @@ import { notFound } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { ArrowLeft, ExternalLink } from "lucide-react";
 import { getDb, schema } from "@/lib/db";
-import { isAdminAllowed } from "@/lib/admin-auth";
 import { LeadStatusBadge } from "../status-badge";
 import { LeadAdminForm } from "./lead-admin-form";
+import { ReassignForm } from "./reassign-form";
 
 export const metadata: Metadata = {
   title: "Lead",
@@ -72,14 +72,10 @@ function Vrij({ text }: { text?: string | null }) {
 
 export default async function LeadDetailPage({
   params,
-  searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ token?: string }>;
 }) {
-  const [{ id }, { token }] = await Promise.all([params, searchParams]);
-  if (!isAdminAllowed(token)) notFound();
-
+  const { id } = await params;
   const db = getDb();
   if (!db) notFound();
 
@@ -90,13 +86,29 @@ export default async function LeadDetailPage({
     .limit(1);
   if (!lead) notFound();
 
-  const tokenSuffix = token ? `?token=${encodeURIComponent(token)}` : "";
+  // Partnerattributie + lijst voor handmatige hertoewijzing
+  const attributedPartner = lead.affiliatePartnerId
+    ? (
+        await db
+          .select()
+          .from(schema.partners)
+          .where(eq(schema.partners.id, lead.affiliatePartnerId))
+          .limit(1)
+      )[0]
+    : null;
+  const allePartners = await db
+    .select({
+      id: schema.partners.id,
+      bedrijfsnaam: schema.partners.bedrijfsnaam,
+      referralCode: schema.partners.referralCode,
+    })
+    .from(schema.partners);
 
   return (
-    <main className="min-h-screen bg-cream px-5 py-16">
+    <main>
       <div className="mx-auto w-full max-w-3xl">
         <Link
-          href={`/admin/leads${tokenSuffix}`}
+          href="/admin/leads"
           className="mb-6 inline-flex items-center gap-2 text-sm font-semibold text-ink-500 transition hover:text-ink"
         >
           <ArrowLeft className="h-4 w-4" /> Alle leads
@@ -122,6 +134,45 @@ export default async function LeadDetailPage({
         </div>
 
         <div className="space-y-4">
+          <Blok titel="Partnerattributie">
+            {attributedPartner ? (
+              <div className="space-y-1">
+                <p className="text-[15px] text-ink-700">
+                  Via{" "}
+                  <Link
+                    href={`/admin/partners/${attributedPartner.id}`}
+                    className="font-bold text-brand hover:underline"
+                  >
+                    {attributedPartner.bedrijfsnaam}
+                  </Link>{" "}
+                  <span className="font-mono text-[13px] text-ink-500">
+                    ({lead.referralCodeSnapshot})
+                  </span>
+                </p>
+                <p className="text-[12px] text-ink-300">
+                  Model: {lead.attributionModel}
+                  {lead.attributedAt &&
+                    ` · toegewezen op ${lead.attributedAt.toLocaleString("nl-NL", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}`}
+                  {lead.attributionModel === "MANUAL" && " · handmatig aangepast"}
+                </p>
+              </div>
+            ) : (
+              <p className="text-[14px] text-ink-500">
+                Organische aanvraag — geen partner gekoppeld.
+              </p>
+            )}
+            <div className="mt-3">
+              <ReassignForm
+                leadId={lead.id}
+                currentPartnerId={lead.affiliatePartnerId}
+                partners={allePartners.map((p) => ({
+                  id: p.id,
+                  label: `${p.bedrijfsnaam} (${p.referralCode})`,
+                }))}
+              />
+            </div>
+          </Blok>
+
           <Blok titel="Contactgegevens">
             <div className="space-y-1">
               <Regel label="Naam" value={lead.naam} />
@@ -218,7 +269,6 @@ export default async function LeadDetailPage({
               leadId={lead.id}
               status={lead.status}
               notities={lead.notities ?? ""}
-              token={token}
             />
           </Blok>
         </div>

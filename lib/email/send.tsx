@@ -7,6 +7,9 @@ import { DemoRequestEmail, type DemoRequestData } from "./templates/demo-request
 import { IntakeConfirmationEmail } from "./templates/intake-confirmation";
 import { IntakeNotificationEmail } from "./templates/intake-notification";
 import { NotificationEmail } from "./templates/notification";
+import { PartnerActivatedEmail } from "./templates/partner-activated";
+import { PartnerInviteEmail } from "./templates/partner-invite";
+import { MagicLoginEmail } from "./templates/magic-login";
 import { WelcomeEmail } from "./templates/welcome";
 
 /**
@@ -54,6 +57,7 @@ export async function sendDemoConfirmation(
 export async function sendIntakeNotification(
   data: IntakeData,
   leadUrl?: string,
+  viaPartner?: string,
 ): Promise<MailResult> {
   const internal = process.env.EMAIL_INTERNAL;
   if (!internal) {
@@ -68,9 +72,11 @@ export async function sendIntakeNotification(
   return sendMail("intake-request", {
     to: internal,
     subject: `Persoonlijke demo-aanvraag: ${data.naam} (${data.bedrijfsnaam})`,
-    react: <IntakeNotificationEmail data={data} leadUrl={leadUrl} />,
+    react: (
+      <IntakeNotificationEmail data={data} leadUrl={leadUrl} viaPartner={viaPartner} />
+    ),
     replyTo: data.email,
-    text: `Persoonlijke demo-aanvraag van ${data.naam} (${data.bedrijfsnaam}, ${data.plaats}) — ${data.email}`,
+    text: `Persoonlijke demo-aanvraag van ${data.naam} (${data.bedrijfsnaam}, ${data.plaats}) — ${data.email}${viaPartner ? `\nVia partner: ${viaPartner}` : ""}`,
   });
 }
 
@@ -97,6 +103,67 @@ export async function sendWelcomeEmail(
     subject: "Welkom bij DogWare 🐾",
     react: <WelcomeEmail naam={naam} />,
     text: `Welkom bij DogWare, ${naam}!`,
+  });
+}
+
+/** Uitnodiging voor het Partnerprogramma (nieuw of opnieuw verstuurd). */
+export async function sendPartnerInvite(
+  to: string,
+  naam: string,
+  inviteUrl: string,
+  opnieuw = false,
+): Promise<MailResult> {
+  return sendMail("partner-invite", {
+    to,
+    subject: opnieuw
+      ? "Je nieuwe uitnodiging voor het DogWare Partnerprogramma"
+      : "Uitnodiging: het DogWare Partnerprogramma 🤝",
+    react: <PartnerInviteEmail naam={naam} inviteUrl={inviteUrl} opnieuw={opnieuw} />,
+    text: `Hoi ${naam},\n\nJe bent uitgenodigd voor het DogWare Partnerprogramma. Activeer je account via: ${inviteUrl}\n\nDeze link is 7 dagen geldig en werkt één keer.`,
+  });
+}
+
+/** Bevestiging dat het partneraccount actief is. */
+export async function sendPartnerActivated(
+  to: string,
+  naam: string,
+  referralLink: string,
+  portalUrl: string,
+): Promise<MailResult> {
+  return sendMail("partner-activated", {
+    to,
+    subject: "Je partneraccount is actief — hier is je persoonlijke link",
+    react: (
+      <PartnerActivatedEmail
+        naam={naam}
+        referralLink={referralLink}
+        portalUrl={portalUrl}
+      />
+    ),
+    text: `Hoi ${naam},\n\nJe partneraccount is actief. Jouw persoonlijke link: ${referralLink}\nJe omgeving: ${portalUrl}`,
+  });
+}
+
+/** Wachtwoordloze inlogmail: Magic Link + Magic Code. */
+export async function sendMagicLogin(
+  to: string,
+  naam: string,
+  loginUrl: string,
+  code: string,
+  geldigMinuten: number,
+): Promise<MailResult> {
+  return sendMail("magic-login", {
+    to,
+    subject: `${code.slice(0, 3)} ${code.slice(3)} is je DogWare-inlogcode`,
+    react: (
+      <MagicLoginEmail
+        naam={naam}
+        loginUrl={loginUrl}
+        code={code}
+        geldigMinuten={geldigMinuten}
+      />
+    ),
+    text: `Hoi ${naam},\n\nLog in via: ${loginUrl}\nOf gebruik code: ${code}\n\nGeldig: ${geldigMinuten} minuten, eenmalig. Niet aangevraagd? Negeer deze mail.`,
   });
 }
 

@@ -11,12 +11,10 @@ export function LeadAdminForm({
   leadId,
   status,
   notities,
-  token,
 }: {
   leadId: string;
   status: LeadStatus;
   notities: string;
-  token?: string;
 }) {
   const [state, formAction, pending] = useActionState(
     updateLead,
@@ -26,7 +24,6 @@ export function LeadAdminForm({
   return (
     <form action={formAction} className="space-y-4">
       <input type="hidden" name="id" value={leadId} />
-      {token && <input type="hidden" name="token" value={token} />}
 
       <div>
         <label

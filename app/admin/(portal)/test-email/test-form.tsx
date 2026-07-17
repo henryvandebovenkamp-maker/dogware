@@ -14,7 +14,7 @@ const TEMPLATES = [
   { value: "notification", label: "Interne notificatie" },
 ];
 
-export function TestEmailForm({ token }: { token?: string }) {
+export function TestEmailForm() {
   const [state, formAction, pending] = useActionState(
     sendTestEmail,
     INITIAL_STATE,
@@ -22,8 +22,6 @@ export function TestEmailForm({ token }: { token?: string }) {
 
   return (
     <form action={formAction} className="space-y-4">
-      {token && <input type="hidden" name="token" value={token} />}
-
       <div>
         <label
           htmlFor="to"

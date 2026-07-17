@@ -47,15 +47,32 @@ const WEBSITE_LABELS: Record<string, string> = {
 export function IntakeNotificationEmail({
   data,
   leadUrl,
+  viaPartner,
 }: {
   data: IntakeData;
   leadUrl?: string;
+  /** Bijv. "Hondenschool Jansen (DW-A7K4P2)" bij een partneraanvraag */
+  viaPartner?: string;
 }) {
   return (
     <EmailLayout
       preview={`Persoonlijke demo-aanvraag van ${data.naam} (${data.bedrijfsnaam})`}
       heading="Nieuwe persoonlijke demo-aanvraag 🎉"
     >
+      {viaPartner && (
+        <Text
+          style={{
+            ...paragraph,
+            backgroundColor: "#e3ede6",
+            borderRadius: 8,
+            color: "#335844",
+            fontWeight: 700,
+            padding: "10px 14px",
+          }}
+        >
+          Via partner: {viaPartner}
+        </Text>
+      )}
       <Section
         style={{
           backgroundColor: emailColors.cream,

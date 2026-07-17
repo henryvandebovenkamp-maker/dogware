@@ -1,10 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
 import { desc } from "drizzle-orm";
 import { Inbox, Users } from "lucide-react";
 import { getDb, schema } from "@/lib/db";
-import { isAdminAllowed } from "@/lib/admin-auth";
 import { LeadStatusBadge } from "./status-badge";
 
 export const metadata: Metadata = {
@@ -12,14 +10,7 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export default async function LeadsPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ token?: string }>;
-}) {
-  const { token } = await searchParams;
-  if (!isAdminAllowed(token)) notFound();
-
+export default async function LeadsPage() {
   const db = getDb();
   const leads = db
     ? await db
@@ -28,10 +19,8 @@ export default async function LeadsPage({
         .orderBy(desc(schema.leads.createdAt))
     : null;
 
-  const tokenSuffix = token ? `?token=${encodeURIComponent(token)}` : "";
-
   return (
-    <main className="min-h-screen bg-cream px-5 py-16">
+    <main>
       <div className="mx-auto w-full max-w-4xl">
         <div className="mb-8 flex items-center gap-3">
           <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand text-white">
@@ -69,7 +58,7 @@ export default async function LeadsPage({
             {leads.map((lead) => (
               <li key={lead.id}>
                 <Link
-                  href={`/admin/leads/${lead.id}${tokenSuffix}`}
+                  href={`/admin/leads/${lead.id}`}
                   className="flex flex-col gap-2 rounded-2xl bg-white p-5 shadow-soft ring-1 ring-ink/5 transition hover:-translate-y-0.5 hover:shadow-lift sm:flex-row sm:items-center sm:justify-between"
                 >
                   <span>

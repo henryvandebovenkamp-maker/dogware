@@ -8,7 +8,7 @@ import {
   sendWelcomeEmail,
 } from "@/lib/email/send";
 import type { MailResult } from "@/lib/email/types";
-import { isTestEmailAllowed } from "./auth";
+import { getAdminActor } from "@/lib/admin-auth";
 
 export type TestEmailState = {
   status: "idle" | "success" | "error";
@@ -21,8 +21,7 @@ export async function sendTestEmail(
   formData: FormData,
 ): Promise<TestEmailState> {
   // Server actions zijn ook via directe POST bereikbaar — dus ook hier de check.
-  const token = String(formData.get("token") ?? "") || undefined;
-  if (!isTestEmailAllowed(token)) {
+  if (!(await getAdminActor())) {
     return { status: "error", message: "Geen toegang." };
   }
 

@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { LEAD_STATUSES, type LeadStatus } from "@/lib/db/schema";
-import { isAdminAllowed } from "@/lib/admin-auth";
+import { getAdminActor } from "@/lib/admin-auth";
 
 export type UpdateLeadState = {
   status: "idle" | "success" | "error";
@@ -17,8 +17,8 @@ export async function updateLead(
   formData: FormData,
 ): Promise<UpdateLeadState> {
   // Server actions zijn ook via directe POST bereikbaar — dus ook hier de check.
-  const token = String(formData.get("token") ?? "") || undefined;
-  if (!isAdminAllowed(token)) {
+  const actor = await getAdminActor();
+  if (!actor) {
     return { status: "error", message: "Geen toegang." };
   }
 
