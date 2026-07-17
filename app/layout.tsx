@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Plus_Jakarta_Sans } from "next/font/google";
+import { absoluteUrl, branding } from "@/lib/branding";
 import "./globals.css";
 
 const jakarta = Plus_Jakarta_Sans({
@@ -9,47 +10,61 @@ const jakarta = Plus_Jakarta_Sans({
   weight: ["400", "500", "600", "700", "800"],
 });
 
-const SITE_URL = "https://dogware.vercel.app";
-
 export const metadata: Metadata = {
-  metadataBase: new URL(SITE_URL),
+  metadataBase: new URL(branding.siteUrl),
   title: {
-    default: "DogWare — Meer tijd voor honden. Minder tijd achter een scherm.",
-    template: "%s · DogWare",
+    default: branding.title,
+    template: `%s · ${branding.name}`,
   },
-  description:
-    "DogWare is het complete bedrijfsplatform voor de hondenbranche. Automatiseer planning, klantbeheer, betalingen, webshop, communicatie en administratie — zodat jij weer kunt doen waar je ooit voor begon: werken met honden.",
-  keywords: [
-    "hondenschool software",
-    "uitlaatservice software",
-    "trimsalon software",
-    "gedragstherapie",
-    "hondenbedrijf platform",
-    "planning honden",
-    "facturatie hondenbedrijf",
-  ],
-  authors: [{ name: "DogWare" }],
+  description: branding.description,
+  keywords: [...branding.keywords],
+  authors: [{ name: branding.name, url: branding.siteUrl }],
+  creator: branding.name,
+  publisher: branding.name,
+  applicationName: branding.name,
+  alternates: {
+    canonical: "/",
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+    },
+  },
   openGraph: {
     type: "website",
     locale: "nl_NL",
-    url: SITE_URL,
-    siteName: "DogWare",
-    title: "DogWare — Meer tijd voor honden. Minder tijd achter een scherm.",
-    description:
-      "Eén platform voor jouw complete hondenbedrijf. Planning, klanten, betalingen, webshop, trainingen, medewerkers en facturen — alles centraal, alles automatisch.",
+    url: branding.siteUrl,
+    siteName: branding.name,
+    title: branding.title,
+    description: branding.description,
   },
   twitter: {
     card: "summary_large_image",
-    title: "DogWare — Meer tijd voor honden.",
-    description:
-      "Het complete bedrijfsplatform voor de hondenbranche. Werk met honden. Wij regelen de rest.",
+    title: branding.title,
+    description: branding.description,
   },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#fbf8f3",
+  themeColor: branding.colors.background,
   width: "device-width",
   initialScale: 1,
+};
+
+/** JSON-LD: DogWare als organisatie, voor zoekmachines. */
+const organizationJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  name: branding.name,
+  slogan: branding.slogan,
+  description: branding.description,
+  url: branding.siteUrl,
+  logo: absoluteUrl(branding.logo.mark),
+  image: absoluteUrl(branding.logo.full),
 };
 
 export default function RootLayout({
@@ -60,6 +75,12 @@ export default function RootLayout({
   return (
     <html lang="nl" className={`${jakarta.variable} h-full antialiased`}>
       <body className="grain min-h-full flex flex-col bg-cream text-ink">
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify(organizationJsonLd),
+          }}
+        />
         {children}
       </body>
     </html>

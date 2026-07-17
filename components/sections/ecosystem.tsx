@@ -12,7 +12,7 @@ import {
   ShoppingBag,
 } from "lucide-react";
 import { Container, SectionHeading } from "@/components/ui";
-import { PawMark } from "@/components/brand";
+import { BrandMark } from "@/components/brand";
 import { Reveal } from "@/components/reveal";
 
 const NODES = [
@@ -74,9 +74,9 @@ export function Ecosystem() {
             </svg>
 
             {/* Center */}
-            <div className="absolute left-1/2 top-1/2 z-10 flex h-32 w-32 -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center rounded-full bg-brand text-white shadow-glow ring-8 ring-cream">
-              <PawMark className="h-8 w-8" />
-              <span className="mt-1 text-sm font-extrabold tracking-tight">DogWare</span>
+            <div className="absolute left-1/2 top-1/2 z-10 flex h-32 w-32 -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center rounded-full bg-white shadow-glow ring-8 ring-cream">
+              <BrandMark size={44} className="h-11 w-11" />
+              <span className="mt-1 text-sm font-extrabold tracking-tight text-ink">Dog<span className="text-brand">Ware</span></span>
             </div>
 
             {/* Nodes */}
@@ -105,9 +105,9 @@ export function Ecosystem() {
 
         {/* Mobiel: center + grid */}
         <div className="mt-12 md:hidden">
-          <div className="mx-auto mb-6 flex h-24 w-24 flex-col items-center justify-center rounded-full bg-brand text-white shadow-glow ring-8 ring-cream">
-            <PawMark className="h-7 w-7" />
-            <span className="mt-1 text-xs font-extrabold">DogWare</span>
+          <div className="mx-auto mb-6 flex h-24 w-24 flex-col items-center justify-center rounded-full bg-white shadow-glow ring-8 ring-cream">
+            <BrandMark size={36} className="h-9 w-9" />
+            <span className="mt-1 text-xs font-extrabold text-ink">Dog<span className="text-brand">Ware</span></span>
           </div>
           <div className="grid grid-cols-2 gap-2.5">
             {NODES.map((n) => (
