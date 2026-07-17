@@ -3,10 +3,7 @@ import { Container, Eyebrow } from "@/components/ui";
 import { Photo } from "@/components/photo";
 import { Reveal } from "@/components/reveal";
 
-/**
- * Het persoonlijke verhaal achter DogWare.
- * Tekst tussen [vierkante haken] is een invulplek — vervang die door je eigen feiten.
- */
+/** Het persoonlijke verhaal van Henry, oprichter van DogWare. */
 export function Story() {
   return (
     <section id="verhaal" className="relative overflow-hidden py-20 sm:py-28">
@@ -23,7 +20,7 @@ export function Story() {
             <Photo
               file="henry-portret.jpg"
               alt="Henry van de Bovenkamp, neus aan neus met zijn hond"
-              label="Portret van jou (liefst met hond)"
+              label="Henry, tussen de honden"
               position="object-left"
               className="aspect-[4/5] w-full max-w-md"
             />
@@ -50,29 +47,36 @@ export function Story() {
 
             <Reveal delay={0.05}>
               <h2 className="mt-5 text-balance text-3xl font-extrabold tracking-tight text-ink sm:text-4xl md:text-[2.7rem] md:leading-[1.08]">
-                Gebouwd door iemand die zelf op het veld stond.
+                Ik sta zelf elke dag tussen de honden.
               </h2>
             </Reveal>
 
             <Reveal delay={0.1}>
               <div className="mt-6 flex flex-col gap-4 text-pretty text-base leading-relaxed text-ink-500 sm:text-lg">
                 <p>
-                  DogWare is niet begonnen als softwarebedrijf. Het begon{" "}
-                  [aantal] jaar geleden bij [naam van je hondenschool /
-                  trainingslocatie], tussen de puppy&apos;s, de pubers in hun
-                  flegmatische fase en de baasjes met duizend vragen.
+                  Hoi, ik ben Henry. Ik heb een uitlaatservice in de regio
+                  Utrecht en geef daarnaast hondentrainingen. Werken met honden
+                  is nog steeds het leukste wat er is. Daar begon het voor mij,
+                  en daar draait het nog altijd om.
                 </p>
                 <p>
-                  [Vertel hier in twee of drie zinnen jouw moment: wanneer merkte
-                  je dat de administratie groter werd dan het hondenwerk? Bijv.
-                  &ldquo;Elke avond na de laatste les zat ik nog uren met
-                  inschrijvingen, betalingen en losse lijstjes.&rdquo;]
+                  Maar ergens onderweg merkte ik dat ik steeds meer tijd kwijt
+                  was aan alles eromheen. Offertes maken, afspraken verzetten,
+                  planningen omgooien, losse appjes beantwoorden, betalingen
+                  nakijken. Voor ik het wist zat ik &apos;s avonds nog te
+                  regelen in plaats van dat ik met de honden bezig was geweest.
                 </p>
                 <p>
-                  Dus bouwde ik wat ik zelf miste: één rustige plek waar alles
-                  vanzelf loopt. Geen algemene software die &ldquo;ook wel werkt
-                  voor hondenscholen&rdquo;, maar een platform dat begint bij hoe
-                  een dag in de hondenbranche er écht uitziet.
+                  En elke keer dacht ik hetzelfde: dit moet toch makkelijker
+                  kunnen? Zo is DogWare ontstaan. Niet achter een bureau
+                  bedacht, maar tussen de honden, uit precies de dingen waar ik
+                  zelf dagelijks tegenaan liep.
+                </p>
+                <p>
+                  Omdat ik zelf in de praktijk sta, weet ik waar jij mee
+                  worstelt. Ik heb gebouwd wat ik zelf nodig had: één rustige
+                  plek waar je bedrijf gewoon loopt, zodat jij weer tijd
+                  overhoudt voor de dieren.
                 </p>
               </div>
             </Reveal>
@@ -80,9 +84,9 @@ export function Story() {
             <Reveal delay={0.15}>
               <figure className="mt-8 rounded-3xl bg-white p-6 shadow-soft ring-1 ring-ink/5">
                 <blockquote className="text-pretty text-lg font-semibold leading-relaxed text-ink">
-                  &ldquo;Ik wilde niet dat collega&apos;s in de branche hun
-                  avonden kwijt zijn aan regelwerk. Die uren horen bij de honden.
-                  Of gewoon bij jezelf.&rdquo;
+                  &ldquo;Ik gun geen enkele collega dat hun avonden opgaan aan
+                  regelwerk. Die tijd hoort bij de honden. Of gewoon bij
+                  jezelf.&rdquo;
                 </blockquote>
                 <figcaption className="mt-4 flex items-center gap-3">
                   <span className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-100 text-brand">
@@ -93,7 +97,7 @@ export function Story() {
                       Henry van de Bovenkamp
                     </span>
                     <span className="block text-[13px] text-ink-500">
-                      Oprichter van DogWare · [jouw rol, bijv. hondentrainer]
+                      Oprichter van DogWare · uitlaatservice &amp; hondentrainer
                     </span>
                   </span>
                 </figcaption>
