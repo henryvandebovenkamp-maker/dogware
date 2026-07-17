@@ -110,22 +110,22 @@ export function Story() {
         <div className="mt-16 grid gap-4 sm:mt-20 sm:grid-cols-3">
           {[
             {
-              file: "puppy-les.jpg",
-              alt: "Puppyles in volle gang",
-              label: "Die ene doorbraak",
+              file: "rustig-moment.jpg",
+              alt: "Rustig moment samen met een hond op het strand",
+              label: "Even alle tijd voor één",
               tone: "warm" as const,
               delay: 0,
             },
             {
               file: "groep-buiten.jpg",
-              alt: "Met de groep naar buiten",
+              alt: "In het bos met de hele groep honden",
               label: "Gewoon, buiten zijn",
               tone: "sage" as const,
               delay: 0.06,
             },
             {
               file: "blij-baasje.jpg",
-              alt: "Een blij baasje met hond",
+              alt: "Een blij baasje samen onderweg met een hond",
               label: "Een blij baasje",
               tone: "warm" as const,
               delay: 0.12,

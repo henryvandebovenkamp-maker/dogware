@@ -7,11 +7,11 @@ Zodra een bestand bestaat, verschijnt het automatisch op de site — de placehol
 
 | Bestandsnaam        | Wat voor foto                                        | Vorm       |
 | ------------------- | ---------------------------------------------------- | ---------- |
-| `henry-portret.jpg` | Portret van jou, liefst met hond                     | Staand 4:5 |
-| `training-veld.jpg` | Op het veld met een groep                            | Vierkant   |
-| `puppy-les.jpg`     | Puppyles / dat ene doorbraakmoment                   | Liggend 4:3 |
-| `groep-buiten.jpg`  | Buiten met de groep                                  | Liggend 4:3 |
-| `blij-baasje.jpg`   | Een blij baasje met hond                             | Liggend 4:3 |
+| `henry-portret.jpg`  | Portret van jou, liefst met hond                    | Staand 4:5 |
+| `training-veld.jpg`  | Op het veld met een groep                           | Vierkant   |
+| `rustig-moment.jpg`  | Rustig moment samen met één hond                    | Liggend 4:3 |
+| `groep-buiten.jpg`   | Buiten met de hele groep                             | Liggend 4:3 |
+| `blij-baasje.jpg`    | Een blij baasje samen onderweg                       | Liggend 4:3 |
 
 ## Hero (klein rond fotootje in de zwevende kaart)
 
