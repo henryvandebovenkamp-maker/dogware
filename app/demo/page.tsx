@@ -69,7 +69,7 @@ export default async function DemoPage({
 
       <main className="mx-auto w-full max-w-6xl px-5 pb-24 pt-14 sm:px-8 sm:pt-20">
         {welcomePerks && <PartnerWelcome perks={welcomePerks} />}
-        <DemoExperience />
+        <DemoExperience uploadEnabled={Boolean(process.env.UPLOADTHING_TOKEN)} />
       </main>
     </div>
   );

@@ -1,8 +1,10 @@
 "use client";
 
+import "@uploadthing/react/styles.css";
 import { AnimatePresence, motion } from "motion/react";
 import { useMemo, useState, useTransition } from "react";
 import { submitIntake } from "@/app/actions/intake";
+import { UploadDropzone } from "@/lib/uploadthing";
 import { useAutosave } from "@/lib/drafts/use-autosave";
 import { SaveIndicator } from "@/components/drafts/save-indicator";
 import { RestoreBanner } from "@/components/drafts/restore-banner";
@@ -81,7 +83,7 @@ const ROUTE_LABELS = [
   "Bijna klaar",
 ];
 
-export function DemoExperience() {
+export function DemoExperience({ uploadEnabled = false }: { uploadEnabled?: boolean }) {
   const [step, setStep] = useState<StepId>("naam");
   const [bedrijfsnaam, setBedrijfsnaam] = useState("");
   const [services, setServices] = useState<ServiceKey[]>([]);
@@ -95,6 +97,7 @@ export function DemoExperience() {
   const [naam, setNaam] = useState("");
   const [email, setEmail] = useState("");
   const [plaats, setPlaats] = useState("");
+  const [uploads, setUploads] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [restoreApplied, setRestoreApplied] = useState(false);
@@ -130,8 +133,9 @@ export function DemoExperience() {
       naam,
       email,
       plaats,
+      uploads,
     }),
-    [step, bedrijfsnaam, services, discovery, siteUrl, siteGoed, siteMist, energy, modules, droom, naam, email, plaats],
+    [step, bedrijfsnaam, services, discovery, siteUrl, siteGoed, siteMist, energy, modules, droom, naam, email, plaats, uploads],
   );
 
   const {
@@ -162,6 +166,7 @@ export function DemoExperience() {
     if (p.energy) setEnergy(p.energy);
     if (p.modules) setModules(p.modules);
     if (p.droom !== undefined) setDroom(p.droom);
+    if (p.uploads) setUploads(p.uploads);
     if (p.naam !== undefined) setNaam(p.naam);
     if (p.email !== undefined) setEmail(p.email);
     if (p.plaats !== undefined) setPlaats(p.plaats);
@@ -226,6 +231,7 @@ export function DemoExperience() {
         tijdvreters: ENERGY.filter((e) => energy.includes(e.key)).map((e) => e.value),
         functies: MODULES.filter((m) => modules.includes(m.key)).map((m) => m.value),
         droomscenario: droom.trim(),
+        uploads,
       });
       if (result.status === "success") {
         // Concept afronden en lokaal vangnet opruimen.
@@ -517,6 +523,17 @@ export function DemoExperience() {
                       onChange={setDroom}
                     />
                   </div>
+
+                  {uploadEnabled && (
+                    <div className="mt-6 max-w-lg">
+                      <DemoUploads
+                        uploads={uploads}
+                        onAdd={(urls) => setUploads((u) => [...u, ...urls])}
+                        onRemove={(url) => setUploads((u) => u.filter((x) => x !== url))}
+                      />
+                    </div>
+                  )}
+
                   {droom.trim().length > 10 && (
                     <div className="mt-6">
                       <Reaction>{REACTIONS.droom}</Reaction>
@@ -711,6 +728,63 @@ function PreviewFrame({ state }: { state: Parameters<typeof LivePreview>[0]["sta
         Jouw DogWare — bouwt zichzelf op
       </p>
       <LivePreview state={state} />
+    </div>
+  );
+}
+
+/** Optionele upload van logo/huisstijl/foto's tijdens de demo-aanvraag. */
+function DemoUploads({
+  uploads,
+  onAdd,
+  onRemove,
+}: {
+  uploads: string[];
+  onAdd: (urls: string[]) => void;
+  onRemove: (url: string) => void;
+}) {
+  return (
+    <div>
+      <p className="mb-2 text-[13px] font-semibold text-ink-700">
+        Heb je een logo of mooie foto&apos;s? Voeg ze gerust toe (mag ook later).
+      </p>
+      <UploadDropzone
+        endpoint="intakeUploader"
+        config={{ mode: "auto" }}
+        onClientUploadComplete={(files) =>
+          onAdd(files.map((f) => f.ufsUrl).filter(Boolean))
+        }
+        onUploadError={() => {}}
+        appearance={{
+          container:
+            "rounded-2xl border-2 border-dashed border-cream-200 bg-white ut-uploading:opacity-70",
+          label: "text-[13px] font-semibold text-ink-500 hover:text-brand",
+          allowedContent: "text-[11px] text-ink-300",
+          button:
+            "ut-ready:bg-brand ut-uploading:bg-brand/70 rounded-full text-[13px] font-bold px-5 h-auto py-2 after:bg-ink",
+        }}
+      />
+      {uploads.length > 0 && (
+        <ul className="mt-3 space-y-1.5">
+          {uploads.map((url) => (
+            <li
+              key={url}
+              className="flex items-center justify-between gap-2 rounded-xl bg-sage-100 px-3.5 py-2 text-[12px] font-semibold text-sage-600"
+            >
+              <span className="truncate">
+                {decodeURIComponent(url.split("/").pop() ?? url)}
+              </span>
+              <button
+                type="button"
+                onClick={() => onRemove(url)}
+                aria-label="Verwijder upload"
+                className="shrink-0 rounded-full px-1.5 text-sage-600 hover:bg-white/60"
+              >
+                ✕
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

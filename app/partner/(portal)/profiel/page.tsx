@@ -76,7 +76,11 @@ export default async function ProfielPage() {
 
       {/* Formulier */}
       <div className="mt-6">
-        <ProfileForm email={user.email} initial={initial} />
+        <ProfileForm
+          email={user.email}
+          initial={initial}
+          uploadEnabled={Boolean(process.env.UPLOADTHING_TOKEN)}
+        />
       </div>
     </div>
   );

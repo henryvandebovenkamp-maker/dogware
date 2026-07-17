@@ -1,28 +1,47 @@
 import { createUploadthing, type FileRouter } from "uploadthing/next";
+import { UploadThingError } from "uploadthing/server";
+import { getCurrentUser } from "@/lib/auth/session";
 
 const f = createUploadthing();
 
 /**
- * UploadThing FileRouter.
- * Publieke uploads vanuit de demo-intake: logo, huisstijl, inspiratiebeelden.
- * Bewust beperkt: max 4 afbeeldingen van 4MB.
+ * UploadThing FileRouter (v7, leest UPLOADTHING_TOKEN automatisch).
+ *
+ * - intakeUploader: publieke uploads vanuit de demo-aanvraag (logo, huisstijl,
+ *   inspiratiebeelden). Bewust beperkt tot 4 afbeeldingen van 4MB.
+ * - avatarUploader: profielfoto van een ingelogde partner. Alleen toegankelijk
+ *   voor een geldige partnersessie.
  */
 export const uploadRouter = {
   intakeUploader: f({
     image: { maxFileSize: "4MB", maxFileCount: 4 },
   }).onUploadComplete(async ({ file }) => {
-    // Geen gebruikers/auth — bestanden worden alleen via de intake-mail en
-    // het adminportaal ontsloten.
     console.info(
-      JSON.stringify({
-        evt: "upload.complete",
-        at: new Date().toISOString(),
-        name: file.name,
-        size: file.size,
-      }),
+      JSON.stringify({ evt: "upload.intake", at: new Date().toISOString(), size: file.size }),
     );
     return { url: file.ufsUrl };
   }),
+
+  avatarUploader: f({
+    image: { maxFileSize: "2MB", maxFileCount: 1 },
+  })
+    .middleware(async () => {
+      const user = await getCurrentUser();
+      if (!user || user.role !== "AFFILIATE_PARTNER") {
+        throw new UploadThingError("Geen toegang");
+      }
+      return { userId: user.id };
+    })
+    .onUploadComplete(async ({ file, metadata }) => {
+      console.info(
+        JSON.stringify({
+          evt: "upload.avatar",
+          at: new Date().toISOString(),
+          userId: metadata.userId,
+        }),
+      );
+      return { url: file.ufsUrl };
+    }),
 } satisfies FileRouter;
 
 export type UploadRouter = typeof uploadRouter;

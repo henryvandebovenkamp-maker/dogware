@@ -1,11 +1,14 @@
 "use client";
 
+import "@uploadthing/react/styles.css";
+import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   savePartnerProfile,
   type ProfileInput,
 } from "@/app/actions/partner-profile";
 import { formatIban, isValidIban } from "@/lib/iban";
+import { UploadButton } from "@/lib/uploadthing";
 import { GlyphCheck } from "@/components/demo/illustrations";
 
 /**
@@ -15,9 +18,11 @@ import { GlyphCheck } from "@/components/demo/illustrations";
 export function ProfileForm({
   email,
   initial,
+  uploadEnabled,
 }: {
   email: string;
   initial: ProfileInput;
+  uploadEnabled: boolean;
 }) {
   const [data, setData] = useState<ProfileInput>(initial);
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
@@ -59,6 +64,40 @@ export function ProfileForm({
     <div className="space-y-6">
       {/* Persoonlijke gegevens */}
       <Card titel="Persoonlijke gegevens">
+        {/* Profielfoto */}
+        <div className="mb-5 flex items-center gap-4">
+          <span className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full bg-cream-100 ring-1 ring-ink/5">
+            {data.avatarUrl ? (
+              <Image src={data.avatarUrl} alt="Profielfoto" fill sizes="64px" className="object-cover" />
+            ) : (
+              <span className="text-lg font-extrabold text-ink-300">
+                {(data.voornaam || email).charAt(0).toUpperCase()}
+              </span>
+            )}
+          </span>
+          <div>
+            <p className="text-[13px] font-semibold text-ink-700">Profielfoto</p>
+            {uploadEnabled ? (
+              <UploadButton
+                endpoint="avatarUploader"
+                onClientUploadComplete={(files) => {
+                  const url = files?.[0]?.ufsUrl;
+                  if (url) set("avatarUrl", url);
+                }}
+                onUploadError={() => setStatus("error")}
+                appearance={{
+                  button:
+                    "ut-ready:bg-ink ut-uploading:bg-ink/70 rounded-full text-[12px] font-bold px-4 py-2 h-auto after:bg-brand",
+                  allowedContent: "text-[11px] text-ink-300",
+                }}
+                content={{ button: data.avatarUrl ? "Foto vervangen" : "Foto uploaden" }}
+              />
+            ) : (
+              <p className="text-[12px] text-ink-300">Uploaden wordt binnenkort geactiveerd.</p>
+            )}
+          </div>
+        </div>
+
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Voornaam" value={data.voornaam} onChange={(v) => set("voornaam", v)} />
           <Field label="Achternaam" value={data.achternaam} onChange={(v) => set("achternaam", v)} />
