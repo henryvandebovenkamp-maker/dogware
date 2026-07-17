@@ -13,8 +13,8 @@ export const metadata = { title: "Partner" };
 function PayRow({ label, value, mono = false }: { label: string; value?: string | null; mono?: boolean }) {
   return (
     <div className="flex justify-between gap-3 py-0.5">
-      <dt className="text-[13px] text-ink-500">{label}</dt>
-      <dd className={`text-right text-[13px] font-bold text-ink ${mono ? "font-mono" : ""}`}>
+      <dt className="shrink-0 text-[13px] text-ink-500">{label}</dt>
+      <dd className={`min-w-0 break-words text-right text-[13px] font-bold text-ink ${mono ? "font-mono" : ""}`}>
         {value?.trim() || "—"}
       </dd>
     </div>

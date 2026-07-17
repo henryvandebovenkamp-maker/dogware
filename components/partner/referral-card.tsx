@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import { GlyphCheck } from "@/components/demo/illustrations";
 
@@ -19,6 +19,16 @@ export function ReferralCard({
   }) {
   const [copied, setCopied] = useState<"link" | "code" | null>(null);
   const [zoom, setZoom] = useState(false);
+
+  // Modal sluitbaar met Escape (toetsenbordtoegankelijkheid)
+  useEffect(() => {
+    if (!zoom) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setZoom(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [zoom]);
 
   async function copy(value: string, which: "link" | "code") {
     try {
@@ -121,8 +131,18 @@ export function ReferralCard({
           role="dialog"
           aria-modal="true"
         >
-          <div className="rounded-3xl bg-white p-6 shadow-lift" onClick={(e) => e.stopPropagation()}>
-            <Image src={qrDataUrl} alt="QR-code van jouw partnerlink" width={320} height={320} unoptimized />
+          <div
+            className="max-h-[90vh] w-full max-w-xs overflow-auto rounded-3xl bg-white p-6 shadow-lift"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Image
+              src={qrDataUrl}
+              alt="QR-code van jouw partnerlink"
+              width={320}
+              height={320}
+              unoptimized
+              className="h-auto w-full"
+            />
             <p className="mt-3 text-center font-mono text-[13px] font-semibold text-ink-500">
               {code}
             </p>
