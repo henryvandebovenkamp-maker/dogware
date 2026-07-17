@@ -47,7 +47,7 @@ const SERVICE_AGENDA: Record<
   pension: { tijd: "11:00", titel: "Check-in logeergast Moos", meta: "t/m zondag" },
   trimsalon: { tijd: "13:15", titel: "Trimafspraak — Doodle Bo", meta: "volledige vacht" },
   gedragstherapie: { tijd: "15:00", titel: "Gedragsconsult — Nala", meta: "vervolgafspraak 2/4" },
-  oppas: { tijd: "17:30", titel: "Huisbezoek — kat & hond", meta: "Ramona · sleuteladres" },
+  oppas: { tijd: "17:30", titel: "Huisbezoek — hond Boef", meta: "Ramona · sleuteladres" },
   webshop: { tijd: "—", titel: "3 nieuwe bestellingen", meta: "verzendlabels klaar" },
 };
 

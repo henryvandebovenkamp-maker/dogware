@@ -125,7 +125,7 @@ const SIGN: Record<CommerceMailType, { groet: string; regel?: string }> = {
   "deposit-received": { groet: "Hartelijke groet," },
   "delivery-ready": { groet: "Hartelijke groet,", regel: "Wat leuk om je dit te laten zien." },
   "final-ready": { groet: "Met vriendelijke groet," },
-  "final-received": { groet: "Hartelijke groet,", regel: "Meer tijd voor de dieren. Daar doen we het voor." },
+  "final-received": { groet: "Hartelijke groet,", regel: "Meer tijd voor de honden. Daar doen we het voor." },
   "subscription-started": { groet: "Hartelijke groet," },
   "charge-failed": { groet: "Met vriendelijke groet," },
 };

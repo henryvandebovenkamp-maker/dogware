@@ -76,7 +76,7 @@ export function Story() {
                   Omdat ik zelf in de praktijk sta, weet ik waar jij mee
                   worstelt. Ik heb gebouwd wat ik zelf nodig had: één rustige
                   plek waar je bedrijf gewoon loopt, zodat jij weer tijd
-                  overhoudt voor de dieren.
+                  overhoudt voor de honden.
                 </p>
               </div>
             </Reveal>

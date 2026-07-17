@@ -29,7 +29,7 @@ export function Hero() {
 
             <Reveal delay={0.05}>
               <h1 className="mt-6 text-balance text-4xl font-extrabold leading-[1.05] tracking-tight text-ink sm:text-5xl md:text-[3.4rem]">
-                De laatste website die jouw dierenbedrijf{" "}
+                De laatste website die jouw hondenbedrijf{" "}
                 <span className="relative whitespace-nowrap text-brand">
                   ooit nodig heeft
                   <svg
@@ -50,7 +50,7 @@ export function Hero() {
                 Je website, planning, klanten, betalingen en communicatie in{" "}
                 <span className="font-semibold text-ink">één veilige omgeving</span>.
                 Geen losse systemen, geen updates en geen technisch gedoe.{" "}
-                <span className="font-semibold text-ink">Jij zorgt voor de dieren. DogWare zorgt voor de rest.</span>
+                <span className="font-semibold text-ink">Jij zorgt voor de honden. DogWare zorgt voor de rest.</span>
               </p>
             </Reveal>
 

@@ -58,7 +58,7 @@ export const SERVICES: {
   },
   {
     key: "oppas",
-    value: "Dierenoppas aan huis",
+    value: "Hondenoppas aan huis",
     titel: "Zorg aan huis",
     verhaal: "Vertrouwde zorg in hun eigen mand.",
   },

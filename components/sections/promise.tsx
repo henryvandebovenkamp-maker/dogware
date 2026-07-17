@@ -70,7 +70,7 @@ export function PromiseSection() {
             </span>
             <p className="text-balance text-xl font-bold text-ink sm:text-2xl">
               Minder tijd achter je laptop.
-              <span className="text-brand"> Meer tijd tussen de dieren.</span>
+              <span className="text-brand"> Meer tijd tussen de honden.</span>
             </p>
           </div>
         </Reveal>

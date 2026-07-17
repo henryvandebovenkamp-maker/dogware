@@ -25,7 +25,7 @@ export function PartnerInviteEmail({
         groeien. Ik meen het: daar word ik echt blij van.
       </Text>
       <Text style={paragraph}>
-        DogWare groeit het mooist via mensen die andere dierenondernemers
+        DogWare groeit het mooist via mensen die andere hondenondernemers
         kennen en gunnen dat hun bedrijf net zo soepel gaat lopen. Dat jij
         DogWare wilt aanbevelen, betekent veel voor me.
       </Text>
@@ -77,7 +77,7 @@ export function PartnerInviteEmail({
       </Text>
       <Signature
         groet="Hartelijke groet,"
-        regel="Met dezelfde passie voor dieren als jij."
+        regel="Met dezelfde passie voor honden als jij."
       />
     </EmailLayout>
   );

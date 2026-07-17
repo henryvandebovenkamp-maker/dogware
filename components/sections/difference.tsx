@@ -59,7 +59,7 @@ export function Difference() {
                 Eén keer goed geregeld. Wij houden het draaiend.
               </h3>
               <p className="mt-4 text-pretty text-[15px] leading-relaxed text-white/85">
-                Gebouwd vanuit de praktijk van dierenprofessionals én voor je
+                Gebouwd vanuit de praktijk van hondenprofessionals én voor je
                 onderhouden. Jij hoeft geen technisch expert te worden om
                 professioneel en veilig te werken.
               </p>

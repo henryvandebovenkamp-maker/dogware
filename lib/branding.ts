@@ -17,13 +17,13 @@ export const branding = {
   title: "DogWare — Meer tijd voor wat telt",
   /** SEO-omschrijving */
   description:
-    "Het complete platform voor hondenscholen, uitlaatservices, trimsalons en dierenprofessionals. Planning, klanten, betalingen en administratie: alles op één plek, alles automatisch.",
+    "Het complete platform voor hondenscholen, uitlaatservices, trimsalons en andere hondenprofessionals. Planning, klanten, betalingen en administratie: alles op één plek, alles automatisch.",
   keywords: [
     "DogWare",
     "hondenschool software",
     "uitlaatservice software",
     "trimsalon software",
-    "dierenbedrijf software",
+    "hondenbedrijf software",
     "gedragstherapie",
     "hondenbedrijf platform",
     "planning honden",

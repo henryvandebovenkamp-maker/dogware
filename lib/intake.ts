@@ -10,7 +10,7 @@ export const DIENSTEN = [
   "Pension",
   "Trimsalon",
   "Gedragstherapie",
-  "Dierenoppas aan huis",
+  "Hondenoppas aan huis",
   "Webshop",
   "E-learning",
 ] as const;
