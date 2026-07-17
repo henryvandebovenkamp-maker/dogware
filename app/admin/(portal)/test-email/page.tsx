@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Mail } from "lucide-react";
-import { isEmailConfigured } from "@/lib/email/service";
+import { isEmailConfigured, isEmailSandbox } from "@/lib/email/service";
 import { TestEmailForm } from "./test-form";
 
 export const metadata: Metadata = {
@@ -10,6 +10,7 @@ export const metadata: Metadata = {
 
 export default function TestEmailPage() {
   const configured = isEmailConfigured();
+  const sandbox = isEmailSandbox();
 
   return (
     <main className="flex items-center justify-center px-5 py-8">
@@ -31,6 +32,15 @@ export default function TestEmailPage() {
             <strong>Niet geconfigureerd.</strong> Zet <code>RESEND_API_KEY</code>{" "}
             en <code>EMAIL_FROM</code> in <code>.env.local</code> en herstart de
             dev-server.
+          </div>
+        )}
+
+        {configured && sandbox && (
+          <div className="mb-5 rounded-xl bg-gold/10 p-4 text-[13px] leading-relaxed text-ink-700">
+            <strong>Testmodus actief.</strong> Er is nog geen eigen domein
+            geverifieerd bij Resend, dus alle mails worden naar jouw testadres
+            omgeleid (de bedoelde ontvanger staat in het onderwerp). Verifieer
+            je domein op resend.com/domains om naar iedereen te sturen.
           </div>
         )}
 

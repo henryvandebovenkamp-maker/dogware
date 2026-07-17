@@ -24,6 +24,27 @@ function getConfig() {
   };
 }
 
+/**
+ * Sandbox-modus: zolang je nog geen eigen domein bij Resend hebt geverifieerd,
+ * mag het proefadres onboarding@resend.dev alléén naar je eigen Resend-adres
+ * sturen. In plaats van te falen, sturen we élke mail dan naar dat adres
+ * (EMAIL_SANDBOX_TO) met de bedoelde ontvanger in het onderwerp — zodat de
+ * hele flow gewoon werkt tijdens het testen. Zodra EMAIL_FROM een eigen
+ * (geverifieerd) domein gebruikt, stopt dit automatisch.
+ */
+function getSandboxRedirect(from: string): string | null {
+  const usesSandboxSender = /@resend\.dev>?\s*$/i.test(from.trim());
+  const to = process.env.EMAIL_SANDBOX_TO?.trim();
+  if (usesSandboxSender && to) return to;
+  return null;
+}
+
+/** Is de mailservice in sandbox-testmodus (nog geen eigen domein)? */
+export function isEmailSandbox(): boolean {
+  const from = process.env.EMAIL_FROM ?? "";
+  return getSandboxRedirect(from) !== null;
+}
+
 /** Is de mailservice volledig geconfigureerd? */
 export function isEmailConfigured(): boolean {
   return getConfig() !== null;
@@ -101,18 +122,35 @@ export async function sendMail(
   }
 
   const resend = new Resend(config.apiKey);
+
+  // Sandbox: alle mail omleiden naar het testadres zodat er niets faalt.
+  const sandboxTo = getSandboxRedirect(config.from);
+  const origineleOntvanger = Array.isArray(options.to)
+    ? options.to.join(", ")
+    : options.to;
   const payload = {
     from: config.from,
-    to: options.to,
-    subject: options.subject,
+    to: sandboxTo ?? options.to,
+    subject: sandboxTo
+      ? `[TEST → ${origineleOntvanger}] ${options.subject}`
+      : options.subject,
     react: options.react,
     html: options.html,
     text: options.text,
     replyTo: options.replyTo ?? config.replyTo,
-    cc: options.cc,
-    bcc: options.bcc,
+    // In sandbox geen cc/bcc naar echte ontvangers sturen
+    cc: sandboxTo ? undefined : options.cc,
+    bcc: sandboxTo ? undefined : options.bcc,
     attachments: options.attachments,
   };
+
+  if (sandboxTo) {
+    logMail("info", "email.sandbox_redirect", {
+      type,
+      intended: origineleOntvanger,
+      redirected_to: sandboxTo,
+    });
+  }
 
   const maxAttempts = 2;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
