@@ -151,7 +151,7 @@ function CodeInput({ name }: { name: string }) {
         name={name}
         inputMode="numeric"
         autoComplete="one-time-code"
-        pattern="[0-9]*"
+        pattern="[0-9 ]*"
         maxLength={7}
         required
         value={value}
