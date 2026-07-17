@@ -1,5 +1,5 @@
 import { Text } from "@react-email/components";
-import { EmailLayout, paragraph, strong } from "./base";
+import { EmailLayout, Signature, paragraph, strong } from "./base";
 
 /** Persoonlijke bevestiging aan de aanvrager van een demo-intake. */
 export function IntakeConfirmationEmail({ naam }: { naam: string }) {
@@ -24,13 +24,8 @@ export function IntakeConfirmationEmail({ naam }: { naam: string }) {
         </span>{" "}
         Je zit nergens aan vast.
       </Text>
-      <Text style={{ ...paragraph, margin: "20px 0 0" }}>
-        Tot snel!
-        <br />
-        <span style={strong}>Henry van de Bovenkamp</span>
-        <br />
-        Oprichter van DogWare
-      </Text>
+      <Text style={paragraph}>Tot snel — en geniet van je honden. 🐾</Text>
+      <Signature />
     </EmailLayout>
   );
 }

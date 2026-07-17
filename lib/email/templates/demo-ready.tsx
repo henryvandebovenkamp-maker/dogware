@@ -1,5 +1,5 @@
 import { Button, Hr, Section, Text } from "@react-email/components";
-import { EmailLayout, emailColors, paragraph, strong } from "./base";
+import { EmailLayout, Signature, emailColors, paragraph, strong } from "./base";
 
 /**
  * Warme, persoonlijke mail wanneer de voorbeeldwebsite klaarstaat.
@@ -75,13 +75,7 @@ export function DemoReadyEmail({
         wensen of opmerkingen — of laat weten wanneer het jou uitkomt voor een
         korte persoonlijke afspraak. Ik denk graag met je mee.
       </Text>
-      <Text style={{ ...paragraph, margin: "16px 0 0" }}>
-        Hartelijke groet,
-        <br />
-        <span style={strong}>Henry van de Bovenkamp</span>
-        <br />
-        Oprichter van DogWare
-      </Text>
+      <Signature />
     </EmailLayout>
   );
 }

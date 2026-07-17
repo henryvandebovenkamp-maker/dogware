@@ -109,7 +109,7 @@ export async function sendDemo(
     websiteUrl,
   );
   if (!mail.ok) {
-    return { status: "error", message: `Versturen mislukt: ${mail.error.message}` };
+    return { status: "error", message: mail.error.message };
   }
 
   await db

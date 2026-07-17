@@ -53,12 +53,25 @@ export function EmailLayout({
         <Container
           style={{
             backgroundColor: "#ffffff",
-            borderRadius: 16,
+            borderRadius: 18,
             margin: "0 auto",
             maxWidth: 560,
             overflow: "hidden",
+            boxShadow: "0 10px 40px -12px rgba(28,21,15,0.12)",
           }}
         >
+          {/* Warme accentrand bovenaan */}
+          <Section
+            style={{
+              backgroundColor: emailColors.brand,
+              backgroundImage: `linear-gradient(90deg, ${emailColors.brand}, ${emailColors.sage})`,
+              height: 5,
+              lineHeight: "5px",
+              fontSize: 0,
+            }}
+          >
+            &nbsp;
+          </Section>
           <Section
             style={{
               backgroundColor: emailColors.cream,
@@ -100,10 +113,9 @@ export function EmailLayout({
                 margin: 0,
               }}
             >
-              {branding.name} — {branding.slogan}.
+              Gemaakt met liefde voor honden en hun mensen. 🐾
               <br />
-              Je ontvangt deze e-mail omdat je contact met ons had via{" "}
-              {branding.siteUrl.replace(/^https?:\/\//, "")}.
+              {branding.name} — {branding.slogan}.
             </Text>
           </Section>
         </Container>
@@ -125,3 +137,18 @@ export const strong = {
   color: emailColors.ink,
   fontWeight: 700,
 } as const;
+
+/** Warme, persoonlijke ondertekening van Henry — voor klant-mails. */
+export function Signature() {
+  return (
+    <Text style={{ ...paragraph, margin: "20px 0 0" }}>
+      Een hartelijke groet,
+      <br />
+      <span style={strong}>Henry</span>
+      <br />
+      <span style={{ fontSize: 13, color: emailColors.inkSoft }}>
+        DogWare — en zelf ook hondenmens
+      </span>
+    </Text>
+  );
+}
