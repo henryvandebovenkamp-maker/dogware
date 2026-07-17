@@ -45,7 +45,7 @@ export function Solution() {
               <br className="hidden sm:block" /> Alles op één plek.
             </>
           }
-          intro="Geen losse tools die je zelf aan elkaar moet knopen. Eén klant doorloopt je hele bedrijf — en elke stap gebeurt vanzelf in DogWare."
+          intro="Geen losse programma's die je zelf aan elkaar moet knopen. Eén klant doorloopt je hele bedrijf, en elke stap gaat vanzelf in DogWare."
         />
 
         {/* De flow als doorlopende keten */}
@@ -101,7 +101,7 @@ export function Solution() {
           <div className="mx-auto mt-10 flex max-w-2xl flex-col items-center gap-3 text-center">
             <span className="inline-flex items-center gap-2 rounded-full bg-sage-100 px-4 py-1.5 text-[13px] font-bold text-sage-600">
               <RefreshCw className="h-3.5 w-3.5" />
-              En dan weer van voren af aan — automatisch
+              En dan weer van voren af aan, helemaal vanzelf
             </span>
             <p className="text-balance text-xl font-bold text-ink sm:text-2xl">
               Geen dubbele invoer, geen losse abonnementen, geen gedoe.

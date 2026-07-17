@@ -29,7 +29,7 @@ export function Problem() {
         <SectionHeading
           eyebrow="Herken je dit?"
           title="Zoveel losse systemen. En dat voelt normaal."
-          intro="De meeste dierenondernemers werken elke dag met een handvol tools die niets van elkaar weten. Los van elkaar lijkt het te werken — samen kost het je elke avond opnieuw tijd."
+          intro="De meeste dierenondernemers werken met een handvol programma's die niets van elkaar weten. Elk apart lijkt het te werken. Bij elkaar kost het je elke avond opnieuw tijd."
         />
 
         <RevealStagger className="mx-auto mt-12 grid max-w-4xl gap-3 sm:grid-cols-2">

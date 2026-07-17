@@ -13,7 +13,7 @@ const BELOFTES = [
     icon: RefreshCw,
     titel: "Wij houden alles up-to-date",
     tekst:
-      "Geen updates, geen plugins, geen verouderde website. Wij bouwen en onderhouden je omgeving — jij merkt er niets van, behalve dat alles gewoon werkt.",
+      "Geen updates, geen plugins, geen verouderde website. Wij bouwen en onderhouden je omgeving. Jij merkt er niets van, behalve dat alles gewoon werkt.",
   },
   {
     icon: ShieldCheck,
@@ -25,7 +25,7 @@ const BELOFTES = [
     icon: Sprout,
     titel: "Groeit mee met je bedrijf",
     tekst:
-      "Begin met wat je vandaag nodig hebt — een website, planning of klantportaal. Wil je later meer? Dan zetten we het aan. Zonder verhuizen, zonder opnieuw beginnen.",
+      "Begin met wat je vandaag nodig hebt: een website, je planning of een klantportaal. Wil je later meer? Dan zetten we het aan. Je hoeft nooit te verhuizen of opnieuw te beginnen.",
   },
 ];
 

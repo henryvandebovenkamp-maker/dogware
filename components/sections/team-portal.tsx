@@ -48,7 +48,7 @@ export function TeamPortal() {
                 Geef iedere medewerker zijn eigen omgeving.
               </h3>
               <p className="mt-3 text-pretty text-[15px] leading-relaxed text-cream/70">
-                Iedereen werkt zelfstandig — en jij behoudt altijd het overzicht
+                Iedereen werkt zelfstandig en jij houdt altijd het overzicht
                 over het hele team.
               </p>
               <ul className="mt-6 grid gap-2.5">

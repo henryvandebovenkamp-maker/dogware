@@ -36,7 +36,7 @@ export function Payments() {
         <SectionHeading
           eyebrow="Betalingen"
           title="Eenvoudig betaald krijgen."
-          intro="Laat klanten betalen zoals zij dat willen — online én op locatie. Geen ingewikkelde systemen, geen losse oplossingen. Elke betaling wordt automatisch gekoppeld."
+          intro="Laat klanten betalen zoals zij dat willen, online of op locatie. Geen ingewikkelde systemen, geen losse betaaldiensten. Elke betaling komt automatisch op de juiste plek."
         />
 
         <RevealStagger className="mx-auto mt-12 grid max-w-3xl grid-cols-2 gap-3 sm:grid-cols-5">

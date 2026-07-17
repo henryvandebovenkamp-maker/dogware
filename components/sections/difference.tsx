@@ -12,7 +12,7 @@ const NOPES = [
   "Geen WordPress, geen kwetsbare plugins",
   "Alles werkt samen in één omgeving",
   "Wij onderhouden en beveiligen het voor je",
-  "Groeit mee — nooit meer verhuizen",
+  "Groeit mee, dus nooit meer verhuizen",
 ];
 
 export function Difference() {

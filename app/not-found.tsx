@@ -12,7 +12,7 @@ export default function NotFound() {
         Deze pagina is er even vandoor.
       </h1>
       <p className="mt-3 max-w-md text-pretty text-ink-500">
-        Misschien is de link verouderd of klopt er iets niet. Geen zorgen — we
+        Misschien is de link verouderd of klopt er iets niet. Geen zorgen, we
         brengen je zo weer op de goede plek.
       </p>
       <Link

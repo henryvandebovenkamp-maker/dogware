@@ -38,7 +38,7 @@ export function Results() {
         <SectionHeading
           eyebrow="Resultaten"
           title="Wat levert DogWare op?"
-          intro="Geen lijst met features, maar wat het écht oplevert voor jou en je bedrijf."
+          intro="Geen opsomming van functies, maar wat je er echt aan hebt."
         />
 
         <RevealStagger className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

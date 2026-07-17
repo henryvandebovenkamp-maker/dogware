@@ -17,7 +17,7 @@ const MODULES = [
     icon: GraduationCap,
     tab: "Hondenschool",
     title: "Van inschrijving tot diploma.",
-    desc: "Een complete cursusadministratie die zichzelf bijhoudt — van de eerste aanmelding tot het laatste lesmoment.",
+    desc: "Je cursusadministratie houdt zichzelf bij, van de eerste aanmelding tot de laatste les.",
     features: [
       "Online inschrijven",
       "Wachtlijsten",
@@ -51,7 +51,7 @@ const MODULES = [
     icon: Brain,
     tab: "Gedragstherapie",
     title: "Meer aandacht voor de hond. Minder administratie.",
-    desc: "Alles wat je nodig hebt om trajecten zorgvuldig vast te leggen en op te volgen — zonder papierwerk.",
+    desc: "Leg trajecten zorgvuldig vast en volg ze op. Zonder papierwerk.",
     features: [
       "Intakeformulieren",
       "Verslagen",
@@ -87,7 +87,7 @@ export function Modules() {
         <SectionHeading
           eyebrow="Modules"
           title="Eén platform, gebouwd voor jouw vakgebied."
-          intro="Kies de modules die bij jouw bedrijf passen. Combineer er meerdere — ze werken naadloos samen binnen dezelfde omgeving."
+          intro="Kies de onderdelen die bij jouw bedrijf passen. Combineer er zoveel als je wilt. Ze werken gewoon samen in dezelfde omgeving."
         />
 
         {/* Tabs */}

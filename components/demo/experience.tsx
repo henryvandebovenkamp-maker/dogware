@@ -198,7 +198,7 @@ export function DemoExperience() {
 
   function submit() {
     if (!naam.trim() || !plaats.trim()) {
-      setError("Vertel me nog even je naam en plaats — dan weet ik wie ik mag verrassen.");
+      setError("Vertel me nog even je naam en plaats, dan weet ik wie ik mag verrassen.");
       return;
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
@@ -323,7 +323,7 @@ export function DemoExperience() {
                   <StepHeading
                     kicker="Laten we bouwen"
                     titel="Hoe heet jouw bedrijf?"
-                    intro="Kijk daarna even rechts — dit wordt jóuw omgeving."
+                    intro="Kijk daarna even rechts. Dit wordt jóuw omgeving."
                   />
                   <div className="mt-10 max-w-md">
                     <GhostInput
@@ -347,7 +347,7 @@ export function DemoExperience() {
                   <StepHeading
                     kicker="Jouw dagen"
                     titel="Waar word jij iedere dag enthousiast van?"
-                    intro="Kies alles wat bij jouw bedrijf hoort — jouw omgeving groeit mee."
+                    intro="Kies alles wat bij jouw bedrijf hoort. Je omgeving groeit mee."
                   />
                   <div className="mt-8 grid gap-3.5 sm:grid-cols-2">
                     {SERVICES.map((s) => {
@@ -455,7 +455,7 @@ export function DemoExperience() {
                   <StepHeading
                     kicker="Jouw tijd"
                     titel="Wat kost jou nu de meeste energie?"
-                    intro="Wees eerlijk — dit wordt precies wat DogWare van je overneemt."
+                    intro="Wees eerlijk, want dit is precies wat DogWare van je overneemt."
                   />
                   <div className="mt-8 grid gap-3.5 sm:grid-cols-2">
                     {ENERGY.map((e) => (
@@ -530,7 +530,7 @@ export function DemoExperience() {
                   <StepHeading
                     kicker="Bijna klaar"
                     titel="Waar mag ik jouw voorbeeld naartoe sturen?"
-                    intro="Binnen 24 uur. Geen offerte — een kosteloos voorbeeld. Je zit nergens aan vast."
+                    intro="Binnen 24 uur. Geen offerte, maar een kosteloos voorbeeld. Je zit nergens aan vast."
                   />
                   <div className="mt-10 grid max-w-md gap-8">
                     <GhostInput

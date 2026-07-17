@@ -80,7 +80,7 @@ export function FinalCta() {
                   Jouw persoonlijke demo
                 </h3>
                 <p className="text-[13px] text-ink-500">
-                  Niet alleen horen wat kan — het direct zien voor jouw bedrijf
+                  Je hoort niet alleen wat kan, je ziet het meteen voor jouw bedrijf
                 </p>
               </div>
             </div>
@@ -110,7 +110,7 @@ export function FinalCta() {
 
             <p className="mt-4 flex items-center justify-center gap-1.5 text-center text-xs text-ink-300">
               <Sparkles className="h-3.5 w-3.5 text-brand" />
-              Geen offerte, maar een kosteloos voorbeeld — je zit nergens aan
+              Geen offerte, maar een kosteloos voorbeeld. Je zit nergens aan
               vast.
             </p>
           </div>

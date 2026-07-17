@@ -47,7 +47,7 @@ export function Ecosystem() {
         <SectionHeading
           eyebrow="Het DogWare ecosysteem"
           title="Alles gekoppeld. Alles automatisch. Alles centraal."
-          intro="Iedere discipline binnen jouw hondenbedrijf werkt vanuit hetzelfde hart. Wat je ook doet — het is verbonden."
+          intro="Alles wat je doet in je hondenbedrijf werkt vanuit één plek. Wat je ook oppakt, het hangt samen."
         />
 
         {/* Desktop orbit */}

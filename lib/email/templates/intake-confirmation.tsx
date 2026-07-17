@@ -24,7 +24,7 @@ export function IntakeConfirmationEmail({ naam }: { naam: string }) {
         </span>{" "}
         Je zit nergens aan vast.
       </Text>
-      <Text style={paragraph}>Tot snel — en geniet van je honden. 🐾</Text>
+      <Text style={paragraph}>Tot snel! En geniet van je honden. 🐾</Text>
       <Signature />
     </EmailLayout>
   );

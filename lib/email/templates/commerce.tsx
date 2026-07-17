@@ -41,7 +41,7 @@ const COPY: Record<
   "delivery-ready": {
     heading: (n) => `Het is klaar, ${n}!`,
     body: (v) => [
-      "Je DogWare-omgeving is opgeleverd — benieuwd wat je ervan vindt.",
+      "Je DogWare-omgeving is opgeleverd. Benieuwd wat je ervan vindt.",
       `Om alles definitief te maken staat de laatste termijn van ${v.amount} klaar.`,
     ],
     cta: "Bekijk oplevering",
@@ -65,7 +65,7 @@ const COPY: Record<
   "charge-failed": {
     heading: (n) => `Even een seintje, ${n}`,
     body: () => [
-      "Het is deze maand niet gelukt om je abonnement automatisch af te schrijven. Geen zorgen — dat gebeurt zo af en toe.",
+      "Het is deze maand niet gelukt om je abonnement automatisch af te schrijven. Geen zorgen, dat gebeurt zo af en toe.",
       "Je kunt het bedrag eenvoudig zelf via iDEAL voldoen; dan is het meteen weer geregeld.",
     ],
     cta: "Betaal via iDEAL",

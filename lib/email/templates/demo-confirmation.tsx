@@ -5,7 +5,7 @@ import { EmailLayout, paragraph, strong } from "./base";
 export function DemoConfirmationEmail({ naam }: { naam: string }) {
   return (
     <EmailLayout
-      preview="We hebben je demo-aanvraag ontvangen — tot snel!"
+      preview="We hebben je demo-aanvraag ontvangen. Tot snel!"
       heading={`Bedankt, ${naam}! 🐾`}
     >
       <Text style={paragraph}>

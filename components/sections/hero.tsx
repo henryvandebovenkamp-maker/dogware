@@ -139,7 +139,7 @@ export function Hero() {
                   />
                   <div>
                     <p className="text-[11px] font-bold text-ink">Gebouwd door hondenmensen</p>
-                    <p className="text-[10px] text-ink-300">Henry · oprichter — lees het verhaal</p>
+                    <p className="text-[10px] text-ink-300">Henry · oprichter. Lees zijn verhaal</p>
                   </div>
                 </a>
               </div>

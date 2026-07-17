@@ -81,8 +81,8 @@ export function Story() {
               <figure className="mt-8 rounded-3xl bg-white p-6 shadow-soft ring-1 ring-ink/5">
                 <blockquote className="text-pretty text-lg font-semibold leading-relaxed text-ink">
                   &ldquo;Ik wilde niet dat collega&apos;s in de branche hun
-                  avonden kwijt zijn aan regelwerk. Die uren horen bij de honden
-                  — of gewoon bij jezelf.&rdquo;
+                  avonden kwijt zijn aan regelwerk. Die uren horen bij de honden.
+                  Of gewoon bij jezelf.&rdquo;
                 </blockquote>
                 <figcaption className="mt-4 flex items-center gap-3">
                   <span className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-100 text-brand">

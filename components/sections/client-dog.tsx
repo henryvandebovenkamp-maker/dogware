@@ -76,7 +76,7 @@ export function ClientDog() {
         <SectionHeading
           eyebrow="Klant- & hondenbeheer"
           title="Iedere hond en iedere klant perfect georganiseerd."
-          intro="Eén compleet dossier per klant én per hond. Nooit meer zoeken, nooit meer dubbel invoeren — alles overzichtelijk op één plek."
+          intro="Eén dossier per klant en per hond. Nooit meer zoeken of dubbel invoeren. Alles staat overzichtelijk bij elkaar."
         />
 
         <div className="mt-12 grid gap-5 lg:grid-cols-2">

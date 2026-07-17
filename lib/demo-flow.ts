@@ -66,7 +66,7 @@ export const SERVICES: {
     key: "webshop",
     value: "Webshop",
     titel: "Producten verkopen",
-    verhaal: "Van riemen tot snacks — jouw eigen assortiment.",
+    verhaal: "Van riemen tot snacks. Jouw eigen assortiment.",
   },
 ];
 
@@ -126,7 +126,7 @@ export const ENERGY: {
     key: "berichten",
     value: "Klanten beantwoorden",
     titel: "Appjes en mailtjes",
-    verhaal: "'Is er nog plek?' — voor de tiende keer vandaag.",
+    verhaal: "'Is er nog plek?' Voor de tiende keer vandaag.",
     belofte: "Klanten boeken zelf",
   },
   {
@@ -208,11 +208,11 @@ export const MODULES: {
 /** Menselijke reacties van DogWare tijdens de experience. */
 export const REACTIONS = {
   naam: "Mooie naam. Die zetten we meteen boven jouw omgeving.",
-  dienstenEen: "Leuk — daar kan ik straks iets moois voor laten zien.",
+  dienstenEen: "Leuk. Daar laat ik je straks iets moois voor zien.",
   dienstenMeer: "Mooi bedrijf. Dit gaan we straks allemaal samenbrengen.",
   websiteJa: "Fijn, dan bouwen we verder op wat er al staat.",
   websiteNee: "Dan bouwen we een thuisbasis die dit werk vanzelf doet.",
   energie: "Dat hoor ik vaker. Hier gaan we je veel tijd besparen.",
-  modules: "Goeie keuzes. Kijk rechts — het begint al ergens op te lijken.",
+  modules: "Goeie keuzes. Kijk eens rechts, het begint al ergens op te lijken.",
   droom: "Hou dat gevoel vast. Daar bouwen we naartoe.",
 } as const;
