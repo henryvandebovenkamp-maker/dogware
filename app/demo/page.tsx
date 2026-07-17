@@ -4,7 +4,6 @@ import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { Logo } from "@/components/brand";
 import { DemoExperience } from "@/components/demo/experience";
-import { PartnerWelcome } from "@/components/demo/partner-welcome";
 import { getValidAttribution } from "@/lib/referral";
 import { getDb, schema } from "@/lib/db";
 
@@ -33,18 +32,27 @@ export default async function DemoPage({
     redirect(`/p/${encodeURIComponent(ref)}`);
   }
 
-  // Actieve koppeling ophalen (via de cookie die /p/CODE heeft gezet)
-  let welcomePerks: string[] | null = null;
+  // Actieve koppeling ophalen (via de cookie die /p/CODE heeft gezet).
+  // Naam + voordelen gaan als prop mee de centrale demo-flow in, zodat de
+  // ervaring identiek is aan een normale aanvraag — alleen met een
+  // persoonlijke introductie bovenaan.
+  let partnerIntro: { name: string | null; perks: string[] } | null = null;
   const attribution = await getValidAttribution();
   if (attribution) {
     const db = getDb();
     if (db) {
-      const [partner] = await db
-        .select({ perks: schema.partners.newCustomerPerks })
+      const rows = await db
+        .select({
+          perks: schema.partners.newCustomerPerks,
+          bedrijfsnaam: schema.partners.bedrijfsnaam,
+          naam: schema.users.naam,
+        })
         .from(schema.partners)
+        .innerJoin(schema.users, eq(schema.partners.userId, schema.users.id))
         .where(eq(schema.partners.id, attribution.partnerId))
         .limit(1);
-      if (partner) welcomePerks = partner.perks;
+      const p = rows[0];
+      if (p) partnerIntro = { name: p.bedrijfsnaam ?? p.naam ?? null, perks: p.perks };
     }
   }
 
@@ -68,8 +76,10 @@ export default async function DemoPage({
       </header>
 
       <main className="mx-auto w-full max-w-6xl px-5 pb-24 pt-14 sm:px-8 sm:pt-20">
-        {welcomePerks && <PartnerWelcome perks={welcomePerks} />}
-        <DemoExperience uploadEnabled={Boolean(process.env.UPLOADTHING_TOKEN)} />
+        <DemoExperience
+          uploadEnabled={Boolean(process.env.UPLOADTHING_TOKEN)}
+          partner={partnerIntro}
+        />
       </main>
     </div>
   );

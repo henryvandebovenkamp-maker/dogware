@@ -34,6 +34,7 @@ import {
   IlluWordOfMouth,
 } from "./illustrations";
 import { LivePreview } from "./preview";
+import { PartnerWelcome } from "./partner-welcome";
 import {
   BackButton,
   ChoiceCard,
@@ -83,7 +84,14 @@ const ROUTE_LABELS = [
   "Bijna klaar",
 ];
 
-export function DemoExperience({ uploadEnabled = false }: { uploadEnabled?: boolean }) {
+export function DemoExperience({
+  uploadEnabled = false,
+  partner = null,
+}: {
+  uploadEnabled?: boolean;
+  /** Alleen gevuld bij binnenkomst via een partner/affiliate. */
+  partner?: { name: string | null; perks: string[] } | null;
+}) {
   const [step, setStep] = useState<StepId>("naam");
   const [bedrijfsnaam, setBedrijfsnaam] = useState("");
   const [services, setServices] = useState<ServiceKey[]>([]);
@@ -297,7 +305,14 @@ export function DemoExperience({ uploadEnabled = false }: { uploadEnabled?: bool
 
   /* ---------- Experience ---------- */
   return (
-    <div className="grid items-start gap-10 lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-14">
+    <>
+      {/* Persoonlijke introductie bij binnenkomst via een partner.
+          Alleen tijdens de vragen; de finale is voor iedereen identiek. */}
+      {partner && (
+        <PartnerWelcome perks={partner.perks} partnerName={partner.name} />
+      )}
+
+      <div className="grid items-start gap-10 lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-14">
       {/* Vragenkant */}
       <div className="flex min-h-[26rem] flex-col">
         <div className="flex items-center justify-between gap-4">
@@ -648,7 +663,8 @@ export function DemoExperience({ uploadEnabled = false }: { uploadEnabled?: bool
       <div className="sticky top-28 hidden lg:block">
         <PreviewFrame state={previewState} />
       </div>
-    </div>
+      </div>
+    </>
   );
 }
 

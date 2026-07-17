@@ -1,10 +1,17 @@
 import { GlyphCheck, GlyphPaw } from "./illustrations";
 
 /**
- * Warm welkom voor bezoekers die via een partner binnenkomen.
- * Uitnodigend, niet commercieel — "er wordt tijd voor je genomen".
+ * Persoonlijke introductie voor bezoekers die via een partner binnenkomen.
+ * Wordt getoond bovenaan de demo-flow (alleen tijdens de vragen, niet in de
+ * finale), zodat de rest van de ervaring identiek is aan de normale aanvraag.
  */
-export function PartnerWelcome({ perks }: { perks: string[] }) {
+export function PartnerWelcome({
+  perks,
+  partnerName,
+}: {
+  perks: string[];
+  partnerName?: string | null;
+}) {
   return (
     <div className="mx-auto mb-10 max-w-2xl overflow-hidden rounded-3xl bg-white shadow-lift ring-1 ring-ink/5">
       <div className="h-1.5 bg-gradient-to-r from-brand to-sage" />
@@ -14,7 +21,9 @@ export function PartnerWelcome({ perks }: { perks: string[] }) {
           Je bent persoonlijk uitgenodigd
         </span>
         <h2 className="mt-4 text-balance text-2xl font-extrabold tracking-tight text-ink sm:text-[1.7rem]">
-          Welkom! Je bent doorverwezen door een DogWare-partner.
+          {partnerName
+            ? `${partnerName} denkt dat DogWare goed bij jouw bedrijf past.`
+            : "Welkom! Je bent doorverwezen door een DogWare-partner."}
         </h2>
 
         {perks.length > 0 && (
@@ -34,8 +43,9 @@ export function PartnerWelcome({ perks }: { perks: string[] }) {
         )}
 
         <p className="mt-5 text-[14px] leading-relaxed text-ink-500">
-          Vul hieronder rustig iets over je bedrijf in. Ik neem echt de tijd om
-          een persoonlijk voorbeeld voor je te maken — geen standaard verhaal.
+          Leuk dat je er bent. Vul hieronder rustig iets over je bedrijf in, dan
+          maak ik met alle tijd een persoonlijk voorbeeld voor je. Geen standaard
+          verhaal, vrijblijvend en zonder verplichtingen.
         </p>
       </div>
     </div>
