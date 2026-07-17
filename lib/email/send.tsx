@@ -11,6 +11,8 @@ import { PartnerActivatedEmail } from "./templates/partner-activated";
 import { PartnerInviteEmail } from "./templates/partner-invite";
 import { MagicLoginEmail } from "./templates/magic-login";
 import { DemoReadyEmail } from "./templates/demo-ready";
+import { CommerceEmail, type CommerceMailType } from "./templates/commerce";
+import { branding } from "@/lib/branding";
 import { WelcomeEmail } from "./templates/welcome";
 
 /**
@@ -188,6 +190,38 @@ export async function sendDemoReady(
       />
     ),
     text: `Hoi ${naam},\n\nJe persoonlijke DogWare-voorbeeld voor ${bedrijfsnaam} staat klaar.\n${demoUrl ? `Voorbeeldwebsite: ${demoUrl}\n` : ""}Log veilig in (zonder wachtwoord): ${loginUrl}\n\nBenieuwd wat je ervan vindt!\n\nHartelijke groet,\nHenry van de Bovenkamp\nDogWare`,
+  });
+}
+
+/** Commerciële journey-mails (voorstel, betalingen, abonnement). */
+export async function sendCommerceMail(
+  type: CommerceMailType,
+  to: string,
+  naam: string,
+  vars: { amount?: string; extra?: string } = {},
+): Promise<MailResult> {
+  const subjects: Record<CommerceMailType, string> = {
+    "proposal-sent": "Je persoonlijke voorstel van DogWare",
+    "deposit-ready": "We kunnen beginnen — de eerste termijn staat klaar",
+    "deposit-received": "Ontvangen! We gaan jouw DogWare bouwen",
+    "delivery-ready": "Je DogWare-omgeving is klaar",
+    "final-ready": "De laatste termijn staat voor je klaar",
+    "final-received": "Helemaal rond — bedankt!",
+    "subscription-started": "Welkom als vaste DogWare-klant",
+    "charge-failed": "Je maandbetaling is nog niet gelukt",
+  };
+  return sendMail(type === "charge-failed" ? "notification" : "demo-ready", {
+    to,
+    subject: subjects[type],
+    react: (
+      <CommerceEmail
+        type={type}
+        naam={naam.split(" ")[0]}
+        ctaUrl={`${branding.siteUrl}/account`}
+        vars={vars}
+      />
+    ),
+    text: `${subjects[type]}${vars.amount ? ` — ${vars.amount}` : ""}. Bekijk het in je omgeving: ${branding.siteUrl}/account`,
   });
 }
 

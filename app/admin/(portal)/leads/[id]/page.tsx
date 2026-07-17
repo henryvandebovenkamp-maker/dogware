@@ -9,6 +9,8 @@ import { LeadAdminForm } from "./lead-admin-form";
 import { ReassignForm } from "./reassign-form";
 import { StageTimeline } from "./journey";
 import { DemoPanel, StageControl } from "./journey-controls";
+import { AdminCommercePanel } from "@/components/commerce/admin-panel";
+import { buildPanelData } from "@/lib/commerce-view";
 
 export const metadata: Metadata = {
   title: "Lead",
@@ -94,6 +96,8 @@ export default async function LeadDetailPage({
     .where(eq(schema.journeyEvents.leadId, id))
     .orderBy(desc(schema.journeyEvents.createdAt))
     .limit(50);
+
+  const panelData = await buildPanelData(id);
 
   return (
     <main className="mx-auto w-full max-w-2xl">
@@ -221,6 +225,13 @@ export default async function LeadDetailPage({
               klantEmail={lead.email}
               alSent={Boolean(lead.demoSentAt)}
             />
+          </div>
+        </Sectie>
+
+        {/* Financiën & betalingen */}
+        <Sectie titel="Financiën & betalingen">
+          <div className="rounded-xl bg-white p-5 shadow-soft ring-1 ring-ink/5">
+            <AdminCommercePanel data={panelData} />
           </div>
         </Sectie>
 

@@ -461,6 +461,132 @@ export const journeyTasks = pgTable(
 
 export type JourneyEvent = typeof journeyEvents.$inferSelect;
 export type JourneyTask = typeof journeyTasks.$inferSelect;
+
+/* =========================================================================
+ * Commerciële journey — afspraak, betalingen, abonnement (Mollie)
+ * ========================================================================= */
+
+/** Uitgebreide commerciële status (naast de zichtbare journey-stage). */
+export const COMMERCE_STATUSES = [
+  "DRAFT",
+  "PROPOSAL_SENT",
+  "PROPOSAL_ACCEPTED",
+  "DEPOSIT_PENDING",
+  "DEPOSIT_PAID",
+  "BUILDING",
+  "DELIVERY_READY",
+  "FINAL_PAYMENT_PENDING",
+  "FULLY_PAID",
+  "SUBSCRIPTION_SCHEDULED",
+  "ACTIVE_CUSTOMER",
+  "PAYMENT_ISSUE",
+  "CANCELLED",
+] as const;
+export type CommerceStatus = (typeof COMMERCE_STATUSES)[number];
+
+/**
+ * Eén commerciële afspraak per lead/klant — de bron van waarheid voor alle
+ * bedragen. Alles in eurocenten. Gekoppeld aan de bestaande lead (klant).
+ */
+export const commerce = pgTable(
+  "commerce",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    leadId: uuid("lead_id")
+      .notNull()
+      .references(() => leads.id, { onDelete: "cascade" }),
+    status: text("status").$type<CommerceStatus>().notNull().default("DRAFT"),
+
+    // Centrale afspraak (centen)
+    projectCents: integer("project_cents").notNull().default(0),
+    setupCents: integer("setup_cents").notNull().default(0),
+    discountType: text("discount_type").$type<"none" | "amount" | "percent">().notNull().default("none"),
+    discountValue: integer("discount_value").notNull().default(0),
+    vatPercent: integer("vat_percent").notNull().default(21),
+    depositPercent: integer("deposit_percent").notNull().default(50),
+
+    // Abonnement
+    monthlyCents: integer("monthly_cents").notNull().default(0),
+    freeMonths: integer("free_months").notNull().default(0),
+    introDiscountPercent: integer("intro_discount_percent").notNull().default(0),
+    introDiscountMonths: integer("intro_discount_months").notNull().default(0),
+    subscriptionStartRule: text("subscription_start_rule")
+      .$type<"na-oplevering" | "na-laatste-betaling" | "eerste-volgende-maand" | "handmatig">()
+      .notNull()
+      .default("na-oplevering"),
+    subscriptionStartAt: timestamp("subscription_start_at", { withTimezone: true }),
+    opmerkingen: text("opmerkingen"),
+
+    // Voorstel — geaccepteerde versie wordt onveranderlijk vastgelegd
+    proposalVersion: integer("proposal_version").notNull().default(0),
+    proposalSentAt: timestamp("proposal_sent_at", { withTimezone: true }),
+    /** Bevroren momentopname van de afspraak bij akkoord (JSON) */
+    acceptedSnapshot: jsonb("accepted_snapshot").$type<Record<string, unknown>>(),
+    acceptedAt: timestamp("accepted_at", { withTimezone: true }),
+    acceptedIpHash: text("accepted_ip_hash"),
+
+    // Mollie recurring
+    mollieCustomerId: text("mollie_customer_id"),
+    mollieMandateId: text("mollie_mandate_id"),
+    mandateStatus: text("mandate_status"),
+
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("commerce_lead_idx").on(t.leadId)],
+);
+
+export const PAYMENT_TYPES = [
+  "DEPOSIT",
+  "FINAL_PAYMENT",
+  "SUBSCRIPTION",
+  "MANUAL_CORRECTION",
+  "REFUND",
+] as const;
+export type PaymentType = (typeof PAYMENT_TYPES)[number];
+
+export const PAYMENT_STATUSES = [
+  "CREATED",
+  "OPEN",
+  "PENDING",
+  "PAID",
+  "FAILED",
+  "EXPIRED",
+  "CANCELED",
+  "REFUNDED",
+] as const;
+export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
+
+/** Elke betaling (eenmalig of periodiek). Mollie blijft bron van waarheid. */
+export const payments = pgTable(
+  "payments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    commerceId: uuid("commerce_id")
+      .notNull()
+      .references(() => commerce.id, { onDelete: "cascade" }),
+    type: text("type").$type<PaymentType>().notNull(),
+    status: text("status").$type<PaymentStatus>().notNull().default("CREATED"),
+    amountCents: integer("amount_cents").notNull(),
+    /** Mollie payment-ID (tr_...) — uniek */
+    molliePaymentId: text("mollie_payment_id"),
+    /** Periode voor abonnementsbetalingen, bijv. "2026-08" — voorkomt dubbele incasso */
+    periode: text("periode"),
+    paidAt: timestamp("paid_at", { withTimezone: true }),
+    /** Idempotentie: markeert of de 'betaald'-verwerking al is uitgevoerd */
+    processedAt: timestamp("processed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("payments_mollie_idx").on(t.molliePaymentId),
+    // Blokkeert dubbele incasso voor dezelfde abonnementsperiode
+    uniqueIndex("payments_sub_period_idx").on(t.commerceId, t.type, t.periode),
+    index("payments_commerce_idx").on(t.commerceId, t.createdAt),
+  ],
+);
+
+export type Commerce = typeof commerce.$inferSelect;
+export type Payment = typeof payments.$inferSelect;
 export type User = typeof users.$inferSelect;
 export type Partner = typeof partners.$inferSelect;
 export type ReferralClick = typeof referralClicks.$inferSelect;

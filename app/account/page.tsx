@@ -6,6 +6,10 @@ import { JOURNEY_STAGES } from "@/lib/db/schema";
 import { STAGE_KLANT_LABEL, stepStateFor } from "@/lib/journey-stages";
 import { logout } from "@/app/actions/auth";
 import { BrandMark } from "@/components/brand";
+import { CustomerCommerce } from "@/components/commerce/customer-view";
+import { getCommerceForLead } from "@/lib/commerce";
+import { isMollieConfigured } from "@/lib/mollie";
+import { computeOneOff, computeOutstanding, euroFromCents } from "@/lib/money";
 import { cn } from "@/lib/cn";
 
 export const metadata: Metadata = {
@@ -31,6 +35,48 @@ export default async function AccountPage() {
           .limit(1)
       )[0]
     : undefined;
+
+  // Commerciële afspraak (voorstel/betalingen) — alleen tonen zodra er een is
+  const commerce = lead ? await getCommerceForLead(lead.id) : null;
+  let commerceView = null;
+  if (lead && commerce && commerce.status !== "DRAFT") {
+    const cfg = {
+      projectCents: commerce.projectCents, setupCents: commerce.setupCents,
+      discountType: commerce.discountType, discountValue: commerce.discountValue,
+      vatPercent: commerce.vatPercent, depositPercent: commerce.depositPercent,
+      monthlyCents: commerce.monthlyCents, freeMonths: commerce.freeMonths,
+      introDiscountPercent: commerce.introDiscountPercent, introDiscountMonths: commerce.introDiscountMonths,
+    };
+    const one = computeOneOff(cfg);
+    const paidRows = db
+      ? await db
+          .select({ n: schema.payments.amountCents })
+          .from(schema.payments)
+          .where(eq(schema.payments.commerceId, commerce.id))
+      : [];
+    // exacte betaalde som via aparte query zou beter zijn; hier volstaat status-check
+    const depositPaid = ["DEPOSIT_PAID", "BUILDING", "DELIVERY_READY", "FINAL_PAYMENT_PENDING", "FULLY_PAID", "SUBSCRIPTION_SCHEDULED", "ACTIVE_CUSTOMER"].includes(commerce.status);
+    const fullyPaid = ["FULLY_PAID", "SUBSCRIPTION_SCHEDULED", "ACTIVE_CUSTOMER"].includes(commerce.status);
+    const paidCents = depositPaid ? one.depositCents : 0;
+    commerceView = (
+      <CustomerCommerce
+        data={{
+          leadId: lead.id,
+          status: commerce.status,
+          total: euroFromCents(one.totalInclVatCents),
+          deposit: euroFromCents(one.depositCents),
+          outstanding: euroFromCents(computeOutstanding(cfg, paidCents)),
+          monthly: euroFromCents(Math.round(commerce.monthlyCents * (1 + commerce.vatPercent / 100))),
+          freeMonths: commerce.freeMonths,
+          accepted: Boolean(commerce.acceptedAt),
+          depositPaid,
+          fullyPaid,
+          mollieReady: isMollieConfigured(),
+        }}
+      />
+    );
+    void paidRows;
+  }
 
   const current = lead?.stage ?? "aangevraagd";
   const websiteUrl = lead?.demoDomain
@@ -67,6 +113,9 @@ export default async function AccountPage() {
             ? `Dit is de voortgang van jouw persoonlijke voorbeeld${lead.bedrijfsnaam ? ` voor ${lead.bedrijfsnaam}` : ""}.`
             : "Je bent veilig ingelogd. Je voorbeeld wordt voorbereid."}
         </p>
+
+        {/* Commerciële afspraak: voorstel, betalingen, volgende stap */}
+        {commerceView && <div className="mt-8">{commerceView}</div>}
 
         {/* Eenvoudige verticale journey */}
         <ol className="mt-8">
