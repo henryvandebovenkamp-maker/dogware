@@ -119,6 +119,38 @@ export async function requestLoginChallenge(
   return { ok: true };
 }
 
+/**
+ * Maak een eenmalige magic-login-token voor een bestaande gebruiker en geef
+ * de kale token terug (voor gebruik in een andere mail, bijv. de demo-mail).
+ * Verstuurt zelf geen inlogmail. Eerdere open challenges vervallen.
+ */
+export async function createMagicLinkToken(
+  userId: string,
+  email: string,
+  geldigMinuten = CHALLENGE_MINUTES,
+): Promise<string | null> {
+  const db = getDb();
+  if (!db) return null;
+  await db
+    .delete(schema.loginChallenges)
+    .where(
+      and(
+        eq(schema.loginChallenges.userId, userId),
+        isNull(schema.loginChallenges.usedAt),
+      ),
+    );
+  const token = generateToken();
+  const code = generateLoginCode();
+  await db.insert(schema.loginChallenges).values({
+    userId,
+    email: email.trim().toLowerCase(),
+    tokenHash: hashToken(token),
+    codeHash: hashToken(code),
+    expiresAt: new Date(Date.now() + geldigMinuten * 60_000),
+  });
+  return token;
+}
+
 type VerifyResult =
   | { ok: true; user: User; destination: string }
   | { ok: false; message: string };
@@ -235,10 +267,29 @@ async function completeLogin(
     return { ok: false, message: "Dit account is niet beschikbaar." };
   }
 
+  const eersteLogin = user.lastLoginAt === null;
   await db
     .update(schema.users)
     .set({ lastLoginAt: new Date(), status: user.status === "INVITED" ? "ACTIVE" : user.status })
     .where(eq(schema.users.id, user.id));
+
+  // Demo Journey: eerste login van een demo-klant schuift de stage door.
+  if (user.role === "CUSTOMER") {
+    const [lead] = await db
+      .select({ id: schema.leads.id })
+      .from(schema.leads)
+      .where(eq(schema.leads.demoCustomerUserId, user.id))
+      .limit(1);
+    if (lead) {
+      const { setStage, logJourneyEvent } = await import("@/lib/journey");
+      await setStage(lead.id, "ingelogd");
+      await logJourneyEvent(
+        lead.id,
+        eersteLogin ? "first_login" : "login",
+        eersteLogin ? "Klant voor het eerst ingelogd" : "Klant opnieuw ingelogd",
+      );
+    }
+  }
 
   await createSession(user.id, user.role);
   await logActivity({

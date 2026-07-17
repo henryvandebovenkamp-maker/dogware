@@ -9,6 +9,7 @@ export type MailType =
   | "partner-invite"
   | "partner-activated"
   | "magic-login"
+  | "demo-ready"
   | "welcome"
   | "notification"
   | "test";

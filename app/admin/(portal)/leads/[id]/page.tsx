@@ -1,12 +1,19 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { ArrowLeft, ExternalLink } from "lucide-react";
 import { getDb, schema } from "@/lib/db";
 import { LeadStatusBadge } from "../status-badge";
 import { LeadAdminForm } from "./lead-admin-form";
 import { ReassignForm } from "./reassign-form";
+import { StageTimeline } from "./journey";
+import {
+  DemoSetupForm,
+  SendDemoButton,
+  StageControl,
+  TaskList,
+} from "./journey-controls";
 
 export const metadata: Metadata = {
   title: "Lead",
@@ -104,6 +111,21 @@ export default async function LeadDetailPage({
     })
     .from(schema.partners);
 
+  // Demo Journey: tijdlijn-events en interne taken
+  const [events, tasks] = await Promise.all([
+    db
+      .select()
+      .from(schema.journeyEvents)
+      .where(eq(schema.journeyEvents.leadId, id))
+      .orderBy(desc(schema.journeyEvents.createdAt))
+      .limit(50),
+    db
+      .select()
+      .from(schema.journeyTasks)
+      .where(eq(schema.journeyTasks.leadId, id))
+      .orderBy(schema.journeyTasks.createdAt),
+  ]);
+
   return (
     <main>
       <div className="mx-auto w-full max-w-3xl">
@@ -132,6 +154,65 @@ export default async function LeadDetailPage({
           </div>
           <LeadStatusBadge status={lead.status} />
         </div>
+
+        {/* Demo Journey — het hart van het verkoopproces */}
+        <div className="mb-5 grid gap-4 lg:grid-cols-[1fr_1.1fr]">
+          <section className="rounded-2xl bg-white p-5 shadow-soft ring-1 ring-ink/5">
+            <h2 className="mb-4 text-sm font-extrabold text-ink">Demo Journey</h2>
+            <StageTimeline current={lead.stage} />
+            <div className="mt-4 border-t border-cream-100 pt-4">
+              <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-ink-300">
+                Status handmatig aanpassen
+              </p>
+              <StageControl leadId={lead.id} current={lead.stage} />
+            </div>
+          </section>
+
+          <div className="space-y-4">
+            <section className="rounded-2xl bg-white p-5 shadow-soft ring-1 ring-ink/5">
+              <h2 className="mb-3 text-sm font-extrabold text-ink">Voorbeeldwebsite</h2>
+              <DemoSetupForm
+                leadId={lead.id}
+                template={lead.demoTemplate}
+                domein={lead.demoDomain}
+                primair={lead.demoPrimaryColor}
+                secundair={lead.demoSecondaryColor}
+              />
+              <div className="mt-4 border-t border-cream-100 pt-4">
+                <SendDemoButton leadId={lead.id} alSent={Boolean(lead.demoSentAt)} />
+              </div>
+            </section>
+
+            <section className="rounded-2xl bg-white p-5 shadow-soft ring-1 ring-ink/5">
+              <h2 className="mb-3 text-sm font-extrabold text-ink">Interne taken</h2>
+              <TaskList leadId={lead.id} tasks={tasks} />
+            </section>
+          </div>
+        </div>
+
+        {/* Tijdlijn / logboek */}
+        <section className="mb-5 rounded-2xl bg-white p-5 shadow-soft ring-1 ring-ink/5">
+          <h2 className="mb-3 text-sm font-extrabold text-ink">Tijdlijn</h2>
+          {events.length === 0 ? (
+            <p className="py-3 text-center text-[13px] text-ink-300">Nog geen gebeurtenissen.</p>
+          ) : (
+            <ul className="space-y-2">
+              {events.map((e) => (
+                <li key={e.id} className="flex items-start gap-3 text-[13px]">
+                  <span className="w-28 shrink-0 text-[11px] text-ink-300">
+                    {e.createdAt.toLocaleString("nl-NL", {
+                      day: "numeric",
+                      month: "short",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </span>
+                  <span className="text-ink-700">{e.label}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
 
         <div className="space-y-4">
           <Blok titel="Partnerattributie">

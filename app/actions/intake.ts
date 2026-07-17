@@ -5,6 +5,7 @@ import { branding } from "@/lib/branding";
 import { getDb, schema } from "@/lib/db";
 import { ATTRIBUTION_MODEL, getValidAttribution } from "@/lib/referral";
 import { logActivity } from "@/lib/audit";
+import { DEFAULT_TASKS, logJourneyEvent } from "@/lib/journey";
 import {
   sendIntakeConfirmation,
   sendIntakeNotification,
@@ -118,11 +119,26 @@ export async function submitIntake(raw: IntakeData): Promise<IntakeState> {
           referralClickId: attribution?.clickId ?? null,
           attributionModel: attribution ? ATTRIBUTION_MODEL : null,
           attributedAt: attribution ? new Date() : null,
+          // Demo Journey start
+          source: attribution ? "referral" : "website",
+          stage: "aangevraagd",
         })
         .returning({ id: schema.leads.id });
       if (lead) {
         leadUrl = `${branding.siteUrl}/admin/leads/${lead.id}`;
+        // Demo Journey opstarten: eerste tijdlijn-events + standaardtaken
+        await logJourneyEvent(lead.id, "requested", "Demo aangevraagd via de website");
+        await logJourneyEvent(lead.id, "journey_created", "Journey aangemaakt");
+        await db.insert(schema.journeyTasks).values(
+          DEFAULT_TASKS.map((label) => ({ leadId: lead.id, label })),
+        );
         if (attribution) {
+          await logJourneyEvent(
+            lead.id,
+            "attributed",
+            `Aangebracht via partner (${attribution.referralCode})`,
+            { partnerId: attribution.partnerId },
+          );
           await logActivity({
             action: "LEAD_ATTRIBUTED",
             objectType: "lead",

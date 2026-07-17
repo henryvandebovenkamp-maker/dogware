@@ -15,7 +15,11 @@ import {
  * ========================================================================= */
 
 /** Rollen — later uitbreidbaar met ADMIN, SALES, SUPPORT, ACCOUNTING. */
-export const USER_ROLES = ["SUPER_ADMIN", "AFFILIATE_PARTNER"] as const;
+export const USER_ROLES = [
+  "SUPER_ADMIN",
+  "AFFILIATE_PARTNER",
+  "CUSTOMER",
+] as const;
 export type UserRole = (typeof USER_ROLES)[number];
 
 export const USER_STATUSES = ["INVITED", "ACTIVE", "BLOCKED"] as const;
@@ -335,6 +339,22 @@ export const leads = pgTable(
     attributionModel: text("attribution_model").$type<AttributionModel>(),
     attributedAt: timestamp("attributed_at", { withTimezone: true }),
 
+    // Bron van de aanvraag
+    source: text("source").$type<LeadSource>().notNull().default("website"),
+
+    // Demo Journey — stage + voorbeeldwebsite-opzet
+    stage: text("stage").$type<JourneyStage>().notNull().default("aangevraagd"),
+    demoTemplate: text("demo_template"),
+    demoDomain: text("demo_domain"),
+    demoPrimaryColor: text("demo_primary_color"),
+    demoSecondaryColor: text("demo_secondary_color"),
+    /** Gekoppeld demo-klantaccount (passwordless magic login) */
+    demoCustomerUserId: uuid("demo_customer_user_id").references(
+      () => users.id,
+      { onDelete: "set null" },
+    ),
+    demoSentAt: timestamp("demo_sent_at", { withTimezone: true }),
+
     // Adminportaal
     status: text("status").$type<LeadStatus>().notNull().default("nieuw"),
     notities: text("notities"),
@@ -342,12 +362,81 @@ export const leads = pgTable(
   (t) => [
     index("leads_created_idx").on(t.createdAt),
     index("leads_status_idx").on(t.status),
+    index("leads_stage_idx").on(t.stage),
     index("leads_partner_idx").on(t.affiliatePartnerId),
   ],
 );
 
 export type Lead = typeof leads.$inferSelect;
 export type NewLead = typeof leads.$inferInsert;
+
+/* =========================================================================
+ * Demo Journey — stages, tijdlijn-events en interne taken
+ * ========================================================================= */
+
+export const LEAD_SOURCES = [
+  "website",
+  "affiliate",
+  "referral",
+  "handmatig",
+] as const;
+export type LeadSource = (typeof LEAD_SOURCES)[number];
+
+/** De vaste stappen van de klantreis, in volgorde. */
+export const JOURNEY_STAGES = [
+  "aangevraagd",
+  "voorbereiden",
+  "demo-verstuurd",
+  "ingelogd",
+  "bekeken",
+  "feedback",
+  "afspraak",
+  "offerte",
+  "akkoord",
+  "gestart",
+] as const;
+export type JourneyStage = (typeof JOURNEY_STAGES)[number];
+
+/** Chronologisch logboek per aanvraag (de zichtbare tijdlijn). */
+export const journeyEvents = pgTable(
+  "journey_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    leadId: uuid("lead_id")
+      .notNull()
+      .references(() => leads.id, { onDelete: "cascade" }),
+    /** Korte machinecode, bijv. "email_sent", "first_login", "stage_changed" */
+    kind: text("kind").notNull(),
+    /** Menselijke omschrijving voor de tijdlijn */
+    label: text("label").notNull(),
+    meta: jsonb("meta").$type<Record<string, unknown>>(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [index("journey_events_lead_idx").on(t.leadId, t.createdAt)],
+);
+
+/** Interne, afvinkbare taken per aanvraag. */
+export const journeyTasks = pgTable(
+  "journey_tasks",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    leadId: uuid("lead_id")
+      .notNull()
+      .references(() => leads.id, { onDelete: "cascade" }),
+    label: text("label").notNull(),
+    done: boolean("done").notNull().default(false),
+    doneAt: timestamp("done_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [index("journey_tasks_lead_idx").on(t.leadId, t.createdAt)],
+);
+
+export type JourneyEvent = typeof journeyEvents.$inferSelect;
+export type JourneyTask = typeof journeyTasks.$inferSelect;
 export type User = typeof users.$inferSelect;
 export type Partner = typeof partners.$inferSelect;
 export type ReferralClick = typeof referralClicks.$inferSelect;

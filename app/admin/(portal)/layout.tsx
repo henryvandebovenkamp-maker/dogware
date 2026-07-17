@@ -20,6 +20,7 @@ export const metadata: Metadata = {
 
 const NAV = [
   { href: "/admin", label: "Overzicht", Icon: GlyphPaw },
+  { href: "/admin/journeys", label: "Demo Journeys", Icon: GlyphSpark },
   { href: "/admin/leads", label: "Demo-aanvragen", Icon: GlyphClients },
   { href: "/admin/partners", label: "Partners", Icon: GlyphTeam },
   { href: "/admin/referrals", label: "Referrals", Icon: GlyphSpark },

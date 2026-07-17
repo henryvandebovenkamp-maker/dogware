@@ -10,6 +10,7 @@ import { NotificationEmail } from "./templates/notification";
 import { PartnerActivatedEmail } from "./templates/partner-activated";
 import { PartnerInviteEmail } from "./templates/partner-invite";
 import { MagicLoginEmail } from "./templates/magic-login";
+import { DemoReadyEmail } from "./templates/demo-ready";
 import { WelcomeEmail } from "./templates/welcome";
 
 /**
@@ -164,6 +165,29 @@ export async function sendMagicLogin(
       />
     ),
     text: `Hoi ${naam},\n\nLog in via: ${loginUrl}\nOf gebruik code: ${code}\n\nGeldig: ${geldigMinuten} minuten, eenmalig. Niet aangevraagd? Negeer deze mail.`,
+  });
+}
+
+/** Warme mail: de voorbeeldwebsite staat klaar (met passwordless magic login). */
+export async function sendDemoReady(
+  to: string,
+  naam: string,
+  bedrijfsnaam: string,
+  loginUrl: string,
+  demoUrl?: string,
+): Promise<MailResult> {
+  return sendMail("demo-ready", {
+    to,
+    subject: `Je persoonlijke DogWare-voorbeeld staat klaar, ${naam}`,
+    react: (
+      <DemoReadyEmail
+        naam={naam}
+        bedrijfsnaam={bedrijfsnaam}
+        demoUrl={demoUrl}
+        loginUrl={loginUrl}
+      />
+    ),
+    text: `Hoi ${naam},\n\nJe persoonlijke DogWare-voorbeeld voor ${bedrijfsnaam} staat klaar.\n${demoUrl ? `Voorbeeldwebsite: ${demoUrl}\n` : ""}Log veilig in (zonder wachtwoord): ${loginUrl}\n\nBenieuwd wat je ervan vindt!\n\nHartelijke groet,\nHenry van de Bovenkamp\nDogWare`,
   });
 }
 

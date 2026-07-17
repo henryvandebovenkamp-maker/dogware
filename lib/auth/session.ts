@@ -12,12 +12,14 @@ const SESSION_COOKIE = "dw_session";
 const SESSION_DAYS: Record<UserRole, number> = {
   SUPER_ADMIN: 7,
   AFFILIATE_PARTNER: 30,
+  CUSTOMER: 14,
 };
 
 /** Bestemming per rol na inloggen — altijd server-side bepaald, nooit via de client. */
 export const ROLE_DESTINATIONS: Record<UserRole, string> = {
   SUPER_ADMIN: "/admin",
   AFFILIATE_PARTNER: "/partner",
+  CUSTOMER: "/account",
 };
 
 /* ---------- Sessiebeheer ---------- */
