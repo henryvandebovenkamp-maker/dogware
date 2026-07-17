@@ -14,6 +14,7 @@ import { Payments } from "@/components/sections/payments";
 import { Invoicing } from "@/components/sections/invoicing";
 import { TeamPortal } from "@/components/sections/team-portal";
 import { Difference } from "@/components/sections/difference";
+import { PromiseSection } from "@/components/sections/promise";
 import { Results } from "@/components/sections/results";
 import { Testimonials } from "@/components/sections/testimonials";
 import { FinalCta } from "@/components/sections/final-cta";
@@ -37,6 +38,7 @@ export default function Home() {
         <Invoicing />
         <TeamPortal />
         <Difference />
+        <PromiseSection />
         <Results />
         <Testimonials />
         <FinalCta />

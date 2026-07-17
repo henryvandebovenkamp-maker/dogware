@@ -2,8 +2,18 @@ import { X, Check, PawPrint } from "lucide-react";
 import { Container, SectionHeading } from "@/components/ui";
 import { Reveal } from "@/components/reveal";
 
-const GENERIC = ["Kappers", "Restaurants", "Winkels", "Algemene bedrijven"];
-const NOPES = ["Geen aanpassingen", "Geen workarounds", "Geen compromissen"];
+const GENERIC = [
+  "Zelf updates en plugins bijhouden",
+  "Losse systemen die niet samenwerken",
+  "Elk jaar opnieuw een website bouwen",
+  "Onverwacht onderhoud en beveiligingsrisico's",
+];
+const NOPES = [
+  "Geen WordPress, geen kwetsbare plugins",
+  "Alles werkt samen in één omgeving",
+  "Wij onderhouden en beveiligen het voor je",
+  "Groeit mee — nooit meer verhuizen",
+];
 
 export function Difference() {
   return (
@@ -11,8 +21,8 @@ export function Difference() {
       <Container>
         <SectionHeading
           eyebrow="Het verschil"
-          title="Waarom DogWare anders is."
-          intro="De meeste software is gemaakt voor algemene bedrijven en daarna 'geschikt gemaakt' voor honden. DogWare is het tegenovergestelde."
+          title="Een gewone website vraagt onderhoud. DogWare vraagt niets."
+          intro="Bij een traditionele website blijf je zelf puzzelen met updates, plugins en losse systemen. DogWare werkt precies andersom: makkelijk, veilig en zonder technisch gedoe."
         />
 
         <div className="mt-12 grid gap-5 lg:grid-cols-2">
@@ -20,10 +30,10 @@ export function Difference() {
           <Reveal>
             <div className="flex h-full flex-col rounded-3xl border border-cream-200 bg-white/60 p-7 sm:p-8">
               <p className="text-sm font-semibold uppercase tracking-wider text-ink-300">
-                De meeste software
+                Een traditionele website
               </p>
               <h3 className="mt-3 text-xl font-bold text-ink-500">
-                Gemaakt voor iedereen. Dus voor niemand echt.
+                Werkt vandaag. Maar vraagt elke maand je aandacht.
               </h3>
               <ul className="mt-6 space-y-3">
                 {GENERIC.map((g) => (
@@ -46,12 +56,12 @@ export function Difference() {
                 DogWare
               </p>
               <h3 className="mt-3 text-xl font-bold">
-                Gebouwd vanuit de praktijk van hondenprofessionals.
+                Eén keer goed geregeld. Wij houden het draaiend.
               </h3>
               <p className="mt-4 text-pretty text-[15px] leading-relaxed text-white/85">
-                Iedere functie is ontworpen voor ondernemers die dagelijks werken
-                met honden en hun eigenaren. Gewoon een systeem dat begrijpt hoe
-                jouw bedrijf werkt.
+                Gebouwd vanuit de praktijk van dierenprofessionals én voor je
+                onderhouden. Jij hoeft geen technisch expert te worden om
+                professioneel en veilig te werken.
               </p>
               <ul className="mt-6 space-y-3">
                 {NOPES.map((n) => (

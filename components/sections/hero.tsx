@@ -23,15 +23,15 @@ export function Hero() {
                   <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand opacity-60" />
                   <span className="relative inline-flex h-2 w-2 rounded-full bg-brand" />
                 </span>
-                Het complete platform voor de hondenbranche
+                Eén keer goed geregeld. Voor altijd onderhouden.
               </span>
             </Reveal>
 
             <Reveal delay={0.05}>
               <h1 className="mt-6 text-balance text-4xl font-extrabold leading-[1.05] tracking-tight text-ink sm:text-5xl md:text-[3.4rem]">
-                Jij bent geen hondenprofessional geworden om{" "}
+                De laatste website die jouw dierenbedrijf{" "}
                 <span className="relative whitespace-nowrap text-brand">
-                  administratie
+                  ooit nodig heeft
                   <svg
                     className="absolute -bottom-1 left-0 h-2.5 w-full text-brand/30"
                     viewBox="0 0 100 8"
@@ -40,30 +40,29 @@ export function Hero() {
                   >
                     <path d="M0 5 Q 25 0 50 4 T 100 3" stroke="currentColor" strokeWidth="3" fill="none" strokeLinecap="round" />
                   </svg>
-                </span>{" "}
-                te doen.
+                </span>
+                .
               </h1>
             </Reveal>
 
             <Reveal delay={0.1}>
               <p className="mt-6 max-w-xl text-pretty text-lg leading-relaxed text-ink-500">
-                DogWare is niet zomaar software die je erbij neemt. Het is je{" "}
-                <span className="font-semibold text-ink">complete bedrijf op één plek</span>{" "}
-                — website, planning, klanten en administratie die vanzelf
-                samenwerken. Zodat jij weer kunt doen waarvoor je ooit begon.{" "}
-                <span className="font-semibold text-ink">Werken met honden.</span>
+                Je website, planning, klanten, betalingen en communicatie in{" "}
+                <span className="font-semibold text-ink">één veilige omgeving</span>.
+                Geen losse systemen, geen updates en geen technisch gedoe.{" "}
+                <span className="font-semibold text-ink">Jij zorgt voor de dieren. DogWare zorgt voor de rest.</span>
               </p>
             </Reveal>
 
             <Reveal delay={0.15}>
               <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
                 <Button href="/demo" variant="primary" size="lg">
-                  Vraag een demo aan
+                  Laat mijn voorbeeld maken
                   <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
                 </Button>
                 <Button href="#oplossing" variant="ghost" size="lg">
                   <PlayCircle className="h-5 w-5 text-brand" />
-                  Bekijk hoe DogWare werkt
+                  Bekijk DogWare voor mijn bedrijf
                 </Button>
               </div>
             </Reveal>

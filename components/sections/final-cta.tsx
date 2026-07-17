@@ -80,7 +80,7 @@ export function FinalCta() {
                   Jouw persoonlijke demo
                 </h3>
                 <p className="text-[13px] text-ink-500">
-                  Geen standaard presentatie — jouw bedrijf, jouw demo
+                  Niet alleen horen wat kan — het direct zien voor jouw bedrijf
                 </p>
               </div>
             </div>
