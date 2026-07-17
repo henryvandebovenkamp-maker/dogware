@@ -27,9 +27,9 @@ const COLS = [
     title: "DogWare",
     links: [
       { label: "Waarom DogWare", href: "#verschil" },
-      { label: "Demo aanvragen", href: "#demo" },
+      { label: "Demo aanvragen", href: "/demo" },
       { label: "Inloggen", href: "#demo" },
-      { label: "Contact", href: "#demo" },
+      { label: "Contact", href: "/demo" },
     ],
   },
 ];

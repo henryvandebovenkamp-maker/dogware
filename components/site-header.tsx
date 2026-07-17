@@ -60,13 +60,13 @@ export function SiteHeader() {
 
         <div className="hidden items-center gap-2 lg:flex">
           <Link
-            href="#demo"
+            href="/demo"
             className="rounded-full px-4 py-2 text-sm font-semibold text-ink-700 transition-colors hover:text-ink"
           >
             Inloggen
           </Link>
           <Link
-            href="#demo"
+            href="/demo"
             className="rounded-full bg-brand px-5 py-2.5 text-sm font-semibold text-white shadow-[0_10px_26px_-12px_rgba(224,86,42,0.85)] transition-all hover:-translate-y-0.5 hover:bg-brand-600"
           >
             Vraag een demo aan
@@ -97,7 +97,7 @@ export function SiteHeader() {
               </Link>
             ))}
             <Link
-              href="#demo"
+              href="/demo"
               onClick={() => setOpen(false)}
               className="mt-4 rounded-full bg-brand px-6 py-4 text-center text-base font-semibold text-white shadow-glow"
             >
