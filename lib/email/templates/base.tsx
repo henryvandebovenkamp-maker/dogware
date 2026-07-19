@@ -12,9 +12,8 @@ import {
   Section,
   Text,
 } from "@react-email/components";
-import { useContext, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { absoluteUrl, branding } from "@/lib/branding";
-import { EmailLogoContext } from "../logo-context";
 
 /**
  * Gedeelde e-maillayout in de DogWare-huisstijl.
@@ -40,9 +39,9 @@ export function EmailLayout({
   heading: string;
   children: ReactNode;
 }) {
-  // Override via de Super Admin (of de statische default uit branding.ts).
-  const emailLogoSrc =
-    useContext(EmailLogoContext) ?? absoluteUrl(branding.logo.email);
+  // Standaard e-maillogo. Een Super Admin-override wordt in service.ts in de
+  // gerenderde HTML omgewisseld (voorkomt een client/server-contextgrens).
+  const emailLogoSrc = absoluteUrl(branding.logo.email);
   return (
     <Html lang="nl">
       <Head />
