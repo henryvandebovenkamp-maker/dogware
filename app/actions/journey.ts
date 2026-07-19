@@ -4,12 +4,10 @@ import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { JOURNEY_STAGES, type JourneyStage } from "@/lib/db/schema";
-import { branding } from "@/lib/branding";
 import { getAdminActor } from "@/lib/admin-auth";
-import { createMagicLinkToken } from "@/lib/auth/challenge";
 import { logActivity } from "@/lib/audit";
 import { logJourneyEvent, setStage } from "@/lib/journey";
-import { sendDemoReady } from "@/lib/email/send";
+import { sendDemoReady, sendPartnerDemoSent } from "@/lib/email/send";
 
 export type JourneyActionState = {
   status: "idle" | "success" | "error";
@@ -67,6 +65,14 @@ export async function sendDemo(
   if (!website) {
     return { status: "error", message: "Vul eerst de voorbeeldwebsite-URL in." };
   }
+  const portaal =
+    String(formData.get("portaal") ?? "").trim() || lead.demoPortalUrl || "";
+  if (!portaal) {
+    return {
+      status: "error",
+      message: "Vul eerst de demoportaal-URL in (dat is de inloglink).",
+    };
+  }
   const loginEmail =
     (String(formData.get("loginEmail") ?? "").trim().toLowerCase() ||
       lead.demoLoginEmail ||
@@ -95,18 +101,22 @@ export async function sendDemo(
       .where(eq(schema.leads.id, leadId));
   }
 
-  // Magic login-link, 7 dagen geldig (demo-uitnodiging)
-  const token = await createMagicLinkToken(customerId, loginEmail, 7 * 24 * 60);
-  if (!token) return { status: "error", message: "Kon geen inloglink maken." };
-  const loginUrl = `${branding.siteUrl}/inloggen/${token}`;
+  // Links normaliseren; de klant logt op het demoportaal in met het bekende
+  // e-mailadres (passwordless — geen vooraf gegenereerde magic-link nodig).
   const websiteUrl = website.startsWith("http") ? website : `https://${website}`;
+  const portaalUrl = portaal.startsWith("http") ? portaal : `https://${portaal}`;
+
+  // Uitsluitend gegevens uit de aanvraag — nooit aannames.
+  const firstName = lead.naam.trim().split(/\s+/)[0] || lead.naam.trim();
+  const modules = [...(lead.diensten ?? []), ...(lead.functies ?? [])];
 
   const mail = await sendDemoReady(
     loginEmail,
-    lead.naam,
-    lead.bedrijfsnaam,
-    loginUrl,
+    firstName,
+    portaalUrl,
     websiteUrl,
+    modules,
+    lead.bedrijfsnaam?.trim() || undefined,
   );
   if (!mail.ok) {
     return { status: "error", message: mail.error.message };
@@ -116,6 +126,7 @@ export async function sendDemo(
     .update(schema.leads)
     .set({
       demoDomain: website,
+      demoPortalUrl: portaal,
       demoLoginEmail: loginEmail,
       demoSentAt: new Date(),
       status: "demo verstuurd",
@@ -130,8 +141,79 @@ export async function sendDemo(
     objectId: leadId,
   });
 
+  // Partner automatisch informeren — alléén bij een partner-/affiliate-aanvraag
+  // en alleen bij de eerste verzending (geen dubbele berichten bij opnieuw
+  // versturen). De partner krijgt uitsluitend de publieke voorbeeldwebsite te
+  // zien — nooit de portaal-/loginlink.
+  if (lead.affiliatePartnerId && !lead.demoSentAt) {
+    await notifyPartnerDemoSent(db, {
+      leadId,
+      partnerId: lead.affiliatePartnerId,
+      publicDemoUrl: websiteUrl,
+      klantBedrijfsnaam: lead.bedrijfsnaam?.trim() || undefined,
+    });
+  }
+
   revalidatePath(`/admin/leads/${leadId}`);
   return { status: "success", message: "Demo verstuurd en journey bijgewerkt." };
+}
+
+/**
+ * Stuurt de partner een persoonlijk "de demo is verstuurd"-berichtje en legt
+ * dit vast in de timeline. Faalt nooit hard: de partnermail mag de hoofd-flow
+ * (klant is al gemaild) niet blokkeren.
+ */
+async function notifyPartnerDemoSent(
+  db: NonNullable<ReturnType<typeof getDb>>,
+  {
+    leadId,
+    partnerId,
+    publicDemoUrl,
+    klantBedrijfsnaam,
+  }: {
+    leadId: string;
+    partnerId: string;
+    publicDemoUrl: string;
+    klantBedrijfsnaam?: string;
+  },
+): Promise<void> {
+  try {
+    const [partner] = await db
+      .select({
+        voornaam: schema.partners.voornaam,
+        naam: schema.users.naam,
+        email: schema.users.email,
+      })
+      .from(schema.partners)
+      .leftJoin(schema.users, eq(schema.users.id, schema.partners.userId))
+      .where(eq(schema.partners.id, partnerId))
+      .limit(1);
+
+    if (!partner?.email) return;
+
+    const firstName =
+      partner.voornaam?.trim() ||
+      partner.naam?.trim().split(/\s+/)[0] ||
+      "partner";
+
+    const mail = await sendPartnerDemoSent(
+      partner.email,
+      firstName,
+      publicDemoUrl,
+      klantBedrijfsnaam,
+    );
+    if (!mail.ok) return;
+
+    await logJourneyEvent(
+      leadId,
+      "partner_notified",
+      `Partner automatisch geïnformeerd: ${partner.email}`,
+      { partnerId },
+    );
+  } catch {
+    // Bewust stil: de klant is al gemaild; een mislukte partnermail mag de
+    // demo-verzending niet ongedaan maken of een foutmelding tonen.
+  }
 }
 
 /* ---------- Stage handmatig aanpassen ---------- */

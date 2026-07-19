@@ -585,8 +585,31 @@ export const payments = pgTable(
   ],
 );
 
+/* =========================================================================
+ * Site-instellingen (singleton) — door de Super Admin beheerd
+ * ========================================================================= */
+
+/**
+ * Eén rij (id = "singleton") met runtime-instellingen die de Super Admin kan
+ * aanpassen zonder deploy. Nu alleen een optionele override voor het
+ * e-maillogo; leeg = de statische default uit lib/branding.ts. De website
+ * blijft hier bewust buiten.
+ */
+export const siteSettings = pgTable("site_settings", {
+  id: text("id").primaryKey().default("singleton"),
+  /** Override voor het logo in e-mails (absolute URL). Null = default. */
+  emailLogoUrl: text("email_logo_url"),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedByUserId: uuid("updated_by_user_id").references(() => users.id, {
+    onDelete: "set null",
+  }),
+});
+
 export type Commerce = typeof commerce.$inferSelect;
 export type Payment = typeof payments.$inferSelect;
 export type User = typeof users.$inferSelect;
 export type Partner = typeof partners.$inferSelect;
 export type ReferralClick = typeof referralClicks.$inferSelect;
+export type SiteSettings = typeof siteSettings.$inferSelect;

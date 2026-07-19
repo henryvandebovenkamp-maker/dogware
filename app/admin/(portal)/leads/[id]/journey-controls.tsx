@@ -97,6 +97,7 @@ export function DemoPanel({
       <form action={sendAction} className="border-t border-cream-100 pt-4">
         <input type="hidden" name="leadId" value={leadId} />
         <input type="hidden" name="website" value={w} />
+        <input type="hidden" name="portaal" value={p} />
         <input type="hidden" name="loginEmail" value={e} />
         <button
           type="submit"

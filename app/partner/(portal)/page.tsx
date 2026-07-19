@@ -119,6 +119,28 @@ export default async function PartnerDashboard() {
                 <span className="rounded-full bg-[#2f6bed]/10 px-3 py-1 text-[11px] font-bold text-[#2f6bed]">
                   {STAGE_KLANT_LABEL[l.stage]}
                 </span>
+                {l.demoUrl && (
+                  <span className="flex w-full flex-wrap items-center justify-between gap-2 border-t border-ink/5 pt-2.5">
+                    <a
+                      href={l.demoUrl.startsWith("http") ? l.demoUrl : `https://${l.demoUrl}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[12px] font-bold text-brand hover:underline"
+                    >
+                      Bekijk demo →
+                    </a>
+                    {l.demoSentAt && (
+                      <span className="text-[11px] text-ink-300">
+                        Verstuurd op{" "}
+                        {l.demoSentAt.toLocaleDateString("nl-NL", {
+                          day: "numeric",
+                          month: "long",
+                          year: "numeric",
+                        })}
+                      </span>
+                    )}
+                  </span>
+                )}
               </li>
             ))}
           </ul>

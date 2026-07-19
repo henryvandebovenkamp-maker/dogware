@@ -8,6 +8,7 @@ import { IntakeConfirmationEmail } from "./templates/intake-confirmation";
 import { IntakeNotificationEmail } from "./templates/intake-notification";
 import { NotificationEmail } from "./templates/notification";
 import { PartnerActivatedEmail } from "./templates/partner-activated";
+import { PartnerDemoSentEmail } from "./templates/partner-demo-sent";
 import { PartnerInviteEmail } from "./templates/partner-invite";
 import { MagicLoginEmail } from "./templates/magic-login";
 import { DemoReadyEmail } from "./templates/demo-ready";
@@ -147,6 +148,40 @@ export async function sendPartnerActivated(
   });
 }
 
+/**
+ * Automatisch berichtje aan de partner zodra de demo naar de klant is
+ * verstuurd. Alleen versturen bij een partner-/affiliate-aanvraag.
+ *
+ * @param demoUrl     UITSLUITEND de publieke voorbeeldwebsite — nooit de
+ *                    loginlink, magic link of beheeromgeving.
+ * @param companyName alleen meesturen als die is ingevuld — nooit verzinnen.
+ */
+export async function sendPartnerDemoSent(
+  to: string,
+  partnerFirstName: string,
+  demoUrl?: string,
+  companyName?: string,
+): Promise<MailResult> {
+  return sendMail("partner-demo-sent", {
+    to,
+    subject: "Leuk nieuws! De demo is verstuurd 🎉",
+    react: (
+      <PartnerDemoSentEmail
+        partnerFirstName={partnerFirstName}
+        companyName={companyName}
+        demoUrl={demoUrl}
+      />
+    ),
+    text:
+      `Hi ${partnerFirstName},\n\n` +
+      `Even een leuk berichtje! De demo${companyName ? ` voor ${companyName}` : ""} staat inmiddels klaar en is verstuurd. ` +
+      `Bedankt dat je DogWare hebt aanbevolen, dat waardeer ik enorm.\n\n` +
+      (demoUrl ? `Bekijk de demo (voorbeeldwebsite): ${demoUrl}\n\n` : "") +
+      `Zodra ik een reactie krijg of we een vervolgstap zetten, laat ik het je natuurlijk weten.\n\n` +
+      `Met kwispelende groet,\nHenry van de Bovenkamp\nDogWare\n${branding.phone}`,
+  });
+}
+
 /** Wachtwoordloze inlogmail: Magic Link + Magic Code. */
 export async function sendMagicLogin(
   to: string,
@@ -171,25 +206,49 @@ export async function sendMagicLogin(
 }
 
 /** Warme mail: de voorbeeldwebsite staat klaar (met passwordless magic login). */
+/**
+ * Persoonlijk eerste voorbeeld. Alle inhoud komt uit de aanvraag:
+ * @param firstName    voornaam uit de aanvraag
+ * @param portaalUrl   link naar het demoportaal (login met het bekende mailadres)
+ * @param demoUrl      link naar de voorbeeldwebsite (optioneel)
+ * @param modules      door de klant geselecteerde onderdelen (leesbare labels)
+ * @param bedrijfsnaam alleen meesturen als die is ingevuld — nooit verzinnen
+ */
 export async function sendDemoReady(
   to: string,
-  naam: string,
-  bedrijfsnaam: string,
-  loginUrl: string,
+  firstName: string,
+  portaalUrl: string,
   demoUrl?: string,
+  modules: string[] = [],
+  bedrijfsnaam?: string,
 ): Promise<MailResult> {
+  const gekozen = modules.map((m) => m.trim()).filter(Boolean);
   return sendMail("demo-ready", {
     to,
-    subject: `Je persoonlijke DogWare-voorbeeld staat klaar, ${naam}`,
+    subject: `Je persoonlijke DogWare-voorbeeld staat klaar, ${firstName}`,
     react: (
       <DemoReadyEmail
-        naam={naam}
+        firstName={firstName}
         bedrijfsnaam={bedrijfsnaam}
+        modules={gekozen}
         demoUrl={demoUrl}
-        loginUrl={loginUrl}
+        portaalUrl={portaalUrl}
       />
     ),
-    text: `Hoi ${naam},\n\nJe persoonlijke DogWare-voorbeeld voor ${bedrijfsnaam} staat klaar.\n${demoUrl ? `Voorbeeldwebsite: ${demoUrl}\n` : ""}Log veilig in (zonder wachtwoord): ${loginUrl}\n\nBenieuwd wat je ervan vindt!\n\nHartelijke groet,\nHenry van de Bovenkamp\nDogWare`,
+    text:
+      `Hi ${firstName},\n\n` +
+      `Bedankt voor je aanvraag! Ik ben meteen even voor je aan de slag gegaan.\n\n` +
+      (gekozen.length
+        ? `Ik zag dat je vooral interesse hebt in ${gekozen.join(", ")}, dus daar heb ik in dit eerste voorbeeld alvast extra aandacht aan besteed. Zo krijg je direct een goed beeld van wat er allemaal mogelijk is.\n\n`
+        : `Ik heb goed naar je aanvraag gekeken en daar in dit eerste voorbeeld alvast extra aandacht aan besteed. Zo krijg je direct een goed beeld van wat er allemaal mogelijk is.\n\n`) +
+      (demoUrl ? `Bekijk jouw voorbeeldwebsite: ${demoUrl}\n\n` : "") +
+      `Ben je ook benieuwd hoe de beheeromgeving werkt? Log in met hetzelfde e-mailadres waarmee je de demo hebt aangevraagd. Je ontvangt automatisch een e-mail waarmee je veilig kunt inloggen. Simpel en zonder wachtwoord.\n` +
+      `Inloggen in jouw demo: ${portaalUrl}\n\n` +
+      `Kijk er rustig even doorheen. Grote kans dat je meteen ideeën of vragen krijgt.\n\n` +
+      `Vind je het leuk om alles even samen door te nemen? Bel me gerust of stuur even een appje. In ongeveer 15 minuten laat ik je zien hoe alles werkt en kun je al je vragen stellen.\n` +
+      `06-83853373\n\n` +
+      `Veel kijkplezier!\n\n` +
+      `Met vriendelijke groet,\nHenry van de Bovenkamp\nDogWare`,
   });
 }
 

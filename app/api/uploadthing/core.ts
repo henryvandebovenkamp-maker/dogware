@@ -42,6 +42,29 @@ export const uploadRouter = {
       );
       return { url: file.ufsUrl };
     }),
+
+  // Alleen de Super Admin: een eigen e-maillogo. PNG met transparante
+  // achtergrond, retina (breed genoeg voor scherpe weergave).
+  emailLogoUploader: f({
+    image: { maxFileSize: "2MB", maxFileCount: 1 },
+  })
+    .middleware(async () => {
+      const user = await getCurrentUser();
+      if (!user || user.role !== "SUPER_ADMIN") {
+        throw new UploadThingError("Geen toegang");
+      }
+      return { userId: user.id };
+    })
+    .onUploadComplete(async ({ file, metadata }) => {
+      console.info(
+        JSON.stringify({
+          evt: "upload.email_logo",
+          at: new Date().toISOString(),
+          userId: metadata.userId,
+        }),
+      );
+      return { url: file.ufsUrl };
+    }),
 } satisfies FileRouter;
 
 export type UploadRouter = typeof uploadRouter;

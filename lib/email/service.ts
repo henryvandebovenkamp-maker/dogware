@@ -1,6 +1,9 @@
 import "server-only";
+import { createElement } from "react";
 import { Resend } from "resend";
 import type { MailError, MailOptions, MailResult, MailType } from "./types";
+import { EmailLogoContext } from "./logo-context";
+import { getEmailLogoUrl } from "@/lib/site-settings";
 
 /**
  * Centrale mailservice van DogWare.
@@ -123,6 +126,13 @@ export async function sendMail(
 
   const resend = new Resend(config.apiKey);
 
+  // E-maillogo bepalen (Super Admin-override of default) en via de context aan
+  // de gedeelde header meegeven — zonder elke template aan te passen.
+  const emailLogoUrl = await getEmailLogoUrl();
+  const reactWithLogo = options.react
+    ? createElement(EmailLogoContext.Provider, { value: emailLogoUrl }, options.react)
+    : undefined;
+
   // Sandbox: alle mail omleiden naar het testadres zodat er niets faalt.
   const sandboxTo = getSandboxRedirect(config.from);
   const origineleOntvanger = Array.isArray(options.to)
@@ -134,7 +144,7 @@ export async function sendMail(
     subject: sandboxTo
       ? `[TEST → ${origineleOntvanger}] ${options.subject}`
       : options.subject,
-    react: options.react,
+    react: reactWithLogo,
     html: options.html,
     text: options.text,
     replyTo: options.replyTo ?? config.replyTo,

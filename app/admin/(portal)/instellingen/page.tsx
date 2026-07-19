@@ -1,8 +1,11 @@
 import { ATTRIBUTION_DAYS, ATTRIBUTION_MODEL } from "@/lib/referral";
+import { getEmailLogoSetting } from "@/lib/site-settings";
+import { EmailLogoSettings } from "@/components/admin/email-logo-settings";
 
 export const metadata = { title: "Instellingen" };
 
-export default function InstellingenPage() {
+export default async function InstellingenPage() {
+  const { effectiveUrl, isOverride } = await getEmailLogoSetting();
   return (
     <div className="mx-auto max-w-3xl">
       <h1 className="text-2xl font-extrabold tracking-tight text-ink">Instellingen</h1>
@@ -11,6 +14,11 @@ export default function InstellingenPage() {
       </p>
 
       <div className="mt-6 space-y-3">
+        <EmailLogoSettings
+          key={effectiveUrl}
+          currentUrl={effectiveUrl}
+          isOverride={isOverride}
+        />
         <div className="rounded-2xl bg-white p-5 shadow-soft ring-1 ring-ink/5">
           <h2 className="text-sm font-extrabold text-ink">Partnerprogramma</h2>
           <dl className="mt-3 space-y-2 text-[13px]">

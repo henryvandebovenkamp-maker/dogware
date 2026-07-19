@@ -77,6 +77,10 @@ export async function getPartnerLeads(partnerId: string) {
       status: schema.leads.status,
       stage: schema.leads.stage,
       referralCodeSnapshot: schema.leads.referralCodeSnapshot,
+      // Alleen de PUBLIEKE voorbeeldwebsite + verzenddatum — nooit de
+      // portaal-/loginlink of persoonsgegevens van de aanvrager.
+      demoUrl: schema.leads.demoDomain,
+      demoSentAt: schema.leads.demoSentAt,
     })
     .from(schema.leads)
     .where(eq(schema.leads.affiliatePartnerId, partnerId))

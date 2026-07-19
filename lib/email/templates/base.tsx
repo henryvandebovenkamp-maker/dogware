@@ -1,5 +1,6 @@
 import {
   Body,
+  Column,
   Container,
   Head,
   Heading,
@@ -7,11 +8,13 @@ import {
   Html,
   Img,
   Preview,
+  Row,
   Section,
   Text,
 } from "@react-email/components";
-import type { ReactNode } from "react";
+import { useContext, type ReactNode } from "react";
 import { absoluteUrl, branding } from "@/lib/branding";
+import { EmailLogoContext } from "../logo-context";
 
 /**
  * Gedeelde e-maillayout in de DogWare-huisstijl.
@@ -37,6 +40,9 @@ export function EmailLayout({
   heading: string;
   children: ReactNode;
 }) {
+  // Override via de Super Admin (of de statische default uit branding.ts).
+  const emailLogoSrc =
+    useContext(EmailLogoContext) ?? absoluteUrl(branding.logo.email);
   return (
     <Html lang="nl">
       <Head />
@@ -72,19 +78,32 @@ export function EmailLayout({
           >
             &nbsp;
           </Section>
+          {/* Header: e-maillogo (zonder slogan) — eenvoudige tabelstructuur,
+              perfect gecentreerd, proportioneel geschaald (geen vaste hoogte). */}
           <Section
             style={{
               backgroundColor: emailColors.cream,
               borderBottom: `1px solid ${emailColors.line}`,
-              padding: "22px 32px",
+              padding: "24px 32px",
             }}
           >
-            <Img
-              src={absoluteUrl(branding.logo.email)}
-              alt={`${branding.name}. ${branding.slogan}`}
-              width="192"
-              height="96"
-            />
+            <Row>
+              <Column align="center">
+                <Img
+                  src={emailLogoSrc}
+                  alt={branding.name}
+                  width="234"
+                  style={{
+                    display: "block",
+                    width: "234px",
+                    height: "auto",
+                    maxWidth: "100%",
+                    border: 0,
+                    margin: "0 auto",
+                  }}
+                />
+              </Column>
+            </Row>
           </Section>
 
           <Section style={{ padding: "32px" }}>

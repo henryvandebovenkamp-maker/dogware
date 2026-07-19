@@ -33,6 +33,11 @@ export const branding = {
   /** Productie-URL; lokaal/preview overschrijfbaar via NEXT_PUBLIC_SITE_URL */
   siteUrl: process.env.NEXT_PUBLIC_SITE_URL ?? "https://dogware.nl",
 
+  /** Persoonlijk telefoon-/WhatsApp-nummer (zoals getoond in e-mails). */
+  phone: "06-83853373",
+  /** Zelfde nummer als tel:-link (internationaal formaat). */
+  phoneTel: "+31683853373",
+
   /** Merk-kleuren (gelijk aan de tokens in globals.css) */
   colors: {
     primary: "#e0562a", // brand-oranje
