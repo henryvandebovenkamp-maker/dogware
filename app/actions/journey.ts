@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { JOURNEY_STAGES, type JourneyStage } from "@/lib/db/schema";
 import { getAdminActor } from "@/lib/admin-auth";
@@ -141,27 +141,38 @@ export async function sendDemo(
     objectId: leadId,
   });
 
-  // Partner automatisch informeren — alléén bij een partner-/affiliate-aanvraag
-  // en alleen bij de eerste verzending (geen dubbele berichten bij opnieuw
-  // versturen). De partner krijgt uitsluitend de publieke voorbeeldwebsite te
-  // zien — nooit de portaal-/loginlink.
-  if (lead.affiliatePartnerId && !lead.demoSentAt) {
-    await notifyPartnerDemoSent(db, {
+  // Partner automatisch informeren — alléén bij een partner-/affiliate-aanvraag.
+  // Idempotent op basis van de timeline: de partner wordt hooguit één keer per
+  // lead gemaild, maar wél alsnog bij een re-send als het de vorige keer niet
+  // is gelukt (of vóór deze feature bestond). De partner krijgt uitsluitend de
+  // publieke voorbeeldwebsite te zien — nooit de portaal-/loginlink.
+  let partnerNotifyFailed = false;
+  if (lead.affiliatePartnerId) {
+    const result = await notifyPartnerDemoSent(db, {
       leadId,
       partnerId: lead.affiliatePartnerId,
       publicDemoUrl: websiteUrl,
       klantBedrijfsnaam: lead.bedrijfsnaam?.trim() || undefined,
     });
+    partnerNotifyFailed = result === "failed";
   }
 
   revalidatePath(`/admin/leads/${leadId}`);
-  return { status: "success", message: "Demo verstuurd en journey bijgewerkt." };
+  return {
+    status: "success",
+    message: partnerNotifyFailed
+      ? "Demo verstuurd — maar de partner kon niet automatisch worden gemaild. Probeer 'opnieuw versturen' of check de logs."
+      : "Demo verstuurd en journey bijgewerkt.",
+  };
 }
 
 /**
  * Stuurt de partner een persoonlijk "de demo is verstuurd"-berichtje en legt
- * dit vast in de timeline. Faalt nooit hard: de partnermail mag de hoofd-flow
- * (klant is al gemaild) niet blokkeren.
+ * dit vast in de timeline. Faalt nooit hard (throwt niet): de klant is al
+ * gemaild. Idempotent: al eerder gestuurd → "skipped".
+ *
+ * @returns "sent" (nu verstuurd), "skipped" (al eerder gebeurd) of "failed"
+ *          (geen e-mail bekend of verzenden mislukt — wordt gelogd).
  */
 async function notifyPartnerDemoSent(
   db: NonNullable<ReturnType<typeof getDb>>,
@@ -176,8 +187,21 @@ async function notifyPartnerDemoSent(
     publicDemoUrl: string;
     klantBedrijfsnaam?: string;
   },
-): Promise<void> {
+): Promise<"sent" | "skipped" | "failed"> {
   try {
+    // Al eerder geïnformeerd? Dan niets doen (voorkomt dubbele berichten).
+    const [existing] = await db
+      .select({ id: schema.journeyEvents.id })
+      .from(schema.journeyEvents)
+      .where(
+        and(
+          eq(schema.journeyEvents.leadId, leadId),
+          eq(schema.journeyEvents.kind, "partner_notified"),
+        ),
+      )
+      .limit(1);
+    if (existing) return "skipped";
+
     const [partner] = await db
       .select({
         voornaam: schema.partners.voornaam,
@@ -189,7 +213,12 @@ async function notifyPartnerDemoSent(
       .where(eq(schema.partners.id, partnerId))
       .limit(1);
 
-    if (!partner?.email) return;
+    if (!partner?.email) {
+      console.error(
+        JSON.stringify({ evt: "partner_notify.no_email", leadId, partnerId }),
+      );
+      return "failed";
+    }
 
     const firstName =
       partner.voornaam?.trim() ||
@@ -202,7 +231,17 @@ async function notifyPartnerDemoSent(
       publicDemoUrl,
       klantBedrijfsnaam,
     );
-    if (!mail.ok) return;
+    if (!mail.ok) {
+      console.error(
+        JSON.stringify({
+          evt: "partner_notify.mail_failed",
+          leadId,
+          partnerId,
+          error: mail.error.message,
+        }),
+      );
+      return "failed";
+    }
 
     await logJourneyEvent(
       leadId,
@@ -210,9 +249,19 @@ async function notifyPartnerDemoSent(
       `Partner automatisch geïnformeerd: ${partner.email}`,
       { partnerId },
     );
-  } catch {
-    // Bewust stil: de klant is al gemaild; een mislukte partnermail mag de
-    // demo-verzending niet ongedaan maken of een foutmelding tonen.
+    return "sent";
+  } catch (err) {
+    // Bewust nooit throwen: de klant is al gemaild. Wel loggen zodat het
+    // zichtbaar is en niet stil verdwijnt.
+    console.error(
+      JSON.stringify({
+        evt: "partner_notify.exception",
+        leadId,
+        partnerId,
+        error: err instanceof Error ? err.message : String(err),
+      }),
+    );
+    return "failed";
   }
 }
 
