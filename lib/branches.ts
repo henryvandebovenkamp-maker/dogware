@@ -177,7 +177,7 @@ export const BRANCHES: Branche[] = [
     hero: {
       kopVoor: "De laatste website die jouw",
       kopAccent: "hondenschool",
-      kopNa: "ooit nodig heeft.",
+      kopNa: "nodig heeft.",
       sub: "Inschrijvingen, wachtlijsten, lesplanning, huiswerk en facturen in één omgeving. Cursisten schrijven zichzelf in en betalen meteen. Jij staat op het veld, niet achter je laptop.",
       chips: [
         "Online inschrijven",
@@ -322,7 +322,7 @@ export const BRANCHES: Branche[] = [
     hero: {
       kopVoor: "De laatste website die jouw",
       kopAccent: "trimsalon",
-      kopNa: "ooit nodig heeft.",
+      kopNa: "nodig heeft.",
       sub: "Klanten boeken zelf een plekje in je agenda, ook 's avonds om elf uur. Herinneringen gaan automatisch, de factuur staat er al. Jij houdt je handen vrij voor de honden.",
       chips: [
         "Online afspraken",
@@ -467,7 +467,7 @@ export const BRANCHES: Branche[] = [
     hero: {
       kopVoor: "De laatste website die jouw",
       kopAccent: "uitlaatservice",
-      kopNa: "ooit nodig heeft.",
+      kopNa: "nodig heeft.",
       sub: "Routes, groepen en capaciteit in één overzicht. Klanten geven zelf hun dagen door, abonnementen worden automatisch gefactureerd. Jij bent buiten met de honden.",
       chips: [
         "Routes & ritten",
@@ -612,7 +612,7 @@ export const BRANCHES: Branche[] = [
     hero: {
       kopVoor: "De laatste website die jouw",
       kopAccent: "dagopvang",
-      kopNa: "ooit nodig heeft.",
+      kopNa: "nodig heeft.",
       sub: "Weet elke ochtend precies wie er komt. Klanten boeken hun dagen zelf, strippenkaarten tellen zichzelf af en de facturatie loopt vanzelf mee.",
       chips: [
         "Dagplanning",
@@ -757,7 +757,7 @@ export const BRANCHES: Branche[] = [
     hero: {
       kopVoor: "De laatste website die jouw",
       kopAccent: "pension",
-      kopNa: "ooit nodig heeft.",
+      kopNa: "nodig heeft.",
       sub: "Reserveringen, kennelindeling en bezetting in één kalender. Klanten boeken hun vakantieperiode zelf en betalen meteen een aanbetaling. Nooit meer dubbel geboekt.",
       chips: [
         "Online reserveren",
@@ -902,7 +902,7 @@ export const BRANCHES: Branche[] = [
     hero: {
       kopVoor: "De laatste website die jouw",
       kopAccent: "gedragspraktijk",
-      kopNa: "ooit nodig heeft.",
+      kopNa: "nodig heeft.",
       sub: "Uitgebreide intakeformulieren, complete dossiers en trajecten die je zorgvuldig opvolgt. Zonder papierwerk, zonder losse documenten.",
       chips: [
         "Online intake",
@@ -1046,7 +1046,7 @@ export const BRANCHES: Branche[] = [
     hero: {
       kopVoor: "De laatste website die jouw",
       kopAccent: "dierenzorg aan huis",
-      kopNa: "ooit nodig heeft.",
+      kopNa: "nodig heeft.",
       sub: "Bezoeken, sleutels, voerinstructies en routes op één plek. Klanten boeken hun periode zelf en krijgen na elk bezoek een update. Vertrouwde zorg, vlekkeloos geregeld.",
       chips: [
         "Bezoeken plannen",
@@ -1190,7 +1190,7 @@ export const BRANCHES: Branche[] = [
     hero: {
       kopVoor: "De laatste website die jouw",
       kopAccent: "chipservice",
-      kopNa: "ooit nodig heeft.",
+      kopNa: "nodig heeft.",
       sub: "Chipafspraken, chipnummers, registraties en certificaten op één plek. Fokkers en baasjes boeken zelf, jij levert het bewijs met één klik.",
       chips: [
         "Online afspraken",
@@ -1334,7 +1334,7 @@ export const BRANCHES: Branche[] = [
     hero: {
       kopVoor: "De laatste website die jouw",
       kopAccent: "webshop",
-      kopNa: "ooit nodig heeft.",
+      kopNa: "nodig heeft.",
       sub: "Verkoop riemen, snacks, voer en cadeaubonnen naast je diensten. Eén assortiment, één winkelwagen, één afrekening — in dezelfde omgeving als je agenda en klanten.",
       chips: [
         "Producten & varianten",
@@ -1483,7 +1483,7 @@ export const ALGEMEEN: Omit<Branche, "slug" | "path" | "seo" | "faq" | "kaartTek
   hero: {
     kopVoor: "De laatste website die jouw",
     kopAccent: "hondenbedrijf",
-    kopNa: "ooit nodig heeft.",
+    kopNa: "nodig heeft.",
     sub: "Je website, planning, klanten, betalingen en communicatie in één veilige omgeving. Geen losse systemen, geen updates en geen technisch gedoe. Jij zorgt voor de honden. DogWare zorgt voor de rest.",
     chips: [
       "Website",
