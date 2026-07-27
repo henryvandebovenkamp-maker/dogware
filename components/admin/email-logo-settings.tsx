@@ -18,9 +18,12 @@ const IDLE: SettingsActionState = { status: "idle" };
 export function EmailLogoSettings({
   currentUrl,
   isOverride,
+  uploadEnabled,
 }: {
   currentUrl: string;
   isOverride: boolean;
+  /** False zolang UPLOADTHING_TOKEN ontbreekt of niet klopt — zie lib/uploads. */
+  uploadEnabled: boolean;
 }) {
   const [saveState, saveAction] = useActionState(saveEmailLogo, IDLE);
   const [resetState, resetAction, resetting] = useActionState(resetEmailLogo, IDLE);
@@ -62,6 +65,12 @@ export function EmailLogoSettings({
       </form>
 
       <div className="mt-4 flex flex-wrap items-center gap-3">
+        {!uploadEnabled && (
+          <p className="text-[12px] font-semibold text-ink-300">
+            Uploaden is niet beschikbaar: UPLOADTHING_TOKEN ontbreekt of is ongeldig.
+          </p>
+        )}
+        {uploadEnabled && (
         <UploadButton
           endpoint="emailLogoUploader"
           onUploadBegin={() => setUploading(true)}
@@ -88,6 +97,7 @@ export function EmailLogoSettings({
                 : "Eigen logo uploaden",
           }}
         />
+        )}
 
         {(isOverride || uploadedUrl) && (
           <form action={resetAction}>

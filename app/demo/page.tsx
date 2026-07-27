@@ -6,6 +6,7 @@ import { Logo } from "@/components/brand";
 import { DemoExperience } from "@/components/demo/experience";
 import { SERVICES } from "@/lib/demo-flow";
 import { getValidAttribution, normalizeReferralCode } from "@/lib/referral";
+import { uploadsEnabled } from "@/lib/uploads";
 import { REFERRAL_BENEFITS } from "@/lib/branding";
 import { getDb, schema } from "@/lib/db";
 
@@ -118,7 +119,7 @@ export default async function DemoPage({
 
       <main className="mx-auto w-full max-w-6xl px-5 pb-24 pt-14 sm:px-8 sm:pt-20">
         <DemoExperience
-          uploadEnabled={Boolean(process.env.UPLOADTHING_TOKEN)}
+          uploadEnabled={uploadsEnabled()}
           partner={uitgenodigdVia ? partnerIntro : null}
           attributedPartner={partnerIntro}
           initialServices={initialServices}

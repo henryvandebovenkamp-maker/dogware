@@ -1,5 +1,6 @@
 import { ATTRIBUTION_DAYS, ATTRIBUTION_MODEL } from "@/lib/referral";
 import { getEmailLogoSetting } from "@/lib/site-settings";
+import { uploadsEnabled } from "@/lib/uploads";
 import { EmailLogoSettings } from "@/components/admin/email-logo-settings";
 
 export const metadata = { title: "Instellingen" };
@@ -18,6 +19,7 @@ export default async function InstellingenPage() {
           key={effectiveUrl}
           currentUrl={effectiveUrl}
           isOverride={isOverride}
+          uploadEnabled={uploadsEnabled()}
         />
         <div className="rounded-2xl bg-white p-5 shadow-soft ring-1 ring-ink/5">
           <h2 className="text-sm font-extrabold text-ink">Partnerprogramma</h2>

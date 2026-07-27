@@ -3,6 +3,7 @@ import { requirePartner } from "@/lib/auth/session";
 import { referralLinkFor } from "@/lib/referral";
 import { euro, getPartnerForUser } from "@/lib/partner-data";
 import { decryptField } from "@/lib/crypto-field";
+import { uploadsEnabled } from "@/lib/uploads";
 import { ProfileForm } from "@/components/partner/profile-form";
 import { ReferralCard } from "@/components/partner/referral-card";
 import type { ProfileInput } from "@/app/actions/partner-profile";
@@ -79,7 +80,7 @@ export default async function ProfielPage() {
         <ProfileForm
           email={user.email}
           initial={initial}
-          uploadEnabled={Boolean(process.env.UPLOADTHING_TOKEN)}
+          uploadEnabled={uploadsEnabled()}
         />
       </div>
     </div>
