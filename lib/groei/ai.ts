@@ -15,10 +15,25 @@ import { BRANCHES } from "@/lib/branches";
  * fallbacks zichtbaar blijven in Vercel.
  */
 
-const MODEL = "anthropic/claude-opus-5";
+/**
+ * Standaard Sonnet 5: dat model is beschikbaar op de gratis gateway-laag,
+ * terwijl Opus 5 daar geblokkeerd wordt ("Free tier users do not have access
+ * to this model"). Wil je Opus 5 — merkbaar sterker op nuance en toon — zet
+ * dan credits bij op Vercel en gebruik:
+ *
+ *   GROEI_MODEL=anthropic/claude-opus-5
+ */
+const MODEL = process.env.GROEI_MODEL?.trim() || "anthropic/claude-sonnet-5";
 
+/**
+ * De gateway haalt zijn credentials zelf op: een AI_GATEWAY_API_KEY als die
+ * er is, anders het OIDC-token van het gekoppelde Vercel-project. Dat werkt
+ * ook zonder dat er iets in de environment staat, dus een harde check op een
+ * sleutel zou een werkende opstelling ten onrechte blokkeren. Gaat er toch
+ * iets mis, dan komt dat als nette foutmelding terug uit de aanroep zelf.
+ */
 export function aiBeschikbaar(): boolean {
-  return Boolean(process.env.AI_GATEWAY_API_KEY?.trim());
+  return true;
 }
 
 /* ---------------------------------------------------------------- analyse -- */
