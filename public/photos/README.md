@@ -37,8 +37,23 @@ herkenbaar maken.
 | `branche-chipservice.jpg`       | /chipservice-software         | Pup wordt gechipt                      | Liggend 4:3 |
 | `branche-webshop.jpg`           | /webshop-software             | Assortiment riemen, snacks, speelgoed  | Liggend 4:3 |
 
-Zolang een foto ontbreekt toont de pagina een nette placeholder in de huisstijl
-mét de bestandsnaam erin, zodat je meteen ziet wat er nog moet komen.
+**Deze negen staan er nu als tijdelijke afbeelding.** Het zijn gegenereerde
+merkvlakken, geen foto's: een zacht verloop met een pootafdruk, de branchenaam
+en onderin de tekst `TIJDELIJKE AFBEELDING`. Zo ziet een branchepagina er af
+uit, maar zie je in één oogopslag welke nog vervangen moeten worden.
+
+Vervangen doe je door simpelweg je eigen `.jpg` op dezelfde naam te zetten —
+verder is er niets aan te passen. Liggend 4:3 werkt het beste; het vlak op de
+pagina heeft die verhouding.
+
+Opnieuw genereren (bijvoorbeeld na een naamswijziging):
+
+```
+node scripts/generate-branche-placeholders.mjs
+```
+
+Dat script overschrijft nooit een bestaand bestand. Wil je een placeholder
+opnieuw laten maken, verwijder hem dan eerst.
 
 ## Testimonials (ronde avatars, optioneel)
 
