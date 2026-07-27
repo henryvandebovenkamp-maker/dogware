@@ -13,7 +13,8 @@ import {
 } from "@/lib/groei";
 import { aiBeschikbaar, schrijfBericht } from "@/lib/groei/ai";
 import { laatsteAnalyse, onderzoekProspect } from "@/lib/groei/onderzoek";
-import { sendNotification } from "@/lib/email/send";
+import { sendGroeiBericht } from "@/lib/email/send";
+import { afmeldEenKlikLink, afmeldLink } from "@/lib/groei/afmelden";
 import { branding } from "@/lib/branding";
 import type { GroeiGrondslag } from "@/lib/db/schema";
 
@@ -251,17 +252,22 @@ export async function verstuurBericht(
         .limit(1)
     : [];
 
-  const link = voorstel ? `${branding.siteUrl}/voorstel/${voorstel.token}` : branding.siteUrl;
-  const body = (tekst || b.tekst).replaceAll("{{voorstel}}", link);
+  const link = voorstel ? `${branding.siteUrl}/voorstel/${voorstel.token}` : null;
 
-  // LET OP: dit gebruikt voorlopig de interne notificatietemplate. Die ziet
-  // eruit als een systeembericht, terwijl deze mail juist persoonlijk moet
-  // ogen. Er hoort nog een sobere "van Henry"-template te komen.
-  const resultaat = await sendNotification(
-    onderwerp || b.onderwerp,
-    body,
-    p.email,
-  );
+  // De plaatshouder blijft in de tekst staan; de template maakt er een nette
+  // link van. Is er geen voorstel, dan valt hij weg in plaats van als losse
+  // rommel in de mail te belanden.
+  const body = tekst || b.tekst;
+
+  const resultaat = await sendGroeiBericht({
+    to: p.email,
+    onderwerp: onderwerp || b.onderwerp,
+    tekst: body,
+    voorstelUrl: link,
+    afmeldUrl: afmeldLink(p.id),
+    afmeldEenKlikUrl: afmeldEenKlikLink(p.id),
+    antwoordNaar: user.email,
+  });
 
   if (!resultaat.ok) {
     return { status: "error", message: "Versturen mislukte. Probeer het opnieuw." };

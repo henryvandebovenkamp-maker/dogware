@@ -7,6 +7,7 @@ import { DemoRequestEmail, type DemoRequestData } from "./templates/demo-request
 import { IntakeConfirmationEmail } from "./templates/intake-confirmation";
 import { IntakeNotificationEmail } from "./templates/intake-notification";
 import { NotificationEmail } from "./templates/notification";
+import { GroeiBerichtEmail } from "./templates/groei-bericht";
 import { PartnerActivatedEmail } from "./templates/partner-activated";
 import { PartnerDemoSentEmail } from "./templates/partner-demo-sent";
 import { PartnerInviteEmail } from "./templates/partner-invite";
@@ -305,5 +306,57 @@ export async function sendNotification(
     subject: title,
     react: <NotificationEmail title={title} message={message} />,
     text: message,
+  });
+}
+
+/**
+ * Een persoonlijk bericht van Henry aan een collega-hondenbedrijf.
+ *
+ * Drie dingen die deze functie anders doet dan de rest:
+ *
+ * 1. `replyTo` gaat naar Henry's eigen adres. Antwoorden op deze mail hoort
+ *    bij hem terecht te komen, niet bij een postbus die niemand leest.
+ * 2. De afmeldlink zit óók in de kopregels, zodat Gmail en Outlook hun eigen
+ *    afmeldknop kunnen tonen. Zonder die koppen leest een mailprovider dit
+ *    als post die zich verstopt, en dat kost je bezorging.
+ * 3. Er gaat een platte-tekstversie mee met dezelfde inhoud. Een mail die
+ *    alleen uit HTML bestaat is een spamsignaal.
+ */
+export async function sendGroeiBericht(data: {
+  to: string;
+  onderwerp: string;
+  tekst: string;
+  voorstelUrl: string | null;
+  afmeldUrl: string;
+  afmeldEenKlikUrl: string;
+  antwoordNaar?: string;
+}): Promise<MailResult> {
+  const platteTekst = [
+    data.voorstelUrl
+      ? data.tekst.replaceAll("{{voorstel}}", data.voorstelUrl)
+      : data.tekst.replaceAll("{{voorstel}}", ""),
+    "",
+    "—",
+    `Henry van de Bovenkamp · ${branding.name} · ${branding.siteUrl}`,
+    `Liever geen mail meer? ${data.afmeldUrl}`,
+  ].join("\n");
+
+  return sendMail("groei-bericht", {
+    to: data.to,
+    subject: data.onderwerp,
+    replyTo: data.antwoordNaar,
+    react: (
+      <GroeiBerichtEmail
+        tekst={data.tekst}
+        voorstelUrl={data.voorstelUrl}
+        afmeldUrl={data.afmeldUrl}
+        voorbeeld={data.tekst.replace(/\s+/g, " ").slice(0, 110)}
+      />
+    ),
+    text: platteTekst,
+    headers: {
+      "List-Unsubscribe": `<${data.afmeldEenKlikUrl}>, <${data.afmeldUrl}>`,
+      "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+    },
   });
 }

@@ -159,6 +159,7 @@ export async function sendMail(
     cc: sandboxTo ? undefined : options.cc,
     bcc: sandboxTo ? undefined : options.bcc,
     attachments: options.attachments,
+    headers: options.headers,
   };
 
   if (sandboxTo) {

@@ -13,6 +13,7 @@ export type MailType =
   | "demo-ready"
   | "welcome"
   | "notification"
+  | "groei-bericht"
   | "test";
 
 export type MailAttachment = {
@@ -34,6 +35,8 @@ export type MailOptions = {
   cc?: string | string[];
   bcc?: string | string[];
   attachments?: MailAttachment[];
+  /** Extra kopregels, bijv. List-Unsubscribe bij zakelijke post. */
+  headers?: Record<string, string>;
 };
 
 export type MailResult =
