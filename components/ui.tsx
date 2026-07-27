@@ -48,35 +48,52 @@ type ButtonProps = {
   children: ReactNode;
   variant?: "primary" | "secondary" | "ghost" | "light";
   className?: string;
-  size?: "md" | "lg";
+  size?: "sm" | "md" | "lg";
+  /** Bijv. om een mobiel menu te sluiten bij het navigeren */
+  onClick?: () => void;
 };
 
+/**
+ * De knop van DogWare — één bron voor de hele site.
+ *
+ * Bewust ingetogen: de kop mag de aandacht krijgen, de knop nodigt uit zonder
+ * te schreeuwen. Daarom rustige verhoudingen, een zachte hoek in plaats van
+ * een volledige pil, en in ruststand vrijwel geen schaduw. De warme gloed
+ * verschijnt pas bij hover, samen met een lift van één pixel — genoeg om
+ * aanraakbaar te voelen, te weinig om af te leiden.
+ *
+ * Hoogtes komen uit padding en niet uit een vaste `h-`, zodat een lang label
+ * op een smal scherm netjes kan doorlopen in plaats van af te snijden.
+ */
 export function Button({
   href,
   children,
   variant = "primary",
   size = "md",
   className,
+  onClick,
 }: ButtonProps) {
   const base =
-    "group inline-flex items-center justify-center gap-2 rounded-full font-semibold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-cream";
+    "group inline-flex items-center justify-center gap-1.5 rounded-xl font-semibold leading-[1.2] tracking-[-0.01em] transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/45 focus-visible:ring-offset-2 focus-visible:ring-offset-cream";
   const sizes = {
-    md: "px-5 py-2.5 text-sm",
-    lg: "px-7 py-3.5 text-base",
+    sm: "px-3.5 py-2 text-[13px]",
+    md: "px-4 py-2.5 text-sm",
+    lg: "px-5 py-3 text-[15px]",
   };
   const variants = {
     primary:
-      "bg-brand text-white shadow-[0_12px_30px_-12px_rgba(224,86,42,0.8)] hover:bg-brand-600 hover:-translate-y-0.5",
+      "bg-brand text-white shadow-[0_1px_2px_rgba(28,21,15,0.08)] hover:bg-brand-600 hover:-translate-y-px hover:shadow-[0_6px_16px_-6px_rgba(224,86,42,0.5)] active:translate-y-0 active:shadow-[0_1px_2px_rgba(28,21,15,0.08)]",
     secondary:
-      "bg-ink text-cream hover:bg-ink-700 hover:-translate-y-0.5 shadow-soft",
+      "bg-ink text-cream shadow-[0_1px_2px_rgba(28,21,15,0.08)] hover:bg-ink-700 hover:-translate-y-px active:translate-y-0",
     ghost:
-      "bg-transparent text-ink ring-1 ring-ink/15 hover:ring-ink/30 hover:bg-white/60",
+      "text-ink-700 ring-1 ring-ink/12 hover:bg-white hover:text-ink hover:ring-ink/20 hover:-translate-y-px active:translate-y-0",
     light:
-      "bg-white text-ink shadow-soft ring-1 ring-ink/5 hover:-translate-y-0.5",
+      "bg-white text-ink ring-1 ring-ink/5 shadow-[0_1px_2px_rgba(28,21,15,0.06)] hover:-translate-y-px hover:shadow-soft active:translate-y-0",
   };
   return (
     <Link
       href={href}
+      onClick={onClick}
       className={cn(base, sizes[size], variants[variant], className)}
     >
       {children}

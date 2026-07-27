@@ -91,20 +91,20 @@ export function HeroView({
             </Reveal>
 
             <Reveal delay={0.15}>
-              <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
+              {/* items-start houdt de knoppen op mobiel zo breed als hun tekst;
+                  in een kolom-flex zouden ze anders het hele scherm vullen. */}
+              <div className="mt-9 flex flex-col items-start gap-2.5 sm:flex-row sm:items-center sm:gap-3">
                 <Button href={demoHref(c)} variant="primary" size="lg">
                   Laat mijn voorbeeld maken
-                  <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                  <ArrowRight className="h-3.5 w-3.5 transition-transform duration-150 ease-out group-hover:translate-x-0.5" />
                 </Button>
                 <Button
                   href={!isLanding && "path" in c ? c.path : "#oplossing"}
                   variant="ghost"
                   size="lg"
                 >
-                  <PlayCircle className="h-5 w-5 text-brand" />
-                  {c.slug === "algemeen"
-                    ? "Bekijk DogWare voor mijn bedrijf"
-                    : `DogWare voor ${c.meervoud}`}
+                  <PlayCircle className="h-4 w-4 text-brand" />
+                  Bekijk voorbeeld
                 </Button>
               </div>
             </Reveal>

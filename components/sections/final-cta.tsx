@@ -109,7 +109,7 @@ export function FinalCta({ branche }: { branche?: string }) {
 
             <Button href={demoHref(c)} variant="primary" size="lg" className="mt-7 w-full">
               {specifiek ? c.cta.voorbeeld : "Maak mijn persoonlijke DogWare demo"}
-              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+              <ArrowRight className="h-3.5 w-3.5 transition-transform duration-150 ease-out group-hover:translate-x-0.5" />
             </Button>
 
             <p className="mt-4 flex items-center justify-center gap-1.5 text-center text-xs text-ink-300">

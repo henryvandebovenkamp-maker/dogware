@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { Menu, X, ChevronDown, LogOut } from "lucide-react";
 import { Logo } from "@/components/brand";
+import { Button } from "@/components/ui";
 import { logout } from "@/app/actions/auth";
 import { cn } from "@/lib/cn";
 
@@ -157,12 +158,9 @@ export function HeaderBar({
               Inloggen
             </Link>
           )}
-          <Link
-            href="/demo"
-            className="rounded-full bg-brand px-5 py-2.5 text-sm font-semibold text-white shadow-[0_10px_26px_-12px_rgba(224,86,42,0.85)] transition-all hover:-translate-y-0.5 hover:bg-brand-600"
-          >
+          <Button href="/demo" variant="primary" size="md">
             Vraag een demo aan
-          </Link>
+          </Button>
         </div>
 
         {/* Hamburger mobiel */}
@@ -232,13 +230,15 @@ export function HeaderBar({
               </Link>
             )}
 
-            <Link
+            <Button
               href="/demo"
+              variant="primary"
+              size="lg"
               onClick={() => setOpen(false)}
-              className="mt-2 rounded-full bg-brand px-6 py-4 text-center text-base font-semibold text-white shadow-glow"
+              className="mt-3 w-full"
             >
               Vraag een demo aan
-            </Link>
+            </Button>
           </nav>
         </div>
       )}
