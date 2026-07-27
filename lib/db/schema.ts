@@ -613,3 +613,247 @@ export type User = typeof users.$inferSelect;
 export type Partner = typeof partners.$inferSelect;
 export type ReferralClick = typeof referralClicks.$inferSelect;
 export type SiteSettings = typeof siteSettings.$inferSelect;
+
+/* =========================================================================
+ * Groei — de persoonlijke acquisitieomgeving
+ *
+ * Geen CRM en geen mailtool: een omgeving die helpt om op een menselijke
+ * manier contact te leggen met collega-hondenbedrijven. Henry blijft altijd
+ * de afzender en beslist alles; DogWare bereidt alleen voor.
+ *
+ * Alle tabellen dragen `ownerUserId`. Vandaag is dat altijd Henry, maar
+ * daardoor kunnen partners later hun eigen Groei-omgeving krijgen zonder
+ * datamigratie.
+ * ========================================================================= */
+
+/** Waar een bedrijf staat in de reis. Bewust menselijke woorden. */
+export const GROEI_STAPPEN = [
+  "gevonden",      // ontdekt, nog niets mee gedaan
+  "bekeken",       // website geanalyseerd
+  "voorbereid",    // voorstel + conceptmail klaar voor Henry
+  "verstuurd",     // Henry heeft verstuurd
+  "gelezen",       // voorstelpagina geopend
+  "reactie",       // er is geantwoord
+  "gesprek",       // loopt een gesprek
+  "klant",         // is klant geworden
+  "niet-nu",       // vriendelijk afgehaakt of niet passend
+] as const;
+export type GroeiStap = (typeof GROEI_STAPPEN)[number];
+
+/**
+ * De juridische grondslag om dit bedrijf te mogen benaderen.
+ * Voor rechtspersonen geldt in Nederland een opt-outregime; een eenmanszaak
+ * is juridisch een natuurlijk persoon en vereist toestemming. Dit veld dwingt
+ * die afweging af vóór er iets verstuurd wordt.
+ */
+export const GROEI_GRONDSLAGEN = [
+  "onbekend",        // nog niet vastgesteld — verzenden geblokkeerd
+  "rechtspersoon",   // BV/VOF/stichting: gerechtvaardigd belang, met afmeldrecht
+  "toestemming",     // heeft expliciet toestemming gegeven
+  "klantrelatie",    // bestaande relatie
+] as const;
+export type GroeiGrondslag = (typeof GROEI_GRONDSLAGEN)[number];
+
+/** Een hondenbedrijf dat we mogelijk willen verrassen. */
+export const groeiProspects = pgTable(
+  "groei_prospects",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    ownerUserId: uuid("owner_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+
+    // Wie zijn ze
+    bedrijfsnaam: text("bedrijfsnaam").notNull(),
+    branche: text("branche"),
+    plaats: text("plaats"),
+    website: text("website"),
+    email: text("email"),
+    telefoon: text("telefoon"),
+    contactpersoon: text("contactpersoon"),
+    /** Voornaam voor de aanhef — apart, want "Hi Jan" is geen "Hi Jan de Vries" */
+    voornaam: text("voornaam"),
+    logoUrl: text("logo_url"),
+    socials: jsonb("socials").$type<Record<string, string>>().notNull().default({}),
+    googleRating: text("google_rating"),
+    googleReviews: integer("google_reviews"),
+
+    /**
+     * Waar elk gegeven vandaan komt, per veld. Verplicht onder de AVG om te
+     * kunnen verantwoorden hoe je aan iemands gegevens komt.
+     */
+    herkomst: jsonb("herkomst").$type<Record<string, string>>().notNull().default({}),
+    grondslag: text("grondslag").$type<GroeiGrondslag>().notNull().default("onbekend"),
+
+    stap: text("stap").$type<GroeiStap>().notNull().default("gevonden"),
+    /** Vrije notities van Henry */
+    notities: text("notities"),
+
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("groei_prospects_owner_idx").on(t.ownerUserId, t.stap),
+    index("groei_prospects_created_idx").on(t.createdAt),
+    uniqueIndex("groei_prospects_website_idx").on(t.ownerUserId, t.website),
+  ],
+);
+
+/** Wat DogWare van hun website begreep. Altijd opbouwend geformuleerd. */
+export const groeiAnalyses = pgTable(
+  "groei_analyses",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    prospectId: uuid("prospect_id")
+      .notNull()
+      .references(() => groeiProspects.id, { onDelete: "cascade" }),
+
+    /** Wat er al goed gaat — hier begint elk gesprek mee */
+    sterk: jsonb("sterk").$type<string[]>().notNull().default([]),
+    /** Kansen, positief geformuleerd: "zou een mooie aanvulling zijn" */
+    kansen: jsonb("kansen")
+      .$type<{ titel: string; waarom: string; module: string }[]>()
+      .notNull()
+      .default([]),
+    /**
+     * Concreet waargenomen details van hun site. Dit is het bewijs dat er
+     * echt gekeken is; zonder minstens één detail mag er niets verstuurd.
+     */
+    details: jsonb("details")
+      .$type<{ wat: string; waar: string }[]>()
+      .notNull()
+      .default([]),
+    /** Past DogWare hier eigenlijk wel? Nee is een geldig en nuttig antwoord. */
+    past: boolean("past").notNull().default(true),
+    passendheidUitleg: text("passendheid_uitleg"),
+
+    model: text("model"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("groei_analyses_prospect_idx").on(t.prospectId, t.createdAt)],
+);
+
+/** Het inspiratievoorstel: een pagina in hun eigen stijl, geen offerte. */
+export const groeiVoorstellen = pgTable(
+  "groei_voorstellen",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    prospectId: uuid("prospect_id")
+      .notNull()
+      .references(() => groeiProspects.id, { onDelete: "cascade" }),
+    /** Onraadbare sleutel in de URL — geen opsombare id's */
+    token: text("token").notNull(),
+
+    titel: text("titel").notNull(),
+    intro: text("intro").notNull(),
+    secties: jsonb("secties")
+      .$type<{ kop: string; tekst: string; module?: string }[]>()
+      .notNull()
+      .default([]),
+    /** Kleuren uit hun huisstijl, zodat het voelt als van hen */
+    accentKleur: text("accent_kleur"),
+
+    /** Bewuste klik in plaats van een verborgen trackingpixel */
+    geopendAt: timestamp("geopend_at", { withTimezone: true }),
+    aantalKeerGeopend: integer("aantal_keer_geopend").notNull().default(0),
+    laatstGeopendAt: timestamp("laatst_geopend_at", { withTimezone: true }),
+
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("groei_voorstellen_token_idx").on(t.token),
+    index("groei_voorstellen_prospect_idx").on(t.prospectId),
+  ],
+);
+
+/** Een bericht aan een bedrijf. Altijd van Henry, nooit van "het systeem". */
+export const groeiBerichten = pgTable(
+  "groei_berichten",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    prospectId: uuid("prospect_id")
+      .notNull()
+      .references(() => groeiProspects.id, { onDelete: "cascade" }),
+    voorstelId: uuid("voorstel_id").references(() => groeiVoorstellen.id, {
+      onDelete: "set null",
+    }),
+
+    onderwerp: text("onderwerp").notNull(),
+    tekst: text("tekst").notNull(),
+    /** Concept tot Henry op verzenden drukt */
+    verstuurdAt: timestamp("verstuurd_at", { withTimezone: true }),
+    /** Door Henry aangepast vóór verzenden? Voedt de ideeënbibliotheek. */
+    bewerktDoorHenry: boolean("bewerkt_door_henry").notNull().default(false),
+    model: text("model"),
+
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("groei_berichten_prospect_idx").on(t.prospectId, t.createdAt)],
+);
+
+/** Tijdlijn per bedrijf — dezelfde vorm als journey_events, eigen tabel. */
+export const groeiEvents = pgTable(
+  "groei_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    prospectId: uuid("prospect_id")
+      .notNull()
+      .references(() => groeiProspects.id, { onDelete: "cascade" }),
+    kind: text("kind").notNull(),
+    label: text("label").notNull(),
+    meta: jsonb("meta").$type<Record<string, unknown>>(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("groei_events_prospect_idx").on(t.prospectId, t.createdAt)],
+);
+
+/**
+ * Bedrijven die niet benaderd willen worden. Los van prospects, want een
+ * afmelding moet blijven staan ook als het bedrijf zelf verwijderd wordt.
+ */
+export const groeiBlokkeerlijst = pgTable(
+  "groei_blokkeerlijst",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    /** Genormaliseerd (lowercase, getrimd) */
+    email: text("email"),
+    domein: text("domein"),
+    reden: text("reden"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("groei_blokkeerlijst_email_idx").on(t.email),
+    index("groei_blokkeerlijst_domein_idx").on(t.domein),
+  ],
+);
+
+/**
+ * De ideeënbibliotheek: onderdelen die aantoonbaar werkten. Bewust gevoed
+ * door menselijke reacties, niet door verzendaantallen — anders leert het
+ * systeem "wat vaak verstuurd is" in plaats van "wat raakte".
+ */
+export const groeiIdeeen = pgTable(
+  "groei_ideeen",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    ownerUserId: uuid("owner_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    branche: text("branche"),
+    soort: text("soort").notNull(), // "opening" | "kans" | "sectie" | "afsluiter"
+    tekst: text("tekst").notNull(),
+    /** Hoe vaak dit onderdeel meeging in een bericht dat een reactie kreeg */
+    raakScore: integer("raak_score").notNull().default(0),
+    gebruikt: integer("gebruikt").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("groei_ideeen_owner_idx").on(t.ownerUserId, t.branche, t.soort)],
+);
+
+export type GroeiProspect = typeof groeiProspects.$inferSelect;
+export type NewGroeiProspect = typeof groeiProspects.$inferInsert;
+export type GroeiAnalyse = typeof groeiAnalyses.$inferSelect;
+export type GroeiVoorstel = typeof groeiVoorstellen.$inferSelect;
+export type GroeiBericht = typeof groeiBerichten.$inferSelect;
+export type GroeiEvent = typeof groeiEvents.$inferSelect;
+export type GroeiIdee = typeof groeiIdeeen.$inferSelect;
