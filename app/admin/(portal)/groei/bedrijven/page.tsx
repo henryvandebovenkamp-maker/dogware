@@ -6,6 +6,69 @@ import { BRANCHES } from "@/lib/branches";
 import { GRONDSLAG_META, STAP_META, STAP_VOLGORDE } from "@/lib/groei/stappen";
 import type { GroeiStap } from "@/lib/db/schema";
 
+/**
+ * De lege staat is geen doodlopend eind meer. Wat hier stond — "voeg er één
+ * toe om te beginnen" — legde het werk bij Henry. Nu vertelt het scherm wat
+ * de agents voor hem doen.
+ */
+function LegeStaat({ agents }: { agents: string[] }) {
+  return (
+    <div className="mt-6 rounded-3xl bg-white p-8 shadow-soft ring-1 ring-ink/5">
+      <div className="flex items-center gap-2.5">
+        <span className="relative flex h-2.5 w-2.5">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand opacity-60" />
+          <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-brand" />
+        </span>
+        <p className="text-[15px] font-extrabold text-ink">
+          Je Groei-agents gaan voor je aan het werk
+        </p>
+      </div>
+
+      <p className="mt-3 max-w-lg text-[14px] leading-relaxed text-ink-500">
+        Ze zoeken gericht naar hondenbedrijven die goed bij DogWare passen,
+        controleren de informatie en zetten alleen de interessantste kansen voor je
+        klaar. Zodra er een bedrijf door de controle komt, verschijnt het hier
+        vanzelf.
+      </p>
+
+      {agents.length > 0 ? (
+        <div className="mt-6">
+          <p className="text-[12px] font-bold uppercase tracking-[0.12em] text-ink-300">
+            Nu ingesteld
+          </p>
+          <ul className="mt-2.5 space-y-1.5">
+            {agents.map((a) => (
+              <li key={a} className="flex items-center gap-2.5 text-[14px] text-ink-700">
+                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-sage" />
+                {a}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : (
+        <p className="mt-6 text-[14px] font-semibold text-brand-600">
+          Er staan nog geen agents klaar. Stel ze in en ze beginnen met zoeken.
+        </p>
+      )}
+
+      <div className="mt-7 flex flex-wrap items-center gap-3">
+        <Link
+          href="/admin/groei/agents"
+          className="rounded-xl bg-brand px-5 py-3 text-[15px] font-semibold leading-[1.2] text-white transition-all duration-150 ease-out hover:-translate-y-px hover:bg-brand-600"
+        >
+          {agents.length > 0 ? "Agents bekijken" : "Zoekopdracht instellen"}
+        </Link>
+        <Link
+          href="/admin/groei/bedrijven/nieuw"
+          className="text-[13px] font-semibold text-ink-300 transition-colors hover:text-ink"
+        >
+          of voeg er zelf één toe
+        </Link>
+      </div>
+    </div>
+  );
+}
+
 export const metadata = { title: "Bedrijven" };
 
 const KLEUREN = {
@@ -57,6 +120,28 @@ export default async function BedrijvenPage({
         .limit(200)
     : [];
 
+  // Welke agents er klaarstaan — in gewone taal voor de lege staat.
+  const agents = db
+    ? await db
+        .select({
+          naam: schema.groeiAgents.naam,
+          branche: schema.groeiAgents.branche,
+          provincies: schema.groeiAgents.provincies,
+          actief: schema.groeiAgents.actief,
+        })
+        .from(schema.groeiAgents)
+        .where(eq(schema.groeiAgents.ownerUserId, user.id))
+    : [];
+
+  const agentRegels = agents
+    .filter((a) => a.actief)
+    .map((a) => {
+      const b = BRANCHES.find((x) => x.slug === a.branche);
+      const wat = b ? b.meervoud.charAt(0).toUpperCase() + b.meervoud.slice(1) : "Hondenbedrijven";
+      const waar = a.provincies.length ? a.provincies.join(" en ") : "Nederland";
+      return `${wat} in ${waar}`;
+    });
+
   const filters: { key: string | null; label: string }[] = [
     { key: null, label: "Alles" },
     ...[...STAP_VOLGORDE, "niet-nu" as GroeiStap].map((s) => ({
@@ -74,12 +159,20 @@ export default async function BedrijvenPage({
             Collega&apos;s die misschien iets aan DogWare hebben.
           </p>
         </div>
-        <Link
-          href="/admin/groei/bedrijven/nieuw"
-          className="rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold leading-[1.2] text-white shadow-[0_1px_2px_rgba(28,21,15,0.08)] transition-all duration-150 ease-out hover:-translate-y-px hover:bg-brand-600"
-        >
-          Bedrijf toevoegen
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/admin/groei/agents"
+            className="rounded-xl bg-ink px-4 py-2.5 text-sm font-semibold leading-[1.2] text-cream shadow-[0_1px_2px_rgba(28,21,15,0.08)] transition-all duration-150 ease-out hover:-translate-y-px hover:bg-ink-700"
+          >
+            Agents bekijken
+          </Link>
+          <Link
+            href="/admin/groei/bedrijven/nieuw"
+            className="text-[13px] font-semibold text-ink-300 transition-colors hover:text-ink"
+          >
+            zelf toevoegen
+          </Link>
+        </div>
       </div>
 
       <div className="mt-6 flex flex-wrap gap-1.5">
@@ -102,11 +195,13 @@ export default async function BedrijvenPage({
       </div>
 
       {rijen.length === 0 ? (
-        <p className="mt-6 rounded-2xl bg-white px-5 py-8 text-center text-[14px] text-ink-500 shadow-soft ring-1 ring-ink/5">
-          {actief
-            ? "Geen bedrijven in deze stap."
-            : "Nog geen bedrijven. Voeg er één toe om te beginnen."}
-        </p>
+        actief ? (
+          <p className="mt-6 rounded-2xl bg-white px-5 py-8 text-center text-[14px] text-ink-500 shadow-soft ring-1 ring-ink/5">
+            Geen bedrijven in deze stap.
+          </p>
+        ) : (
+          <LegeStaat agents={agentRegels} />
+        )
       ) : (
         <ul className="mt-6 space-y-2">
           {rijen.map((r) => {

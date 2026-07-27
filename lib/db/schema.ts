@@ -689,6 +689,12 @@ export const groeiProspects = pgTable(
     /** Vrije notities van Henry */
     notities: text("notities"),
 
+    /** Welke bron dit bedrijf aandroeg, bijv. "openstreetmap" of "handmatig" */
+    bron: text("bron").notNull().default("handmatig"),
+    /** Sleutel bij die bron (OSM-type + id), voor deduplicatie tussen runs */
+    bronId: text("bron_id"),
+    gevondenDoorAgentId: uuid("gevonden_door_agent_id"),
+
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -857,3 +863,76 @@ export type GroeiVoorstel = typeof groeiVoorstellen.$inferSelect;
 export type GroeiBericht = typeof groeiBerichten.$inferSelect;
 export type GroeiEvent = typeof groeiEvents.$inferSelect;
 export type GroeiIdee = typeof groeiIdeeen.$inferSelect;
+
+/* =========================================================================
+ * Groei — agents die het voorwerk doen
+ *
+ * Henry voegt geen bedrijven toe; agents ontdekken ze, controleren ze en
+ * zetten alleen de interessante kansen klaar. Elke run is idempotent: hem
+ * opnieuw draaien levert nooit dubbele bedrijven op.
+ * ========================================================================= */
+
+/** Wat een agent doet. Meer rollen komen hier later bij. */
+export const GROEI_AGENT_SOORTEN = ["ontdekken", "kwaliteit"] as const;
+export type GroeiAgentSoort = (typeof GROEI_AGENT_SOORTEN)[number];
+
+export const GROEI_RUN_STATUS = ["bezig", "klaar", "mislukt"] as const;
+export type GroeiRunStatus = (typeof GROEI_RUN_STATUS)[number];
+
+export const groeiAgents = pgTable(
+  "groei_agents",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    ownerUserId: uuid("owner_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+
+    naam: text("naam").notNull(),
+    soort: text("soort").$type<GroeiAgentSoort>().notNull().default("ontdekken"),
+    /** Slug uit lib/branches.ts; leeg = alle branches die de bron ondersteunt */
+    branche: text("branche"),
+    /** Provincienamen zoals in OpenStreetMap; leeg = heel Nederland */
+    provincies: jsonb("provincies").$type<string[]>().notNull().default([]),
+
+    /**
+     * Hoeveel bedrijven deze agent per run maximaal mag toevoegen. Bewust een
+     * grens per agent: liever een handvol goede vondsten per dag dan een lijst
+     * die niemand meer naloopt.
+     */
+    maxPerRun: integer("max_per_run").notNull().default(25),
+    actief: boolean("actief").notNull().default(true),
+
+    laatsteRunAt: timestamp("laatste_run_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("groei_agents_owner_idx").on(t.ownerUserId, t.actief)],
+);
+
+export const groeiAgentRuns = pgTable(
+  "groei_agent_runs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    agentId: uuid("agent_id")
+      .notNull()
+      .references(() => groeiAgents.id, { onDelete: "cascade" }),
+
+    status: text("status").$type<GroeiRunStatus>().notNull().default("bezig"),
+    gestartAt: timestamp("gestart_at", { withTimezone: true }).notNull().defaultNow(),
+    klaarAt: timestamp("klaar_at", { withTimezone: true }),
+
+    /** Wat de bron opleverde */
+    gevonden: integer("gevonden").notNull().default(0),
+    /** Daarvan daadwerkelijk toegevoegd */
+    nieuw: integer("nieuw").notNull().default(0),
+    /** Al bekend, of afgekeurd door de kwaliteitscontrole */
+    overgeslagen: integer("overgeslagen").notNull().default(0),
+
+    /** In gewone taal, zodat het scherm geen logbestand hoeft te tonen */
+    samenvatting: text("samenvatting"),
+    fout: text("fout"),
+  },
+  (t) => [index("groei_agent_runs_agent_idx").on(t.agentId, t.gestartAt)],
+);
+
+export type GroeiAgent = typeof groeiAgents.$inferSelect;
+export type GroeiAgentRun = typeof groeiAgentRuns.$inferSelect;
