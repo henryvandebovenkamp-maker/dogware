@@ -1,3 +1,5 @@
+"use client";
+
 import {
   ArrowRight,
   CheckCircle2,
@@ -9,6 +11,8 @@ import {
 } from "lucide-react";
 import { Button, Container } from "@/components/ui";
 import { BrandMark } from "@/components/brand";
+import { useBrancheContent } from "@/components/branche/branche-context";
+import { demoHref } from "@/lib/branches";
 
 const IMAGINE = [
   "Nog een hond helpen?",
@@ -17,22 +21,27 @@ const IMAGINE = [
   "Meer tijd voor je eigen hond?",
 ];
 
-const KRIJGT = [
-  {
-    icon: MessageCircleHeart,
-    text: "Vertel in 2–3 minuten iets over jouw bedrijf",
-  },
-  {
-    icon: Wand2,
-    text: "Ik bouw een demo die aansluit op jouw diensten en werkwijze",
-  },
-  {
-    icon: Clock,
-    text: "Binnen 24 uur een kosteloos voorbeeld van jouw eigen DogWare-omgeving",
-  },
-];
+export function FinalCta({ branche }: { branche?: string }) {
+  const c = useBrancheContent(branche);
+  const specifiek = c.slug !== "algemeen";
 
-export function FinalCta() {
+  const krijgt = [
+    {
+      icon: MessageCircleHeart,
+      text: "Vertel in 2–3 minuten iets over jouw bedrijf",
+    },
+    {
+      icon: Wand2,
+      text: specifiek
+        ? `Ik bouw een demo die aansluit op de manier waarop jouw ${c.naamKlein} werkt`
+        : "Ik bouw een demo die aansluit op jouw diensten en werkwijze",
+    },
+    {
+      icon: Clock,
+      text: "Binnen 24 uur een kosteloos voorbeeld van jouw eigen DogWare-omgeving",
+    },
+  ];
+
   return (
     <section id="demo" className="relative overflow-hidden bg-ink py-20 text-cream sm:py-28">
       <div className="pointer-events-none absolute inset-0 opacity-70">
@@ -86,7 +95,7 @@ export function FinalCta() {
             </div>
 
             <ul className="space-y-3.5">
-              {KRIJGT.map((k) => (
+              {krijgt.map((k) => (
                 <li key={k.text} className="flex items-start gap-3">
                   <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-100 text-brand">
                     <k.icon className="h-4 w-4" />
@@ -98,13 +107,8 @@ export function FinalCta() {
               ))}
             </ul>
 
-            <Button
-              href="/demo"
-              variant="primary"
-              size="lg"
-              className="mt-7 w-full"
-            >
-              Maak mijn persoonlijke DogWare demo
+            <Button href={demoHref(c)} variant="primary" size="lg" className="mt-7 w-full">
+              {specifiek ? c.cta.voorbeeld : "Maak mijn persoonlijke DogWare demo"}
               <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
             </Button>
 

@@ -7,12 +7,14 @@ import { Logo } from "@/components/brand";
 import { logout } from "@/app/actions/auth";
 import { cn } from "@/lib/cn";
 
+// Root-relatief, zodat de navigatie ook werkt vanaf een branche- of
+// oplossingspagina en niet alleen op de homepage.
 const NAV = [
-  { label: "Platform", href: "#oplossing" },
-  { label: "Modules", href: "#modules" },
-  { label: "Webshop", href: "#webshop" },
-  { label: "Betalingen", href: "#betalingen" },
-  { label: "Waarom DogWare", href: "#verschil" },
+  { label: "Voor wie", href: "/#branches" },
+  { label: "Oplossingen", href: "/#oplossingen" },
+  { label: "Platform", href: "/#oplossing" },
+  { label: "Webshop", href: "/#webshop" },
+  { label: "Waarom DogWare", href: "/#verschil" },
 ];
 
 export type HeaderUser = {

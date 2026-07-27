@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { Logo } from "@/components/brand";
 import { DemoExperience } from "@/components/demo/experience";
+import { SERVICES } from "@/lib/demo-flow";
 import { getValidAttribution } from "@/lib/referral";
 import { REFERRAL_BENEFITS } from "@/lib/branding";
 import { getDb, schema } from "@/lib/db";
@@ -26,12 +27,16 @@ export const metadata: Metadata = {
 export default async function DemoPage({
   searchParams,
 }: {
-  searchParams: Promise<{ ref?: string }>;
+  searchParams: Promise<{ ref?: string; branche?: string }>;
 }) {
-  const { ref } = await searchParams;
+  const { ref, branche } = await searchParams;
   if (ref) {
     redirect(`/p/${encodeURIComponent(ref)}`);
   }
+
+  // Komt de bezoeker via een branchegerichte CTA ("Bekijk een voorbeeld van
+  // een trimsalon"), dan staat zijn dienst meteen aangevinkt in de flow.
+  const initialServices = SERVICES.filter((s) => s.key === branche).map((s) => s.key);
 
   // Actieve koppeling ophalen (via de cookie die /p/CODE heeft gezet).
   // Naam + voordelen gaan als prop mee de centrale demo-flow in, zodat de
@@ -99,6 +104,7 @@ export default async function DemoPage({
         <DemoExperience
           uploadEnabled={Boolean(process.env.UPLOADTHING_TOKEN)}
           partner={partnerIntro}
+          initialServices={initialServices}
         />
       </main>
     </div>

@@ -1,39 +1,34 @@
-import {
-  MessageCircle,
-  Mail,
-  FileText,
-  CalendarX,
-  Globe,
-  Table2,
-  FolderOpen,
-  CreditCard,
-} from "lucide-react";
+"use client";
+
 import { Container, SectionHeading } from "@/components/ui";
 import { Reveal, RevealStagger, RevealItem } from "@/components/reveal";
+import { useBrancheContent } from "@/components/branche/branche-context";
 
-const TOOLS = [
-  { icon: Globe, text: "Een websitebouwer" },
-  { icon: CalendarX, text: "Een losse agenda" },
-  { icon: FileText, text: "Een apart factuurprogramma" },
-  { icon: MessageCircle, text: "WhatsApp voor je klanten" },
-  { icon: Table2, text: "Excel voor je administratie" },
-  { icon: Mail, text: "Losse e-mails voor aanmeldingen" },
-  { icon: FolderOpen, text: "Google Drive voor je bestanden" },
-  { icon: CreditCard, text: "iDEAL via weer een ander systeem" },
-];
+/**
+ * De herkenning: "zo gaat het nu bij mij". Beweegt mee met de gekozen branche,
+ * zodat een trimsalon over telefoontjes leest en een uitlaatservice over de
+ * avondpuzzel met de rit van morgen.
+ */
+export function Problem({ branche }: { branche?: string }) {
+  const c = useBrancheContent(branche);
 
-export function Problem() {
   return (
     <section className="py-20 sm:py-28">
       <Container>
         <SectionHeading
           eyebrow="Herken je dit?"
-          title="Zoveel losse systemen. En dat voelt normaal."
-          intro="De meeste hondenondernemers werken met een handvol programma's die niets van elkaar weten. Elk apart lijkt het te werken. Bij elkaar kost het je elke avond opnieuw tijd."
+          title={c.problem.titel}
+          intro={c.problem.intro}
         />
 
-        <RevealStagger className="mx-auto mt-12 grid max-w-4xl gap-3 sm:grid-cols-2">
-          {TOOLS.map((f) => (
+        {/* De key laat de stagger opnieuw monteren bij een branchewissel.
+            Zonder die remount blijven nieuwe items op de verborgen begintoestand
+            staan: whileInView met once:true is dan al afgevuurd. */}
+        <RevealStagger
+          key={c.slug}
+          className="mx-auto mt-12 grid max-w-4xl gap-3 sm:grid-cols-2"
+        >
+          {c.problem.items.map((f) => (
             <RevealItem key={f.text}>
               <div className="flex items-center gap-4 rounded-2xl bg-white px-5 py-4 shadow-soft ring-1 ring-ink/5 transition-transform hover:-translate-y-0.5">
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand">
@@ -47,8 +42,8 @@ export function Problem() {
 
         <Reveal delay={0.1}>
           <p className="mx-auto mt-12 max-w-2xl text-balance text-center text-xl font-bold text-ink sm:text-2xl">
-            Acht systemen, acht wachtwoorden, nul overzicht.
-            <span className="block text-brand">Waarom doe je dit eigenlijk nog zo?</span>
+            {c.problem.conclusie}
+            <span className="block text-brand">{c.problem.conclusieAccent}</span>
           </p>
         </Reveal>
       </Container>

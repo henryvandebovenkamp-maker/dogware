@@ -19,14 +19,40 @@ Zodra een bestand bestaat, verschijnt het automatisch op de site — de placehol
 | ------------------ | ------------------------------ | -------- |
 | `henry-avatar.jpg` | Close-up van je gezicht        | Vierkant |
 
+## Branchepagina's (grote foto per branche)
+
+Elke branchelandingspagina toont één sfeerfoto uit het vak zelf. Dit is dé plek
+waar een bezoeker denkt "hé, dit gaat over mij", dus kies foto's die het werk
+herkenbaar maken.
+
+| Bestandsnaam                    | Pagina                        | Wat voor foto                          | Vorm        |
+| ------------------------------- | ----------------------------- | -------------------------------------- | ----------- |
+| `branche-hondenschool.jpg`      | /hondenschool-software        | Puppycursus op het trainingsveld       | Liggend 4:3 |
+| `branche-trimsalon.jpg`         | /trimsalon-software           | Hond op de trimtafel                   | Liggend 4:3 |
+| `branche-uitlaatservice.jpg`    | /uitlaatservice-software      | Groep honden in het bos                | Liggend 4:3 |
+| `branche-dagopvang.jpg`         | /dagopvang-software           | Honden die samen spelen op de opvang   | Liggend 4:3 |
+| `branche-pension.jpg`           | /pension-software             | Logeergast in een ruime kennel         | Liggend 4:3 |
+| `branche-gedragstherapie.jpg`   | /gedragstherapie-software     | Rustig consult met hond en baasje      | Liggend 4:3 |
+| `branche-dierenverzorging.jpg`  | /dierenverzorging-software    | Verzorger op bezoek bij hond thuis     | Liggend 4:3 |
+| `branche-chipservice.jpg`       | /chipservice-software         | Pup wordt gechipt                      | Liggend 4:3 |
+| `branche-webshop.jpg`           | /webshop-software             | Assortiment riemen, snacks, speelgoed  | Liggend 4:3 |
+
+Zolang een foto ontbreekt toont de pagina een nette placeholder in de huisstijl
+mét de bestandsnaam erin, zodat je meteen ziet wat er nog moet komen.
+
 ## Testimonials (ronde avatars, optioneel)
 
-| Bestandsnaam             | Persoon        |
-| ------------------------ | -------------- |
-| `testimonial-sanne.jpg`  | Sanne Bakker   |
-| `testimonial-marco.jpg`  | Marco de Wit   |
-| `testimonial-linda.jpg`  | Linda Vermeer  |
-| `testimonial-joost.jpg`  | Joost Hendriks |
+| Bestandsnaam             | Persoon           | Branche              |
+| ------------------------ | ----------------- | -------------------- |
+| `testimonial-sanne.jpg`  | Sanne Bakker      | Hondenschool         |
+| `testimonial-marco.jpg`  | Marco de Wit      | Uitlaatservice       |
+| `testimonial-linda.jpg`  | Linda Vermeer     | Trimsalon            |
+| `testimonial-joost.jpg`  | Joost Hendriks    | Gedragstherapie      |
+| `testimonial-esther.jpg` | Esther Kooij      | Dagopvang            |
+| `testimonial-peter.jpg`  | Peter Aalbers     | Hondenpension        |
+| `testimonial-nadia.jpg`  | Nadia el Amrani   | Dierenzorg aan huis  |
+| `testimonial-rob.jpg`    | Rob Timmermans    | Chipservice          |
+| `testimonial-iris.jpg`   | Iris de Groot     | Webshop              |
 
 Zolang deze ontbreken blijft de emoji staan — dat is prima.
 

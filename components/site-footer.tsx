@@ -1,32 +1,28 @@
 import Link from "next/link";
 import { Logo } from "@/components/brand";
 import { Container } from "@/components/ui";
+import { BRANCHES } from "@/lib/branches";
+import { NEEDS } from "@/lib/needs";
 
+/**
+ * De branche- en oplossingskolommen komen rechtstreeks uit lib/branches.ts en
+ * lib/needs.ts, zodat een nieuwe branche automatisch in de footer verschijnt
+ * en er nergens dubbele lijstjes ontstaan.
+ */
 const COLS = [
   {
-    title: "Platform",
-    links: [
-      { label: "Klant- & hondenbeheer", href: "#oplossing" },
-      { label: "Planning", href: "#oplossing" },
-      { label: "Betalingen", href: "#betalingen" },
-      { label: "Facturatie", href: "#betalingen" },
-      { label: "Webshop", href: "#webshop" },
-    ],
+    title: "Voor wie",
+    links: BRANCHES.map((b) => ({ label: b.naam, href: b.path })),
   },
   {
-    title: "Modules",
-    links: [
-      { label: "Hondenschool", href: "#modules" },
-      { label: "Uitlaatservice", href: "#modules" },
-      { label: "Gedragstherapie", href: "#modules" },
-      { label: "Trimsalon", href: "#modules" },
-      { label: "Opvang & pension", href: "#modules" },
-    ],
+    title: "Oplossingen",
+    links: NEEDS.slice(0, 6).map((n) => ({ label: n.titel, href: n.path })),
   },
   {
     title: "DogWare",
     links: [
-      { label: "Waarom DogWare", href: "#verschil" },
+      { label: "Waarom DogWare", href: "/#verschil" },
+      { label: "Alle branches", href: "/#branches" },
       { label: "Demo aanvragen", href: "/demo" },
       { label: "Partner inloggen", href: "/partner/login" },
       { label: "Contact", href: "/demo" },

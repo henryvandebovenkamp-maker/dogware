@@ -87,6 +87,7 @@ const ROUTE_LABELS = [
 export function DemoExperience({
   uploadEnabled = false,
   partner = null,
+  initialServices = [],
 }: {
   uploadEnabled?: boolean;
   /** Alleen gevuld bij binnenkomst via een partner/affiliate. */
@@ -96,10 +97,15 @@ export function DemoExperience({
     avatarUrl?: string | null;
     perks: string[];
   } | null;
+  /**
+   * Voorselectie vanaf een branchepagina (/demo?branche=trimsalon). De bezoeker
+   * ziet zijn eigen dienst al aangevinkt staan en kan hem gewoon aanpassen.
+   */
+  initialServices?: ServiceKey[];
 }) {
   const [step, setStep] = useState<StepId>("naam");
   const [bedrijfsnaam, setBedrijfsnaam] = useState("");
-  const [services, setServices] = useState<ServiceKey[]>([]);
+  const [services, setServices] = useState<ServiceKey[]>(initialServices);
   const [discovery, setDiscovery] = useState<DiscoveryKey | null>(null);
   const [siteUrl, setSiteUrl] = useState("");
   const [siteGoed, setSiteGoed] = useState("");
@@ -118,7 +124,9 @@ export function DemoExperience({
   // Autosave gaat aan zodra er ergens inhoud is — afgeleid, geen effect nodig.
   const interacted =
     Boolean(bedrijfsnaam) ||
-    services.length > 0 ||
+    // Een voorselectie vanaf een branchepagina telt niet als invoer, anders
+    // zou er een leeg concept ontstaan zodra iemand de pagina alleen opent.
+    services.some((s) => !initialServices.includes(s)) ||
     Boolean(discovery) ||
     Boolean(naam) ||
     Boolean(email) ||

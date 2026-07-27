@@ -1,3 +1,5 @@
+"use client";
+
 import {
   CalendarDays,
   CreditCard,
@@ -9,6 +11,7 @@ import {
   ShoppingBag,
   Users,
 } from "lucide-react";
+import { useBrancheContent } from "@/components/branche/branche-context";
 
 const NAV = [
   { icon: LayoutGrid, label: "Dashboard", active: true },
@@ -20,13 +23,6 @@ const NAV = [
   { icon: MessageSquare, label: "Berichten" },
 ];
 
-const AGENDA = [
-  { time: "09:00", title: "Puppycursus — groep A", who: "6 honden · Buitenterrein", tone: "brand" },
-  { time: "10:30", title: "Gedragsconsult — Bo", who: "Intake · Familie de Vries", tone: "sage" },
-  { time: "13:00", title: "Uitlaatronde Noord", who: "5 honden · Route 2", tone: "gold" },
-  { time: "15:30", title: "Trimbehandeling — Luna", who: "Knippen & wassen", tone: "ink" },
-];
-
 const toneMap: Record<string, string> = {
   brand: "bg-brand",
   sage: "bg-sage",
@@ -34,7 +30,13 @@ const toneMap: Record<string, string> = {
   ink: "bg-ink-500",
 };
 
-export function DashboardMock() {
+/**
+ * Het dashboardvoorbeeld in de hero. De planning beweegt mee met de gekozen
+ * branche, zodat een trimsalon geen puppycursussen in zijn agenda ziet staan.
+ */
+export function DashboardMock({ branche }: { branche?: string }) {
+  const { dashboard } = useBrancheContent(branche);
+
   return (
     <div className="relative overflow-hidden rounded-[1.6rem] bg-white shadow-lift ring-1 ring-ink/5">
       {/* Topbar */}
@@ -83,7 +85,9 @@ export function DashboardMock() {
               <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-300">
                 Donderdag 21 juni
               </p>
-              <h3 className="text-lg font-bold text-ink">Goedemorgen, Sanne 👋</h3>
+              <h3 className="text-lg font-bold text-ink">
+                Goedemorgen, {dashboard.naam} 👋
+              </h3>
             </div>
             <div className="hidden rounded-full bg-sage-100 px-3 py-1 text-[11px] font-semibold text-sage-600 sm:block">
               Alles op schema
@@ -113,10 +117,12 @@ export function DashboardMock() {
           <div className="rounded-2xl bg-cream/60 p-3 ring-1 ring-ink/5">
             <div className="mb-2 flex items-center justify-between">
               <p className="text-xs font-bold text-ink">Planning van vandaag</p>
-              <p className="text-[10px] font-medium text-ink-300">4 afspraken</p>
+              <p className="text-[10px] font-medium text-ink-300">
+                {dashboard.agenda.length} afspraken
+              </p>
             </div>
             <div className="flex flex-col gap-1.5">
-              {AGENDA.map((row) => (
+              {dashboard.agenda.map((row) => (
                 <div
                   key={row.time}
                   className="flex items-center gap-3 rounded-xl bg-white px-3 py-2 shadow-soft ring-1 ring-ink/5"
