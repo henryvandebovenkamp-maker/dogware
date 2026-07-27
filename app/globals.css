@@ -1,4 +1,20 @@
+/*
+ * De laagvolgorde staat bewust vooraan: alles in `uploadthing` heeft de
+ * laagste prioriteit.
+ *
+ * @uploadthing/react/styles.css is met Tailwind v3 gebouwd en herdefinieert
+ * basisutilities als .hidden, .block en .flex. Toen die stylesheet nog vanuit
+ * een component werd geïmporteerd, laadde hij ná onze eigen CSS en won zijn
+ * `.hidden{display:none}` van onze `@media (lg) .lg\:block` — even zwaar, maar
+ * later in het document. Gevolg: elke `hidden lg:block` op een pagina met een
+ * uploadwidget klapte dicht, zoals de live preview in de demo-flow.
+ * In een eigen laag kan hij dat niet meer, en houden we zijn opmaak voor de
+ * dropzone zelf wél.
+ */
+@layer uploadthing;
+
 @import "tailwindcss";
+@import "@uploadthing/react/styles.css" layer(uploadthing);
 
 @theme {
   /* Warm, premium kleurpalet voor de hondenbranche */

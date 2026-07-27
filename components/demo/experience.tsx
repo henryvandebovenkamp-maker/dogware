@@ -1,6 +1,5 @@
 "use client";
 
-import "@uploadthing/react/styles.css";
 import { AnimatePresence, motion } from "motion/react";
 import { useMemo, useState, useTransition } from "react";
 import { submitIntake } from "@/app/actions/intake";
