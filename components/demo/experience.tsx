@@ -35,6 +35,7 @@ import {
 } from "./illustrations";
 import { LivePreview } from "./preview";
 import { PartnerWelcome } from "./partner-welcome";
+import { DemoWelcome } from "./demo-welcome";
 import {
   BackButton,
   ChoiceCard,
@@ -87,14 +88,30 @@ const ROUTE_LABELS = [
 export function DemoExperience({
   uploadEnabled = false,
   partner = null,
+  attributedPartner = null,
   initialServices = [],
 }: {
   uploadEnabled?: boolean;
-  /** Alleen gevuld bij binnenkomst via een partner/affiliate. */
+  /**
+   * Alleen gevuld wanneer de bezoeker via een partnerlink binnenkomt. Stuurt
+   * uitsluitend de introductie aan: wél de persoonlijke uitnodiging met
+   * voordelen, of juist de neutrale versie.
+   */
   partner?: {
     name: string | null;
     firstName?: string | null;
     avatarUrl?: string | null;
+    perks: string[];
+  } | null;
+  /**
+   * De partner waaraan de aanvraag daadwerkelijk wordt toegeschreven — ook als
+   * iemand later via de homepage terugkomt en dus de neutrale onboarding ziet.
+   * Alleen voor de bevestiging ná verzending: de voordelen zijn dan echt
+   * geregistreerd, dus verzwijgen zou de bezoeker misleiden.
+   */
+  attributedPartner?: {
+    name: string | null;
+    firstName?: string | null;
     perks: string[];
   } | null;
   /**
@@ -309,15 +326,15 @@ export function DemoExperience({
           <LivePreview state={previewState} hero />
         </motion.div>
 
-        {partner && (
+        {attributedPartner && (
           <p className="mx-auto mt-6 max-w-lg text-center text-[14px] leading-relaxed text-ink-500">
             Je aanvraag is binnengekomen via{" "}
             <span className="font-semibold text-ink">
-              {partner.firstName || partner.name}
+              {attributedPartner.firstName || attributedPartner.name}
             </span>
             . Je voordelen —{" "}
-            {partner.perks.length > 0
-              ? partner.perks.join(" en ").toLowerCase()
+            {attributedPartner.perks.length > 0
+              ? attributedPartner.perks.join(" en ").toLowerCase()
               : "je korting en gratis eerste maand"}{" "}
             — zijn geregistreerd.
           </p>
@@ -333,15 +350,18 @@ export function DemoExperience({
   /* ---------- Experience ---------- */
   return (
     <>
-      {/* Persoonlijke introductie bij binnenkomst via een partner.
-          Alleen tijdens de vragen; de finale is voor iedereen identiek. */}
-      {partner && (
+      {/* Eén wizard, twee introducties: persoonlijk bij binnenkomst via een
+          partnerlink, neutraal bij een gewone demo-aanvraag. Alleen tijdens de
+          vragen; de finale is voor iedereen identiek. */}
+      {partner ? (
         <PartnerWelcome
           perks={partner.perks}
           partnerName={partner.name}
           firstName={partner.firstName}
           avatarUrl={partner.avatarUrl}
         />
+      ) : (
+        <DemoWelcome />
       )}
 
       <div className="grid items-start gap-10 lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-14">

@@ -6,6 +6,12 @@ import { safeInternalPath } from "@/lib/roles";
  * Publieke partnerlink: https://dogware.../p/DW-XXXXXX
  * Valideert de code server-side, registreert de click en stuurt door naar de
  * demo-ervaring. Een ongeldige code geeft nooit een foutpagina — gewoon /demo.
+ *
+ * Bij een geldige partner gaat `?uitnodiging=CODE` mee in het terugkeerpad.
+ * Dát is het signaal waarop /demo de persoonlijke uitnodiging toont — niet de
+ * attributiecookie. Die cookie leeft 30 dagen en regelt de commissie; zonder
+ * dit onderscheid zou iedereen die ooit op een partnerlink klikte een maand
+ * lang de uitnodigingspagina zien, ook via de gewone 'Demo aanvragen'-knop.
  */
 export async function GET(
   request: NextRequest,
@@ -26,6 +32,7 @@ export async function GET(
         userAgent: request.headers.get("user-agent"),
         searchParams: request.nextUrl.searchParams,
       });
+      demoUrl.searchParams.set("uitnodiging", partner.referralCode);
     }
   } catch (err) {
     // Registratieproblemen mogen de bezoeker nooit hinderen

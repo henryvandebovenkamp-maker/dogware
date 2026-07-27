@@ -5,7 +5,7 @@ import { eq } from "drizzle-orm";
 import { Logo } from "@/components/brand";
 import { DemoExperience } from "@/components/demo/experience";
 import { SERVICES } from "@/lib/demo-flow";
-import { getValidAttribution } from "@/lib/referral";
+import { getValidAttribution, normalizeReferralCode } from "@/lib/referral";
 import { REFERRAL_BENEFITS } from "@/lib/branding";
 import { getDb, schema } from "@/lib/db";
 
@@ -27,9 +27,9 @@ export const metadata: Metadata = {
 export default async function DemoPage({
   searchParams,
 }: {
-  searchParams: Promise<{ ref?: string; branche?: string }>;
+  searchParams: Promise<{ ref?: string; branche?: string; uitnodiging?: string }>;
 }) {
-  const { ref, branche } = await searchParams;
+  const { ref, branche, uitnodiging } = await searchParams;
   if (ref) {
     redirect(`/p/${encodeURIComponent(ref)}`);
   }
@@ -40,8 +40,8 @@ export default async function DemoPage({
 
   // Actieve koppeling ophalen (via de cookie die /p/CODE heeft gezet).
   // Naam + voordelen gaan als prop mee de centrale demo-flow in, zodat de
-  // ervaring identiek is aan een normale aanvraag — alleen met een
-  // persoonlijke introductie bovenaan.
+  // ervaring identiek is aan een normale aanvraag — alleen de introductie
+  // verschilt.
   let partnerIntro: {
     name: string | null;
     firstName: string | null;
@@ -81,6 +81,22 @@ export default async function DemoPage({
     }
   }
 
+  /**
+   * De persoonlijke uitnodiging verschijnt uitsluitend als de bezoeker via de
+   * partnerlink binnenkomt (`?uitnodiging=`) én die code hoort bij de actieve
+   * attributie. Twee bronnen die het eens moeten zijn, want:
+   *  - alleen de parameter zou een uitnodiging tonen zonder dat de voordelen
+   *    daadwerkelijk geregistreerd worden (cookies geweigerd, gedeelde link);
+   *  - alleen de cookie zou iedereen 30 dagen lang de uitnodiging tonen, ook
+   *    via de gewone 'Demo aanvragen'-knop op de homepage.
+   * In alle andere gevallen — geen, ongeldige of verlopen code — valt de
+   * pagina automatisch terug op de neutrale onboarding.
+   */
+  const uitgenodigdVia =
+    uitnodiging && attribution
+      ? normalizeReferralCode(uitnodiging) === attribution.referralCode
+      : false;
+
   return (
     <div className="relative min-h-screen">
       <div className="pointer-events-none fixed inset-0 -z-10">
@@ -103,7 +119,8 @@ export default async function DemoPage({
       <main className="mx-auto w-full max-w-6xl px-5 pb-24 pt-14 sm:px-8 sm:pt-20">
         <DemoExperience
           uploadEnabled={Boolean(process.env.UPLOADTHING_TOKEN)}
-          partner={partnerIntro}
+          partner={uitgenodigdVia ? partnerIntro : null}
+          attributedPartner={partnerIntro}
           initialServices={initialServices}
         />
       </main>
