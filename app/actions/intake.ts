@@ -10,7 +10,7 @@ import {
   sendIntakeConfirmation,
   sendIntakeNotification,
 } from "@/lib/email/send";
-import type { IntakeData } from "@/lib/intake";
+import { isTelefoonGeldig, type IntakeData } from "@/lib/intake";
 
 export type IntakeState = {
   status: "idle" | "success" | "error";
@@ -62,6 +62,12 @@ export async function submitIntake(raw: IntakeData): Promise<IntakeState> {
   }
   if (!EMAIL_REGEX.test(data.email)) {
     return { status: "error", message: "Controleer je e-mailadres." };
+  }
+  if (!data.telefoon) {
+    return { status: "error", message: "Vul je telefoonnummer in." };
+  }
+  if (!isTelefoonGeldig(data.telefoon)) {
+    return { status: "error", message: "Controleer je telefoonnummer." };
   }
   if (data.diensten.length === 0 && !data.dienstenAnders) {
     return { status: "error", message: "Kies minimaal één dienst." };

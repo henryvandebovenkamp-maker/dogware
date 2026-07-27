@@ -18,7 +18,7 @@ import {
   type ModuleKey,
   type ServiceKey,
 } from "@/lib/demo-flow";
-import { EMPTY_INTAKE } from "@/lib/intake";
+import { EMPTY_INTAKE, isTelefoonGeldig } from "@/lib/intake";
 import {
   IlluBehavior,
   IlluDaycare,
@@ -131,6 +131,7 @@ export function DemoExperience({
   const [droom, setDroom] = useState("");
   const [naam, setNaam] = useState("");
   const [email, setEmail] = useState("");
+  const [telefoon, setTelefoon] = useState("");
   const [plaats, setPlaats] = useState("");
   const [uploads, setUploads] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -146,6 +147,7 @@ export function DemoExperience({
     Boolean(discovery) ||
     Boolean(naam) ||
     Boolean(email) ||
+    Boolean(telefoon) ||
     Boolean(plaats) ||
     Boolean(droom) ||
     Boolean(siteUrl) ||
@@ -169,10 +171,11 @@ export function DemoExperience({
       droom,
       naam,
       email,
+      telefoon,
       plaats,
       uploads,
     }),
-    [step, bedrijfsnaam, services, discovery, siteUrl, siteGoed, siteMist, energy, modules, droom, naam, email, plaats, uploads],
+    [step, bedrijfsnaam, services, discovery, siteUrl, siteGoed, siteMist, energy, modules, droom, naam, email, telefoon, plaats, uploads],
   );
 
   const {
@@ -206,6 +209,7 @@ export function DemoExperience({
     if (p.uploads) setUploads(p.uploads);
     if (p.naam !== undefined) setNaam(p.naam);
     if (p.email !== undefined) setEmail(p.email);
+    if (p.telefoon !== undefined) setTelefoon(p.telefoon);
     if (p.plaats !== undefined) setPlaats(p.plaats);
     if (p.step && p.step !== "finale") setStep(p.step);
     setRestoreApplied(true);
@@ -247,6 +251,14 @@ export function DemoExperience({
       setError("Dat e-mailadres lijkt nog niet helemaal te kloppen.");
       return;
     }
+    if (!telefoon.trim()) {
+      setError("Laat ook even je telefoonnummer achter, dan kan ik je bereiken.");
+      return;
+    }
+    if (!isTelefoonGeldig(telefoon)) {
+      setError("Dat telefoonnummer lijkt nog niet helemaal te kloppen.");
+      return;
+    }
     if (pending) return; // dubbele submit voorkomen
     setError(null);
     startTransition(async () => {
@@ -259,6 +271,7 @@ export function DemoExperience({
         bedrijfsnaam: bedrijfsnaam.trim() || naam.trim(),
         naam: naam.trim(),
         email: email.trim(),
+        telefoon: telefoon.trim(),
         plaats: plaats.trim(),
         website: siteUrl.trim(),
         diensten: SERVICES.filter((s) => services.includes(s.key)).map((s) => s.value),
@@ -629,6 +642,13 @@ export function DemoExperience({
                       value={email}
                       onChange={setEmail}
                       placeholder="jij@bedrijf.nl"
+                    />
+                    <GhostInput
+                      size="md"
+                      type="tel"
+                      value={telefoon}
+                      onChange={setTelefoon}
+                      placeholder="06 12 34 56 78"
                     />
                     <GhostInput
                       size="md"

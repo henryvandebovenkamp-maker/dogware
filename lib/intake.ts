@@ -59,6 +59,22 @@ export const WEBSITE_OPTIES = [
   { value: "ja-nieuw", label: "Ja, maar ik wil iets nieuws" },
 ] as const;
 
+/**
+ * Telefoonnummer-controle, bewust ruim.
+ *
+ * Nederlandse nummers worden op allerlei manieren geschreven: 06-12345678,
+ * 06 12 34 56 78, +31 6 12345678, (0512) 123456. We eisen daarom geen vast
+ * formaat, maar controleren dat er genoeg cijfers zijn om een echt nummer te
+ * kunnen zijn. Client en server gebruiken dezelfde functie, zodat de bezoeker
+ * nooit een foutmelding krijgt die de server anders beoordeelt.
+ */
+export function isTelefoonGeldig(waarde: string): boolean {
+  const cijfers = waarde.replace(/\D/g, "");
+  // 9 cijfers is het minimum voor een NL-nummer zonder landcode (bijv.
+  // 612345678); 15 is het internationale maximum volgens E.164.
+  return cijfers.length >= 9 && cijfers.length <= 15;
+}
+
 export type IntakeData = {
   // Stap 1 — Over jou
   bedrijfsnaam: string;
