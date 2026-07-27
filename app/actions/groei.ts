@@ -11,7 +11,8 @@ import {
   setStap,
   voorstelToken,
 } from "@/lib/groei";
-import { aiBeschikbaar, analyseerWebsite, schrijfBericht } from "@/lib/groei/ai";
+import { aiBeschikbaar, schrijfBericht } from "@/lib/groei/ai";
+import { laatsteAnalyse, onderzoekProspect } from "@/lib/groei/onderzoek";
 import { sendNotification } from "@/lib/email/send";
 import { branding } from "@/lib/branding";
 import type { GroeiGrondslag } from "@/lib/db/schema";
@@ -101,68 +102,57 @@ export async function bereidVoor(
     return { status: "error", message: "Zonder website valt er niets te bekijken." };
   }
 
-  let paginaTekst = "";
+  // Zelfde onderzoek als de Onderzoeksagent doet: contactadres, grondslag en
+  // analyse in één doorloop. Eén implementatie, twee aanroepers.
+  //
+  // Heeft de agent dit bedrijf net al bekeken, dan gebruiken we dat werk. Hun
+  // server twee keer in een week bevragen voor hetzelfde antwoord is onnodig.
+  const recent = await laatsteAnalyse(p.id);
+  const versGenoeg =
+    recent && Date.now() - recent.createdAt.getTime() < 14 * 24 * 60 * 60 * 1000;
+
+  let onderzocht: Awaited<ReturnType<typeof onderzoekProspect>>;
   try {
-    const res = await fetch(p.website, {
-      headers: { "user-agent": `${branding.name}Bot (+${branding.siteUrl})` },
-      signal: AbortSignal.timeout(15_000),
-    });
-    const html = await res.text();
-    // Ruwe striptekst is genoeg; het model heeft geen opmaak nodig.
-    paginaTekst = html
-      .replace(/<script[\s\S]*?<\/script>/gi, " ")
-      .replace(/<style[\s\S]*?<\/style>/gi, " ")
-      .replace(/<[^>]+>/g, " ")
-      .replace(/\s+/g, " ")
-      .trim();
-  } catch {
-    return {
-      status: "error",
-      message: "Hun website was niet te bereiken. Probeer het later nog eens.",
-    };
-  }
-
-  if (paginaTekst.length < 200) {
-    return {
-      status: "error",
-      message: "Er kwam te weinig tekst van hun site om iets zinnigs te kunnen zeggen.",
-    };
-  }
-
-  try {
-    const analyse = await analyseerWebsite({
-      bedrijfsnaam: p.bedrijfsnaam,
-      branche: p.branche,
-      website: p.website,
-      paginaTekst,
-    });
-
-    await db.insert(schema.groeiAnalyses).values({
-      prospectId: p.id,
-      sterk: analyse.sterk,
-      kansen: analyse.kansen,
-      details: analyse.details,
-      past: analyse.past,
-      passendheidUitleg: analyse.passendheidUitleg,
-      model: analyse.model,
-    });
-    await logGroeiEvent(
-      p.id,
-      "bekeken",
-      analyse.past
-        ? `Website bekeken — ${analyse.details.length} concrete details gevonden`
-        : "Website bekeken — DogWare voegt hier waarschijnlijk weinig toe",
+    onderzocht = versGenoeg
+      ? { status: "gelukt", detailCount: recent.details.length, past: recent.past, emailGevonden: Boolean(p.email) }
+      : await onderzoekProspect(p);
+  } catch (err) {
+    console.error(
+      JSON.stringify({
+        evt: "groei.onderzoek_fout",
+        at: new Date().toISOString(),
+        error: err instanceof Error ? err.message : "onbekend",
+      }),
     );
-    await setStap(p.id, "bekeken");
+    return { status: "error", message: "Het bekijken van hun site ging mis. Probeer het opnieuw." };
+  }
 
-    if (!analyse.past) {
-      revalidatePath(`/admin/groei/bedrijven/${p.id}`);
-      return {
-        status: "ok",
-        message: "Bekeken. Mijn advies: dit bedrijf overslaan.",
-      };
-    }
+  if (onderzocht.status === "overgeslagen") {
+    return { status: "error", message: `Overgeslagen: ${onderzocht.reden}.` };
+  }
+  if (onderzocht.status === "mislukt") {
+    return {
+      status: "error",
+      message: "Hun website was niet te lezen. Probeer het later nog eens.",
+    };
+  }
 
+  const opgeslagen = versGenoeg ? recent : await laatsteAnalyse(p.id);
+  if (!opgeslagen) {
+    return { status: "error", message: "De analyse is niet opgeslagen. Probeer het opnieuw." };
+  }
+  // De kolom mag leeg zijn; het schrijven verderop rekent op een tekst.
+  const analyse = {
+    ...opgeslagen,
+    passendheidUitleg: opgeslagen.passendheidUitleg ?? "",
+  };
+
+  if (!analyse.past) {
+    revalidatePath(`/admin/groei/bedrijven/${p.id}`);
+    return { status: "ok", message: "Bekeken. Mijn advies: dit bedrijf overslaan." };
+  }
+
+  try {
     // Zinnen die eerder een menselijke reactie opleverden — toon, geen sjabloon.
     const bibliotheek = await db
       .select({ tekst: schema.groeiIdeeen.tekst })

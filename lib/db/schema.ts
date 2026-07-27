@@ -873,7 +873,7 @@ export type GroeiIdee = typeof groeiIdeeen.$inferSelect;
  * ========================================================================= */
 
 /** Wat een agent doet. Meer rollen komen hier later bij. */
-export const GROEI_AGENT_SOORTEN = ["ontdekken", "kwaliteit"] as const;
+export const GROEI_AGENT_SOORTEN = ["ontdekken", "onderzoeken", "kwaliteit"] as const;
 export type GroeiAgentSoort = (typeof GROEI_AGENT_SOORTEN)[number];
 
 export const GROEI_RUN_STATUS = ["bezig", "klaar", "mislukt"] as const;

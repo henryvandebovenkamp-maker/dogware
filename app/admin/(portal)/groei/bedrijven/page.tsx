@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { requireAdmin } from "@/lib/auth/session";
 import { getDb, schema } from "@/lib/db";
 import { BRANCHES } from "@/lib/branches";
@@ -120,6 +120,47 @@ export default async function BedrijvenPage({
         .limit(200)
     : [];
 
+  /**
+   * De laatste analyse per bedrijf. Zonder dit is de lijst een stapel; ermee
+   * is het een volgorde — wie het meest te winnen heeft, staat bovenaan.
+   */
+  const analyses =
+    db && rijen.length
+      ? await db
+          .select({
+            prospectId: schema.groeiAnalyses.prospectId,
+            details: schema.groeiAnalyses.details,
+            past: schema.groeiAnalyses.past,
+            createdAt: schema.groeiAnalyses.createdAt,
+          })
+          .from(schema.groeiAnalyses)
+          .where(
+            inArray(
+              schema.groeiAnalyses.prospectId,
+              rijen.map((r) => r.id),
+            ),
+          )
+          .orderBy(desc(schema.groeiAnalyses.createdAt))
+      : [];
+
+  // Eerste voorkomen wint: de query staat al op nieuwste eerst.
+  const analysePer = new Map<string, (typeof analyses)[number]>();
+  for (const a of analyses) if (!analysePer.has(a.prospectId)) analysePer.set(a.prospectId, a);
+
+  const gesorteerd = [...rijen].sort((a, b) => rang(b) - rang(a));
+
+  /**
+   * Hoe interessant is dit bedrijf nu? Bekeken en passend met veel
+   * aanknopingspunten bovenaan, "past niet" onderaan, nog niet bekeken
+   * ertussenin — die weten we simpelweg nog niet.
+   */
+  function rang(r: (typeof rijen)[number]): number {
+    const a = analysePer.get(r.id);
+    if (!a) return 50;
+    if (!a.past) return 0;
+    return 100 + Math.min(a.details.length, 9);
+  }
+
   // Welke agents er klaarstaan — in gewone taal voor de lege staat.
   const agents = db
     ? await db
@@ -204,7 +245,8 @@ export default async function BedrijvenPage({
         )
       ) : (
         <ul className="mt-6 space-y-2">
-          {rijen.map((r) => {
+          {gesorteerd.map((r) => {
+            const analyse = analysePer.get(r.id);
             const branche = BRANCHES.find((b) => b.slug === r.branche);
             const grondslag = GRONDSLAG_META[r.grondslag];
             return (
@@ -220,6 +262,17 @@ export default async function BedrijvenPage({
                     <span className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[12px] text-ink-300">
                       {branche && <span>{branche.naam}</span>}
                       {r.plaats && <span>· {r.plaats}</span>}
+                      {analyse &&
+                        (!analyse.past ? (
+                          <span>· past waarschijnlijk niet</span>
+                        ) : analyse.details.length > 0 ? (
+                          <span className="font-semibold text-sage-600">
+                            · {analyse.details.length} aanknopingspunt
+                            {analyse.details.length === 1 ? "" : "en"}
+                          </span>
+                        ) : (
+                          <span>· niets concreets gevonden</span>
+                        ))}
                       {!grondslag.magBenaderen && (
                         <span className="font-semibold text-brand-600">
                           · grondslag nog niet vastgesteld

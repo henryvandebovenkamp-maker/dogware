@@ -12,20 +12,26 @@ const IDLE: AgentState = { status: "idle" };
 export function AgentKaart({
   id,
   naam,
+  soort,
   branche,
   gebied,
   actief,
   maxPerRun,
   laatste,
+  wachtrij,
 }: {
   id: string;
   naam: string;
+  soort: string;
   branche: string;
   gebied: string;
   actief: boolean;
   maxPerRun: number;
   laatste: string | null;
+  /** Alleen voor de Onderzoeksagent: hoeveel bedrijven er nog wachten. */
+  wachtrij?: number;
 }) {
+  const onderzoekt = soort === "onderzoeken";
   const [runState, run, bezig] = useActionState(draaiAgentNu, IDLE);
   const [, wissel, wisselt] = useActionState(zetAgentAanUit, IDLE);
 
@@ -35,7 +41,9 @@ export function AgentKaart({
         <div className="min-w-0">
           <p className="text-[15px] font-bold text-ink">{naam}</p>
           <p className="mt-0.5 text-[13px] text-ink-500">
-            Zoekt {branche} in {gebied}, maximaal {maxPerRun} per keer.
+            {onderzoekt
+              ? `Neemt de websites door van bedrijven die nog niet bekeken zijn, ${maxPerRun} per keer.`
+              : `Zoekt ${branche} in ${gebied}, maximaal ${maxPerRun} per keer.`}
           </p>
         </div>
         <span
@@ -48,12 +56,23 @@ export function AgentKaart({
       </div>
 
       <p className="mt-3 text-[12px] text-ink-300">
-        {laatste ? `Laatst gezocht: ${laatste}` : "Heeft nog niet gezocht."}
+        {laatste
+          ? `Laatst aan het werk: ${laatste}`
+          : onderzoekt
+            ? "Heeft nog niets doorgenomen."
+            : "Heeft nog niet gezocht."}
+        {onderzoekt && wachtrij !== undefined
+          ? wachtrij > 0
+            ? ` · ${wachtrij} bedrijven wachten nog`
+            : " · alles is bekeken"
+          : ""}
       </p>
 
       {bezig && (
         <p className="mt-3 rounded-xl bg-cream px-4 py-3 text-[13px] text-ink-500">
-          Aan het zoeken bij OpenStreetMap… dit duurt een halve minuut.
+          {onderzoekt
+            ? "Aan het lezen op hun websites… dit duurt een paar minuten."
+            : "Aan het zoeken bij OpenStreetMap… dit duurt een halve minuut."}
         </p>
       )}
       {runState.status === "ok" && !bezig && (
@@ -75,7 +94,7 @@ export function AgentKaart({
             disabled={bezig || !actief}
             className="rounded-xl bg-ink px-4 py-2.5 text-[14px] font-semibold leading-[1.2] text-cream transition-all duration-150 ease-out hover:-translate-y-px hover:bg-ink-700 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
           >
-            {bezig ? "Bezig…" : "Nu laten zoeken"}
+            {bezig ? "Bezig…" : onderzoekt ? "Nu laten kijken" : "Nu laten zoeken"}
           </button>
         </form>
         <form action={wissel}>
