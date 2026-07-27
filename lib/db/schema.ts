@@ -675,6 +675,15 @@ export const groeiProspects = pgTable(
     voornaam: text("voornaam"),
     logoUrl: text("logo_url"),
     socials: jsonb("socials").$type<Record<string, string>>().notNull().default({}),
+    /**
+     * Wat hun site over zijn eigen uiterlijk prijsgeeft: de deelfoto en de
+     * accentkleur die ze zelf opgeven. Genoeg om een pagina te maken die naar
+     * hén voelt in plaats van naar ons.
+     */
+    stijl: jsonb("stijl")
+      .$type<{ ogImage?: string; themeColor?: string; siteTitel?: string }>()
+      .notNull()
+      .default({}),
     googleRating: text("google_rating"),
     googleReviews: integer("google_reviews"),
 

@@ -37,6 +37,17 @@ export type Websitelezing = {
   emails: string[];
   socials: Record<string, string>;
   rechtsvorm: Rechtsvormsignaal | null;
+  stijl: Sitestijl;
+};
+
+/** Wat een site zelf over zijn uiterlijk prijsgeeft. */
+export type Sitestijl = {
+  /** De foto die ze meesturen als iemand hun site deelt. */
+  ogImage?: string;
+  /** De kleur die ze aan browsers opgeven voor de adresbalk. */
+  themeColor?: string;
+  /** Hoe ze zichzelf in de titelbalk noemen. */
+  siteTitel?: string;
 };
 
 export type Rechtsvormsignaal = {
@@ -49,14 +60,46 @@ export type Rechtsvormsignaal = {
 
 /* --------------------------------------------------------------- ophalen -- */
 
+/**
+ * Entiteiten terugvertalen. Zonder dit komt een gedachtestreepje als
+ * "&#8211;" in de tekst terecht — en daarmee ook in een analyse of op een
+ * pagina die een mens leest.
+ */
+const NAAM_ENTITEITEN: Record<string, string> = {
+  nbsp: " ",
+  amp: "&",
+  lt: "<",
+  gt: ">",
+  quot: '"',
+  apos: "'",
+  eacute: "é",
+  euml: "ë",
+  ouml: "ö",
+  uuml: "ü",
+  ndash: "–",
+  mdash: "—",
+  hellip: "…",
+  rsquo: "’",
+  lsquo: "‘",
+  ldquo: "“",
+  rdquo: "”",
+};
+
+export function decodeerEntiteiten(tekst: string): string {
+  return tekst
+    .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCodePoint(parseInt(h, 16)))
+    .replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(Number(d)))
+    .replace(/&([a-z]+);/gi, (heel, naam) => NAAM_ENTITEITEN[naam.toLowerCase()] ?? heel);
+}
+
 function striptekst(html: string): string {
-  return html
-    .replace(/<script[\s\S]*?<\/script>/gi, " ")
-    .replace(/<style[\s\S]*?<\/style>/gi, " ")
-    .replace(/<noscript[\s\S]*?<\/noscript>/gi, " ")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/&nbsp;/gi, " ")
-    .replace(/&amp;/gi, "&")
+  return decodeerEntiteiten(
+    html
+      .replace(/<script[\s\S]*?<\/script>/gi, " ")
+      .replace(/<style[\s\S]*?<\/style>/gi, " ")
+      .replace(/<noscript[\s\S]*?<\/noscript>/gi, " ")
+      .replace(/<[^>]+>/g, " "),
+  )
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -232,6 +275,49 @@ export function vindSocials(html: string): Record<string, string> {
   return uit;
 }
 
+/* ------------------------------------------------------------------ stijl -- */
+
+function meta(html: string, patroon: RegExp): string | null {
+  const m = patroon.exec(html);
+  return m ? m[1].trim() : null;
+}
+
+/**
+ * Haal op wat de site over zijn eigen uiterlijk zegt.
+ *
+ * Alleen dingen die ze expliciet publiceren om gedeeld te worden: de
+ * deelafbeelding en de kleur die ze aan browsers doorgeven. Geen screenshots,
+ * geen stylesheets uitpluizen — dat is andermans ontwerp overnemen.
+ */
+export function leesStijl(html: string, basis: URL): Sitestijl {
+  const uit: Sitestijl = {};
+
+  const og =
+    meta(html, /<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i) ??
+    meta(html, /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i) ??
+    meta(html, /<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i);
+  if (og) {
+    try {
+      const abs = new URL(og, basis);
+      if (/^https?:$/.test(abs.protocol)) uit.ogImage = abs.toString();
+    } catch {
+      /* een onbruikbare URL laten we gewoon weg */
+    }
+  }
+
+  const kleur = meta(html, /<meta[^>]+name=["']theme-color["'][^>]+content=["']([^"']+)["']/i);
+  if (kleur && /^#?[0-9a-f]{3,8}$/i.test(kleur.trim())) {
+    uit.themeColor = kleur.trim().startsWith("#") ? kleur.trim() : `#${kleur.trim()}`;
+  }
+
+  const titel =
+    meta(html, /<meta[^>]+property=["']og:site_name["'][^>]+content=["']([^"']+)["']/i) ??
+    meta(html, /<title[^>]*>([^<]{2,120})<\/title>/i);
+  if (titel) uit.siteTitel = decodeerEntiteiten(titel).replace(/\s+/g, " ").slice(0, 120);
+
+  return uit;
+}
+
 /* ----------------------------------------------------------------- lezen -- */
 
 /** Lees de site: startpagina plus hoogstens twee pagina's die ertoe doen. */
@@ -264,5 +350,7 @@ export async function leesWebsite(website: string): Promise<Websitelezing | null
     emails: vindEmails(`${alleHtml}\n${alleTekst}`),
     socials: vindSocials(alleHtml),
     rechtsvorm: bepaalRechtsvorm(paginas),
+    // Alleen van de startpagina: die draagt de deelinformatie van het merk.
+    stijl: leesStijl(start.html, new URL(start.url)),
   };
 }

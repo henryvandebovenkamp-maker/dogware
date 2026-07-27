@@ -88,13 +88,18 @@ export async function onderzoekProspect(
       ? { ...p.socials, ...lezing.socials }
       : null;
 
-  if (nieuwAdres || nieuweGrondslag || socials) {
+  // Hun eigen deelfoto en accentkleur, zodat het voorstel naar hén voelt.
+  const stijl =
+    Object.keys(lezing.stijl).length > 0 ? { ...p.stijl, ...lezing.stijl } : null;
+
+  if (nieuwAdres || nieuweGrondslag || socials || stijl) {
     await db
       .update(schema.groeiProspects)
       .set({
         ...(nieuwAdres ? { email: nieuwAdres } : {}),
         ...(nieuweGrondslag ? { grondslag: nieuweGrondslag } : {}),
         ...(socials ? { socials } : {}),
+        ...(stijl ? { stijl } : {}),
         herkomst,
         updatedAt: new Date(),
       })
