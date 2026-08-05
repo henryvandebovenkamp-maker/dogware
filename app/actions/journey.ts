@@ -7,6 +7,7 @@ import { JOURNEY_STAGES, type JourneyStage } from "@/lib/db/schema";
 import { getAdminActor } from "@/lib/admin-auth";
 import { logActivity } from "@/lib/audit";
 import { logJourneyEvent, setStage } from "@/lib/journey";
+import { grantRole } from "@/lib/auth/grant";
 import { sendDemoReady, sendPartnerDemoSent } from "@/lib/email/send";
 
 export type JourneyActionState = {
@@ -95,6 +96,9 @@ export async function sendDemo(
         .returning({ id: schema.users.id });
       customerId = created.id;
     }
+    // Klantrol erbij — een bestaand account (bijv. van een partner) houdt
+    // gewoon alles wat het al had.
+    await grantRole(customerId, "CUSTOMER", actor.id);
     await db
       .update(schema.leads)
       .set({ demoCustomerUserId: customerId })

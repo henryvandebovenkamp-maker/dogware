@@ -11,6 +11,7 @@ import { GroeiBerichtEmail } from "./templates/groei-bericht";
 import { PartnerActivatedEmail } from "./templates/partner-activated";
 import { PartnerDemoSentEmail } from "./templates/partner-demo-sent";
 import { PartnerInviteEmail } from "./templates/partner-invite";
+import { PartnerAddedEmail } from "./templates/partner-added";
 import { MagicLoginEmail } from "./templates/magic-login";
 import { DemoReadyEmail } from "./templates/demo-ready";
 import { CommerceEmail, type CommerceMailType } from "./templates/commerce";
@@ -125,6 +126,34 @@ export async function sendPartnerInvite(
       : "Uitnodiging: het DogWare Partnerprogramma 🤝",
     react: <PartnerInviteEmail naam={naam} inviteUrl={inviteUrl} opnieuw={opnieuw} />,
     text: `Hoi ${naam},\n\nJe bent uitgenodigd voor het DogWare Partnerprogramma. Activeer je account via: ${inviteUrl}\n\nDeze link is 7 dagen geldig en werkt één keer.`,
+  });
+}
+
+/**
+ * Partneromgeving toegevoegd aan een bestaand, al gebruikt DogWare-account.
+ * Bewust géén activatielink: dit account bestaat al en logt in zoals altijd.
+ */
+export async function sendPartnerAdded(
+  to: string,
+  naam: string,
+  referralLink: string,
+  portalUrl: string,
+  opnieuw = false,
+): Promise<MailResult> {
+  return sendMail("partner-added", {
+    to,
+    subject: opnieuw
+      ? "Nogmaals: je persoonlijke DogWare-partnerlink"
+      : "Je partneromgeving staat klaar in je DogWare-account 🤝",
+    react: (
+      <PartnerAddedEmail
+        naam={naam}
+        referralLink={referralLink}
+        portalUrl={portalUrl}
+        opnieuw={opnieuw}
+      />
+    ),
+    text: `Hoi ${naam},\n\nJe partneromgeving is toegevoegd aan je bestaande DogWare-account — er is geen tweede account gemaakt.\n\nJouw persoonlijke link: ${referralLink}\nJe partneromgeving: ${portalUrl}\n\nJe logt in met hetzelfde e-mailadres als altijd.`,
   });
 }
 

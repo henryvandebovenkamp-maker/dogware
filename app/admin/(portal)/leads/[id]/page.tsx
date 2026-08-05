@@ -9,6 +9,8 @@ import { LeadAdminForm } from "./lead-admin-form";
 import { ReassignForm } from "./reassign-form";
 import { StageTimeline } from "./journey";
 import { DemoPanel, StageControl } from "./journey-controls";
+import { PartnerActivatePanel } from "./partner-activate";
+import { findPartnerByUserId, findUserByEmail } from "@/lib/partner-activation";
 import { AdminCommercePanel } from "@/components/commerce/admin-panel";
 import { buildPanelData } from "@/lib/commerce-view";
 
@@ -98,6 +100,14 @@ export default async function LeadDetailPage({
     .limit(50);
 
   const panelData = await buildPanelData(id);
+
+  /*
+   * Is deze persoon zelf al partner? Eén e-mailadres = één account, dus we
+   * kijken naar het account achter dit adres — niet naar de partner via wie
+   * de aanvraag ooit binnenkwam (dat is een aparte relatie).
+   */
+  const persoon = await findUserByEmail(lead.email);
+  const eigenPartner = persoon ? await findPartnerByUserId(persoon.id) : null;
 
   return (
     <main className="mx-auto w-full max-w-2xl">
@@ -211,6 +221,18 @@ export default async function LeadDetailPage({
           {/* Interne notitie + leadstatus */}
           <div className="mt-3 rounded-xl bg-white p-4 shadow-soft ring-1 ring-ink/5">
             <LeadAdminForm leadId={lead.id} status={lead.status} notities={lead.notities ?? ""} />
+          </div>
+
+          {/* Dezelfde persoon, een rol erbij */}
+          <div className="mt-3">
+            <PartnerActivatePanel
+              leadId={lead.id}
+              naam={lead.naam}
+              email={lead.email}
+              telefoon={lead.telefoon}
+              bedrijfsnaam={lead.bedrijfsnaam}
+              bestaandePartnerId={eigenPartner?.id ?? null}
+            />
           </div>
         </Sectie>
 

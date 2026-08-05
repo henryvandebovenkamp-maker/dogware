@@ -16,8 +16,8 @@ export default async function PartnerLoginPage({
 }) {
   const { melding } = await searchParams;
   const user = await getCurrentUser();
-  if (user?.role === "AFFILIATE_PARTNER") redirect("/partner");
-  if (user?.role === "SUPER_ADMIN") redirect("/admin");
+  if (user?.roles.includes("AFFILIATE_PARTNER")) redirect("/partner");
+  if (user?.roles.includes("SUPER_ADMIN")) redirect("/admin");
 
   return (
     <AuthShell

@@ -11,6 +11,7 @@ import {
 } from "@/lib/auth/challenge";
 import { createSession, destroySession } from "@/lib/auth/session";
 import { consumeToken } from "@/lib/auth/tokens";
+import { ensurePrimaryRole, grantRole, rolesForUser } from "@/lib/auth/grant";
 import { referralLinkFor } from "@/lib/referral";
 import { logActivity } from "@/lib/audit";
 import { sendPartnerActivated } from "@/lib/email/send";
@@ -172,7 +173,15 @@ export async function acceptInvite(
     );
   }
 
+  /*
+   * Partnerrol borgen zonder ooit een bestaande rol te overschrijven: wie
+   * hiervoor al klant was, blijft klant én wordt partner.
+   */
+  await ensurePrimaryRole(user.id, user.role);
+  if (partner) await grantRole(user.id, "AFFILIATE_PARTNER", null);
+  const rollen = await rolesForUser(user.id);
+
   // Direct veilig ingelogd — voortaan altijd via Magic Link/Code
-  await createSession(user.id, user.role);
-  redirect(user.role === "SUPER_ADMIN" ? "/admin" : "/partner");
+  await createSession(user.id, rollen);
+  redirect(rollen.includes("SUPER_ADMIN") ? "/admin" : "/partner");
 }

@@ -7,6 +7,7 @@ export type MailType =
   | "intake-request"
   | "intake-confirmation"
   | "partner-invite"
+  | "partner-added"
   | "partner-activated"
   | "partner-demo-sent"
   | "magic-login"

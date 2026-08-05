@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { requirePartner } from "@/lib/auth/session";
+import { otherEnvironments } from "@/lib/roles";
 import { logout } from "@/app/actions/auth";
 import { BrandMark } from "@/components/brand";
 
@@ -21,6 +22,8 @@ export default async function PartnerLayout({
   children: React.ReactNode;
 }) {
   const user = await requirePartner();
+  // Wie ook klant of beheerder is, kan hier zonder opnieuw inloggen wisselen.
+  const andereOmgevingen = otherEnvironments(user.roles, "AFFILIATE_PARTNER");
 
   return (
     <div className="min-h-screen bg-cream">
@@ -37,6 +40,15 @@ export default async function PartnerLayout({
             <span className="hidden text-[13px] font-semibold text-ink-500 sm:block">
               {user.naam}
             </span>
+            {andereOmgevingen.map((omgeving) => (
+              <Link
+                key={omgeving.href}
+                href={omgeving.href}
+                className="text-[13px] font-semibold text-ink-300 transition-colors hover:text-brand-600"
+              >
+                {omgeving.label}
+              </Link>
+            ))}
             <form action={logout}>
               <button
                 type="submit"

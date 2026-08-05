@@ -1,5 +1,5 @@
 import { getCurrentUser } from "@/lib/auth/session";
-import { ROLE_HOME, ROLE_LABEL } from "@/lib/roles";
+import { ROLE_HOME, ROLE_LABEL, primaryRole } from "@/lib/roles";
 import { HeaderBar, type HeaderUser } from "@/components/header-bar";
 
 /**
@@ -9,14 +9,17 @@ import { HeaderBar, type HeaderUser } from "@/components/header-bar";
  */
 export async function SiteHeader() {
   const current = await getCurrentUser();
-  const user: HeaderUser | null = current
-    ? {
-        naam: current.naam,
-        roleLabel: ROLE_LABEL[current.role],
-        homeHref: ROLE_HOME[current.role].href,
-        homeLabel: ROLE_HOME[current.role].label,
-      }
-    : null;
+  // Bij meerdere rollen (bijv. klant én partner) telt de zwaarstwegende rol.
+  const hoofdrol = current ? primaryRole(current.roles) : null;
+  const user: HeaderUser | null =
+    current && hoofdrol
+      ? {
+          naam: current.naam,
+          roleLabel: ROLE_LABEL[hoofdrol],
+          homeHref: ROLE_HOME[hoofdrol].href,
+          homeLabel: ROLE_HOME[hoofdrol].label,
+        }
+      : null;
 
   return <HeaderBar user={user} loginHref="/inloggen" />;
 }

@@ -43,6 +43,38 @@ export const users = pgTable(
   (t) => [uniqueIndex("users_email_idx").on(t.email)],
 );
 
+/**
+ * Rollen per gebruiker — één e-mailadres, één account, meerdere rollen.
+ *
+ * `users.role` blijft bestaan als primaire rol (bepaalt o.a. de sessieduur en
+ * is de rol waarmee het account ooit is aangemaakt). De volledige set rollen
+ * staat hier: iemand kan tegelijk klant én partner zijn. De unieke index op
+ * (user_id, role) maakt toekennen idempotent en race-condition-veilig.
+ */
+export const userRoles = pgTable(
+  "user_roles",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    role: text("role").$type<UserRole>().notNull(),
+    /** Wie kende de rol toe? null = systeem/registratie. */
+    grantedByUserId: uuid("granted_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("user_roles_user_role_idx").on(t.userId, t.role),
+    index("user_roles_role_idx").on(t.role),
+  ],
+);
+
+export type UserRoleRow = typeof userRoles.$inferSelect;
+
 /** Serversessies — token wordt alleen als SHA-256-hash bewaard. */
 export const sessions = pgTable(
   "sessions",

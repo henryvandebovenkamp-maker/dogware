@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { getCurrentUser } from "@/lib/auth/session";
-import { ROLE_HOME, safeInternalPath } from "@/lib/roles";
+import { getCurrentUser, homeFor } from "@/lib/auth/session";
+import { safeInternalPath } from "@/lib/roles";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { LoginForm } from "@/components/auth/auth-forms";
 
@@ -22,7 +22,7 @@ export default async function InloggenPage({
 }) {
   const { next } = await searchParams;
   const user = await getCurrentUser();
-  if (user) redirect(ROLE_HOME[user.role].href);
+  if (user) redirect(homeFor(user.roles));
 
   return (
     <AuthShell

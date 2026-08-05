@@ -27,7 +27,7 @@ export const uploadRouter = {
   })
     .middleware(async () => {
       const user = await getCurrentUser();
-      if (!user || user.role !== "AFFILIATE_PARTNER") {
+      if (!user || !user.roles.includes("AFFILIATE_PARTNER")) {
         throw new UploadThingError("Geen toegang");
       }
       return { userId: user.id };
@@ -50,7 +50,7 @@ export const uploadRouter = {
   })
     .middleware(async () => {
       const user = await getCurrentUser();
-      if (!user || user.role !== "SUPER_ADMIN") {
+      if (!user || !user.roles.includes("SUPER_ADMIN")) {
         throw new UploadThingError("Geen toegang");
       }
       return { userId: user.id };

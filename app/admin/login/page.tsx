@@ -11,8 +11,8 @@ export const metadata: Metadata = {
 
 export default async function AdminLoginPage() {
   const user = await getCurrentUser();
-  if (user?.role === "SUPER_ADMIN") redirect("/admin");
-  if (user?.role === "AFFILIATE_PARTNER") redirect("/partner");
+  if (user?.roles.includes("SUPER_ADMIN")) redirect("/admin");
+  if (user?.roles.includes("AFFILIATE_PARTNER")) redirect("/partner");
 
   return (
     <AuthShell

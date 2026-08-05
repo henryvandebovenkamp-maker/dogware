@@ -12,6 +12,7 @@ import {
   tokenMatches,
 } from "./crypto";
 import { createSession } from "./session";
+import { rolesForUser } from "./grant";
 
 /**
  * Wachtwoordloze login-challenges.
@@ -273,8 +274,10 @@ async function completeLogin(
     .set({ lastLoginAt: new Date(), status: user.status === "INVITED" ? "ACTIVE" : user.status })
     .where(eq(schema.users.id, user.id));
 
+  const rollen = await rolesForUser(user.id);
+
   // Demo Journey: eerste login van een demo-klant schuift de stage door.
-  if (user.role === "CUSTOMER") {
+  if (rollen.includes("CUSTOMER")) {
     const [lead] = await db
       .select({ id: schema.leads.id })
       .from(schema.leads)
@@ -291,7 +294,7 @@ async function completeLogin(
     }
   }
 
-  await createSession(user.id, user.role);
+  await createSession(user.id, rollen);
   await logActivity({
     actorUserId: user.id,
     action: "LOGIN_SUCCESS",
@@ -299,15 +302,16 @@ async function completeLogin(
     objectId: user.id,
   });
 
-  // Bestemming: standaard de eigen omgeving van de rol. Een eerder bewaarde,
-  // veilige terugkeer-URL wordt alleen gebruikt als de rol er toegang toe heeft.
-  const { ROLE_DESTINATIONS } = await import("./session");
+  // Bestemming: standaard de eigen omgeving van de zwaarstwegende rol. Een
+  // eerder bewaarde, veilige terugkeer-URL wordt alleen gebruikt als deze
+  // persoon er met een van zijn rollen ook echt bij mag.
+  const { homeFor } = await import("./session");
   const { roleMayAccess, safeInternalPath } = await import("@/lib/roles");
   const { cookies } = await import("next/headers");
-  let destination = ROLE_DESTINATIONS[user.role];
+  let destination = homeFor(rollen);
   const jar = await cookies();
   const next = safeInternalPath(jar.get("dw_login_next")?.value);
-  if (next && roleMayAccess(user.role, next)) {
+  if (next && roleMayAccess(rollen, next)) {
     destination = next;
   }
   jar.delete("dw_login_next");
