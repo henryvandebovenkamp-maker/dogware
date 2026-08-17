@@ -6,6 +6,7 @@ import { getDb, schema } from "@/lib/db";
 import type { User, UserRole } from "@/lib/db/schema";
 import { generateToken, hashToken } from "./crypto";
 import { ROLE_HOME, primaryRole } from "@/lib/roles";
+import { HQ_OWNER_ROLE } from "@/lib/hq/access";
 
 const SESSION_COOKIE = "dw_session";
 
@@ -86,6 +87,12 @@ export async function revokeAllSessions(userId: string): Promise<void> {
 /**
  * Huidige ingelogde gebruiker inclusief al zijn rollen, of null.
  * De rollen komen in dezelfde query mee (één round trip naar Neon).
+ *
+ * De eigenaarrol van HQ (DOGWARE_OWNER) wordt hier bewust weggefilterd. Die
+ * hoort niet in de gewone rollenwereld thuis: hij mag de sessieduur niet
+ * beïnvloeden, nergens als label opduiken en niet via roleMayAccess() of het
+ * omgevingswisselaartje zichtbaar worden. Uitsluitend lib/hq-auth.ts vraagt
+ * er expliciet naar.
  */
 export async function getCurrentUser(): Promise<SessionUser | null> {
   const db = getDb();
@@ -98,7 +105,9 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
     .select({
       user: schema.users,
       roles: sql<UserRole[]>`coalesce(
-        (select json_agg(ur.role) from user_roles ur where ur.user_id = ${schema.users.id}),
+        (select json_agg(ur.role) from user_roles ur
+          where ur.user_id = ${schema.users.id}
+            and ur.role <> ${HQ_OWNER_ROLE}),
         '[]'::json
       )`,
     })

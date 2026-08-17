@@ -1,0 +1,441 @@
+/*
+ * DogWare Orbit — de visuele schil van HQ.
+ *
+ * Bewust een CSS Module en geen extra animatiebibliotheek: alles hieronder is
+ * gewone CSS met een paar keyframes. De rest van DogWare is warm en licht;
+ * HQ is het tegenovergestelde en zet daarom zijn eigen achtergrond en
+ * kleurenschema, in plaats van de tokens uit globals.css te overschrijven.
+ *
+ * Alle animaties staan op hun ruststand in zowel 0% als 100%, zodat de pagina
+ * er bij prefers-reduced-motion precies goed uitziet: globals.css kort elke
+ * animatie dan af tot één frame, en dat frame is de eindstand.
+ */
+
+.shell {
+  --hq-bg: #04070e;
+  --hq-cyaan: #38e1ff;
+  --hq-cyaan-zacht: #7fdcf5;
+  --hq-blauw: #2f6bff;
+  --hq-goud: #f2c14e;
+  --hq-oranje: #f59e0b;
+  --hq-rood: #f2726d;
+  --hq-groen: #4ade80;
+  --hq-tekst: #cfe4f2;
+  --hq-tekst-zacht: #7d97ab;
+  --hq-lijn: rgba(56, 225, 255, 0.16);
+
+  position: relative;
+  isolation: isolate;
+  min-height: 100dvh;
+  overflow: hidden;
+  padding: clamp(1.25rem, 4vw, 3rem) clamp(1rem, 4vw, 3rem);
+  background: var(--hq-bg);
+  color: var(--hq-tekst);
+  color-scheme: dark;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Diepte: twee zachte lichtbronnen achter de bol. */
+.shell::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  background:
+    radial-gradient(60% 50% at 50% 38%, rgba(47, 107, 255, 0.22), transparent 70%),
+    radial-gradient(40% 40% at 50% 42%, rgba(56, 225, 255, 0.16), transparent 70%),
+    radial-gradient(90% 70% at 50% 120%, rgba(47, 107, 255, 0.1), transparent 70%);
+}
+
+/* Nauwelijks zichtbaar raster — geeft de ruimte schaal zonder aandacht te vragen. */
+.shell::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image:
+    linear-gradient(to right, var(--hq-lijn) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--hq-lijn) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: radial-gradient(70% 60% at 50% 45%, #000 20%, transparent 85%);
+  opacity: 0.5;
+}
+
+/* ---------------- Kop ---------------- */
+
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1.5rem;
+}
+
+.wordmark {
+  margin: 0;
+  font-size: clamp(1rem, 2.6vw, 1.35rem);
+  font-weight: 800;
+  letter-spacing: 0.34em;
+  text-transform: uppercase;
+  color: #eaf6ff;
+}
+
+.wordmark span {
+  color: var(--hq-cyaan);
+}
+
+.subtitel {
+  margin: 0.4rem 0 0;
+  font-size: 0.75rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--hq-tekst-zacht);
+}
+
+/* Statusbadge: zichtbaar, maar niet het luidste element op het scherm. */
+.zegel {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.85rem;
+  border: 1px solid rgba(56, 225, 255, 0.35);
+  border-radius: 999px;
+  background: rgba(56, 225, 255, 0.07);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--hq-cyaan-zacht);
+}
+
+/* ---------------- De bol ---------------- */
+
+.stage {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: min(58vh, 26rem);
+  margin: clamp(2rem, 6vw, 3.5rem) auto clamp(1.5rem, 4vw, 2.5rem);
+}
+
+.orb {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: clamp(11rem, 40vw, 19rem);
+  aspect-ratio: 1;
+}
+
+.ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(56, 225, 255, 0.28);
+  animation: hq-adem 7s ease-in-out infinite;
+}
+
+/* Een gestippelde ring die langzaam draait: beweging zonder onrust. */
+.ringBuiten {
+  inset: -14%;
+  border-style: dashed;
+  border-color: rgba(56, 225, 255, 0.2);
+  animation: hq-draai 42s linear infinite;
+}
+
+.ringMidden {
+  inset: 6%;
+  border-color: rgba(127, 220, 245, 0.3);
+  animation-delay: -2.3s;
+}
+
+.ringBinnen {
+  inset: 18%;
+  border-color: rgba(47, 107, 255, 0.45);
+  animation-delay: -4.6s;
+}
+
+.kern {
+  position: relative;
+  width: 56%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 36% 32%, #bdf0ff 0%, #38e1ff 28%, #1a6cf0 62%, #0a1f52 100%);
+  box-shadow:
+    0 0 3rem rgba(56, 225, 255, 0.45),
+    0 0 8rem rgba(47, 107, 255, 0.35),
+    inset 0 0 2.5rem rgba(4, 7, 14, 0.5);
+  animation: hq-puls 6s ease-in-out infinite;
+}
+
+/* Zachte gloedhalo los van de kern, zodat de puls niet aan de rand "snijdt". */
+.halo {
+  position: absolute;
+  inset: 12%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(56, 225, 255, 0.28), transparent 68%);
+  animation: hq-halo 6s ease-in-out infinite;
+}
+
+.kernLabel {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  gap: 0.3rem;
+  text-align: center;
+}
+
+.kernTitel {
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: #eaf6ff;
+  text-shadow: 0 0 1rem rgba(4, 7, 14, 0.9);
+}
+
+.kernStatus {
+  font-size: 0.62rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(234, 246, 255, 0.75);
+  text-shadow: 0 0 1rem rgba(4, 7, 14, 0.9);
+}
+
+/* ---------------- Statusknooppunten ---------------- */
+
+.nodes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
+  gap: 0.6rem;
+  width: 100%;
+  max-width: 32rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.node {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid rgba(56, 225, 255, 0.16);
+  border-radius: 0.85rem;
+  background: rgba(8, 16, 32, 0.72);
+  backdrop-filter: blur(6px);
+}
+
+.stip {
+  flex: none;
+  width: 0.5rem;
+  height: 0.5rem;
+  margin-top: 0.35rem;
+  border-radius: 50%;
+  background: var(--stip);
+  box-shadow: 0 0 0.6rem var(--stip);
+  animation: hq-knipper 4s ease-in-out infinite;
+}
+
+.nodeLabel {
+  display: block;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--hq-tekst-zacht);
+}
+
+.nodeWaarde {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.83rem;
+  font-weight: 600;
+  color: #e6f4ff;
+}
+
+/*
+ * Vanaf een breed scherm gaan de knooppunten in een baan om de bol staan.
+ * Daaronder blijven ze een gewone, leesbare lijst onder elkaar — de bol houdt
+ * dan het midden en de statussen stapelen eronder.
+ */
+@media (min-width: 62rem) {
+  .nodes {
+    position: absolute;
+    inset: 0;
+    display: block;
+    max-width: none;
+  }
+
+  .node {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 14.5rem;
+    translate: calc(-50% + var(--nx)) calc(-50% + var(--ny));
+  }
+}
+
+/* ---------------- Spraak (nog niet actief) ---------------- */
+
+.voetbalk {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem 1.25rem;
+  margin-top: clamp(1.5rem, 4vw, 2.5rem);
+}
+
+.spraak {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.55rem 1.1rem;
+  border: 1px dashed rgba(242, 193, 78, 0.4);
+  border-radius: 999px;
+  background: rgba(242, 193, 78, 0.06);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: var(--hq-goud);
+}
+
+.spraak[aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
+.mic {
+  display: grid;
+  place-items: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 50%;
+  border: 1px solid rgba(242, 193, 78, 0.5);
+  color: var(--hq-goud);
+}
+
+/* ---------------- Statuscontrole ---------------- */
+
+.controle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+}
+
+.knop {
+  padding: 0.55rem 1.15rem;
+  border: 1px solid rgba(56, 225, 255, 0.45);
+  border-radius: 999px;
+  background: rgba(56, 225, 255, 0.1);
+  color: #eaf6ff;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.knop:hover:not(:disabled) {
+  background: rgba(56, 225, 255, 0.2);
+  border-color: rgba(56, 225, 255, 0.75);
+}
+
+.knop:disabled {
+  opacity: 0.55;
+  cursor: progress;
+}
+
+.uitkomst {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--hq-tekst-zacht);
+}
+
+.uitkomstOk {
+  color: var(--hq-groen);
+}
+
+.uitkomstFout {
+  color: var(--hq-oranje);
+}
+
+/* Zichtbare focus op de donkere achtergrond — nooit outline: none. */
+.shell :focus-visible {
+  outline: 2px solid var(--hq-cyaan);
+  outline-offset: 3px;
+  border-radius: 0.5rem;
+}
+
+/* ---------------- Keyframes ---------------- */
+
+@keyframes hq-puls {
+  0%,
+  100% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
+  50% {
+    transform: scale(1.045);
+    filter: brightness(1.14);
+  }
+}
+
+@keyframes hq-halo {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.85;
+    transform: scale(1.12);
+  }
+}
+
+@keyframes hq-adem {
+  0%,
+  100% {
+    opacity: 0.75;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes hq-draai {
+  from {
+    rotate: 0deg;
+  }
+  to {
+    rotate: 360deg;
+  }
+}
+
+@keyframes hq-knipper {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+/*
+ * globals.css kort animaties al af bij prefers-reduced-motion. Dit blok zet ze
+ * hier volledig uit, zodat er ook geen enkel restframe overblijft.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .ring,
+  .ringBuiten,
+  .kern,
+  .halo,
+  .stip {
+    animation: none;
+  }
+}

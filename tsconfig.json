@@ -11,6 +11,10 @@
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
+    // De tests draaien rechtstreeks op Node (node --test) en importeren daarom
+    // met een expliciete .ts-extensie, zoals ESM vereist. Veilig in combinatie
+    // met noEmit: TypeScript schrijft hier niets weg.
+    "allowImportingTsExtensions": true,
     "jsx": "react-jsx",
     "incremental": true,
     "plugins": [
