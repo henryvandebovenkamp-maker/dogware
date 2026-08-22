@@ -1,14 +1,24 @@
 import { Button, Section, Text } from "@react-email/components";
 import { EmailLayout, Signature, emailColors, paragraph, strong } from "./base";
+import { legalFooterLine } from "@/lib/legal-entity";
 
 export type CommerceMailType =
   | "proposal-sent"
+  | "proposal-reminder"
+  | "proposal-accepted"
+  | "agreement-ready"
+  | "agreement-reminder"
+  | "agreement-signed"
   | "deposit-ready"
+  | "deposit-reminder"
   | "deposit-received"
   | "delivery-ready"
   | "final-ready"
+  | "final-reminder"
   | "final-received"
   | "subscription-started"
+  | "website-live"
+  | "welcome-customer"
   | "charge-failed";
 
 const COPY: Record<
@@ -23,11 +33,59 @@ const COPY: Record<
     ],
     cta: "Bekijk je voorstel",
   },
+  "proposal-reminder": {
+    heading: (n) => `Even een herinnering, ${n}`,
+    body: () => [
+      "Je voorstel staat nog steeds voor je klaar. Geen haast — ik wilde het alleen even onder je aandacht brengen, voor het geval het is ondergesneeuwd.",
+      "Heb je een vraag of wil je iets aangepast zien? Antwoord gerust op deze mail, dan kijk ik er persoonlijk naar.",
+    ],
+    cta: "Bekijk je voorstel",
+  },
+  "proposal-accepted": {
+    heading: (n) => `Wat leuk, ${n} — je bent akkoord!`,
+    body: () => [
+      "Bedankt voor je akkoord op het voorstel. Dat betekent dat we samen aan de slag gaan.",
+      "Nog één stap voordat we kunnen beginnen: de samenwerkingsovereenkomst. Daarin staat precies wat we afspreken, wat het kost en hoe het abonnement werkt. Je kunt hem online lezen en digitaal ondertekenen.",
+    ],
+    cta: "Bekijk de overeenkomst",
+  },
+  "agreement-ready": {
+    heading: (n) => `De overeenkomst staat klaar, ${n}`,
+    body: () => [
+      "Ik heb de samenwerkingsovereenkomst voor je klaargezet. Lees hem rustig door — er staat niets in wat we niet al besproken hebben.",
+      "Onderaan zet je je gegevens en je akkoord. Daarna kun je de eerste termijn voldoen en beginnen we met bouwen.",
+    ],
+    cta: "Overeenkomst tekenen",
+  },
+  "agreement-reminder": {
+    heading: (n) => `Nog even over de overeenkomst, ${n}`,
+    body: () => [
+      "De samenwerkingsovereenkomst wacht nog op je handtekening. Zodra die er staat, kunnen we echt van start.",
+      "Loop je ergens tegenaan of is er iets onduidelijk? Laat het me weten, dan bel ik je gewoon even.",
+    ],
+    cta: "Overeenkomst tekenen",
+  },
+  "agreement-signed": {
+    heading: (n) => `Getekend, ${n} — dank je wel`,
+    body: (v) => [
+      "De overeenkomst is ondertekend. Je krijgt hem in je eigen omgeving te zien, dus je kunt hem altijd teruglezen.",
+      `Nu de laatste stap voordat we beginnen: de eerste termijn van ${v.amount}. Zodra die binnen is, gaan we voor je bouwen.`,
+    ],
+    cta: "Betaal de eerste termijn",
+  },
   "deposit-ready": {
     heading: (n) => `Mooi, ${n}, we kunnen beginnen`,
     body: (v) => [
       "Bedankt voor je akkoord! Om te starten met bouwen vragen we de eerste termijn.",
       `De eerste termijn is ${v.amount}. Zodra dit binnen is, gaan we voor je aan de slag.`,
+    ],
+    cta: "Betaal de eerste termijn",
+  },
+  "deposit-reminder": {
+    heading: (n) => `De eerste termijn staat nog open, ${n}`,
+    body: (v) => [
+      `De overeenkomst is getekend en alles staat klaar. Alleen de eerste termijn van ${v.amount} moet nog voldaan worden.`,
+      "Zodra die binnen is, begin ik meteen met bouwen.",
     ],
     cta: "Betaal de eerste termijn",
   },
@@ -51,16 +109,44 @@ const COPY: Record<
     body: (v) => [`De laatste termijn van ${v.amount} staat voor je klaar. Daarna is alles van jou.`],
     cta: "Betaal de laatste termijn",
   },
+  "final-reminder": {
+    heading: (n) => `Nog één stap, ${n}`,
+    body: (v) => [
+      `Je omgeving is klaar en wacht op de laatste termijn van ${v.amount}.`,
+      "Zodra die binnen is, zetten we je website live en regelen we je abonnement.",
+    ],
+    cta: "Betaal de laatste termijn",
+  },
   "final-received": {
     heading: (n) => `Helemaal rond, ${n} 🐾`,
     body: (v) => [
       `We hebben de laatste termijn van ${v.amount} ontvangen. Je project is volledig betaald. Gefeliciteerd!`,
-      "Binnenkort regelen we samen je maandabonnement, zodat alles blijft draaien.",
+      "Ik zet je website nu live en regel de automatische incasso van je abonnement.",
     ],
   },
   "subscription-started": {
-    heading: (n) => `Welkom als vaste klant, ${n}`,
-    body: (v) => [`Je abonnement is geregeld. ${v.extra ?? ""}`.trim()],
+    heading: (n) => `Je abonnement is geregeld, ${n}`,
+    body: (v) => [
+      "De automatische incasso staat klaar, precies zoals in de overeenkomst afgesproken.",
+      v.extra ?? "",
+    ].filter(Boolean),
+  },
+  "website-live": {
+    heading: (n) => `Hij staat live, ${n}! 🎉`,
+    body: () => [
+      "Je nieuwe website is vanaf nu online. Wat een mooi moment.",
+      "Alles wat je nodig hebt — je omgeving, je facturen en de voortgang — vind je op één plek terug.",
+    ],
+    cta: "Bekijk je omgeving",
+  },
+  "welcome-customer": {
+    heading: (n) => `Welkom bij DogWare, ${n}`,
+    body: (v) => [
+      "Je bent vanaf nu officieel DogWare-klant. Ik ben blij dat je er bent.",
+      v.extra ??
+        "Verandert er iets, wil je iets aanpassen of loop je ergens tegenaan? Mail of bel me gerust — je krijgt gewoon mij aan de lijn.",
+    ],
+    cta: "Naar je omgeving",
   },
   "charge-failed": {
     heading: (n) => `Even een seintje, ${n}`,
@@ -114,6 +200,11 @@ export function CommerceEmail({
         Vragen? Reageer gerust op deze mail, dan krijg je <span style={strong}>mij</span> aan de lijn.
       </Text>
       <Signature groet={SIGN[type].groet} regel={SIGN[type].regel} />
+      {TOONT_ENTITEIT.includes(type) && (
+        <Text style={{ ...paragraph, fontSize: 11, color: "#8a8178", marginTop: 18 }}>
+          {legalFooterLine()}
+        </Text>
+      )}
     </EmailLayout>
   );
 }
@@ -121,11 +212,39 @@ export function CommerceEmail({
 /** Afsluiting afgestemd op de toon per mailtype. */
 const SIGN: Record<CommerceMailType, { groet: string; regel?: string }> = {
   "proposal-sent": { groet: "Hartelijke groet,", regel: "Ik denk graag met je mee." },
+  "proposal-reminder": { groet: "Hartelijke groet," },
+  "proposal-accepted": { groet: "Hartelijke groet,", regel: "Wat fijn dat we samen gaan bouwen." },
+  "agreement-ready": { groet: "Met vriendelijke groet," },
+  "agreement-reminder": { groet: "Met vriendelijke groet," },
+  "agreement-signed": { groet: "Hartelijke groet," },
   "deposit-ready": { groet: "Met vriendelijke groet," },
+  "deposit-reminder": { groet: "Met vriendelijke groet," },
   "deposit-received": { groet: "Hartelijke groet," },
   "delivery-ready": { groet: "Hartelijke groet,", regel: "Wat leuk om je dit te laten zien." },
   "final-ready": { groet: "Met vriendelijke groet," },
+  "final-reminder": { groet: "Met vriendelijke groet," },
   "final-received": { groet: "Hartelijke groet,", regel: "Meer tijd voor de honden. Daar doen we het voor." },
   "subscription-started": { groet: "Hartelijke groet," },
+  "website-live": { groet: "Hartelijke groet,", regel: "Gefeliciteerd met je nieuwe website." },
+  "welcome-customer": { groet: "Hartelijke groet,", regel: "Meer tijd voor wat telt." },
   "charge-failed": { groet: "Met vriendelijke groet," },
 };
+
+/**
+ * De mails waarin een juridische of financiële verplichting staat, dragen
+ * onderaan de contractpartij. De rest niet: DogWare blijft voor de klant het
+ * merk, en OneDaySite hoort alleen te verschijnen waar het iets toevoegt.
+ */
+const TOONT_ENTITEIT: CommerceMailType[] = [
+  "agreement-ready",
+  "agreement-reminder",
+  "agreement-signed",
+  "deposit-ready",
+  "deposit-reminder",
+  "deposit-received",
+  "final-ready",
+  "final-reminder",
+  "final-received",
+  "subscription-started",
+  "charge-failed",
+];

@@ -9,13 +9,22 @@ import { processPaymentByMollieId } from "@/lib/commerce";
  * browser nooit terug opent. Vertrouwt nooit statusdata uit de request zelf.
  */
 export async function POST(request: NextRequest) {
+  /*
+   * Onleesbare of onzinnige invoer is ruis, geen storing: daar helpt opnieuw
+   * sturen niet tegen. Zulke verzoeken krijgen 200, zodat een willekeurige bot
+   * die hier iets heen POST geen eindeloze retryreeks uitlokt. De 500 hieronder
+   * is uitsluitend voor échte verwerkingsfouten — dáár helpt een retry wel.
+   */
+  let id: string;
   try {
     const form = await request.formData();
-    const id = String(form.get("id") ?? "");
-    if (!id.startsWith("tr_")) {
-      // Onbekend/ongeldig ID — 200 zodat Mollie niet blijft retryen op ruis
-      return NextResponse.json({ ok: true });
-    }
+    id = String(form.get("id") ?? "");
+  } catch {
+    return NextResponse.json({ ok: true });
+  }
+  if (!id.startsWith("tr_")) return NextResponse.json({ ok: true });
+
+  try {
     await processPaymentByMollieId(id);
     return NextResponse.json({ ok: true });
   } catch (err) {

@@ -72,6 +72,12 @@ export function computeOneOff(c: CommercialConfig) {
   const depositCents = round((totalInclVat * depositPct) / 100);
   const finalCents = Math.max(0, totalInclVat - depositCents);
 
+  // Het maandbedrag hoort bij dezelfde berekening: overal waar het abonnement
+  // getoond wordt (voorstel, overeenkomst, portaal, mail) komt het hiervandaan
+  // en wordt het niet opnieuw met de hand vermenigvuldigd.
+  const monthlyExVatCents = Math.max(0, round(c.monthlyCents));
+  const monthlyVatCents = round((monthlyExVatCents * Math.max(0, c.vatPercent)) / 100);
+
   return {
     subtotalCents: subtotal,
     discountCents,
@@ -80,8 +86,17 @@ export function computeOneOff(c: CommercialConfig) {
     totalInclVatCents: totalInclVat,
     depositCents,
     finalCents,
+    /** Aanbetalingspercentage zoals werkelijk toegepast (na clamping). */
+    depositPercent: depositPct,
+    /** Tweede termijn als percentage — altijd het complement, nooit los ingevoerd. */
+    finalPercent: 100 - depositPct,
+    monthlyExVatCents,
+    monthlyVatCents,
+    monthlyInclVatCents: monthlyExVatCents + monthlyVatCents,
   };
 }
+
+export type OneOffBreakdown = ReturnType<typeof computeOneOff>;
 
 /**
  * Werkelijk openstaand bedrag voor de tweede termijn: totaal minus wat al
@@ -164,4 +179,47 @@ export function euroFromCents(cents: number): string {
     style: "currency",
     currency: "EUR",
   }).format(cents / 100);
+}
+
+/** Menselijke omschrijving van wanneer het abonnement begint te lopen. */
+export function subscriptionStartLabel(
+  rule: SubscriptionStartRule,
+  handmatig?: Date | null,
+): string {
+  switch (rule) {
+    case "na-oplevering":
+      return "De incasso van het maandbedrag start na oplevering van het project.";
+    case "na-laatste-betaling":
+      return "De incasso van het maandbedrag start na ontvangst van de tweede termijn.";
+    case "eerste-volgende-maand":
+      return "De incasso van het maandbedrag start op de eerste dag van de maand die volgt op de oplevering.";
+    case "handmatig":
+      return handmatig
+        ? `De incasso van het maandbedrag start op ${handmatig.toLocaleDateString("nl-NL", { day: "numeric", month: "long", year: "numeric" })}.`
+        : "De startdatum van het maandbedrag wordt in onderling overleg vastgesteld.";
+  }
+}
+
+/**
+ * Mag er op dit moment al geïncasseerd worden?
+ *
+ * Bewust een aparte, pure functie: "het mandaat is actief" is niet hetzelfde
+ * als "de eerste incasso mag nu plaatsvinden". Zonder dit onderscheid zou een
+ * klant te vroeg worden afgeschreven.
+ */
+export function mayChargeSubscription(opts: {
+  now: Date;
+  startAt: Date | null;
+  freeMonths: number;
+}): boolean {
+  if (!opts.startAt) return false;
+  /*
+   * Bewust in UTC rekenen. Met lokale maandrekenkunde verschuift het antwoord
+   * mee met de zomertijd: een startdatum in september plus twee maanden komt
+   * dan een uur ná middernacht in november uit, waardoor de eerste incasso net
+   * een dag te laat lijkt te mogen. Bij geld is dat geen detail.
+   */
+  const eerste = new Date(opts.startAt);
+  eerste.setUTCMonth(eerste.getUTCMonth() + Math.max(0, opts.freeMonths));
+  return opts.now.getTime() >= eerste.getTime();
 }

@@ -288,29 +288,40 @@ export async function sendCommerceMail(
   to: string,
   naam: string,
   vars: { amount?: string; extra?: string } = {},
+  /**
+   * Persoonlijke, beveiligde link naar de klantomgeving. Zonder deze link valt
+   * de mail terug op /account — dat werkt alleen voor wie al een account
+   * heeft, dus geef hem altijd mee als je hem hebt.
+   */
+  ctaUrl?: string,
 ): Promise<MailResult> {
   const subjects: Record<CommerceMailType, string> = {
     "proposal-sent": "Je persoonlijke voorstel van DogWare",
+    "proposal-reminder": "Je voorstel staat nog voor je klaar",
+    "proposal-accepted": "Je akkoord is binnen — nu de overeenkomst",
+    "agreement-ready": "De samenwerkingsovereenkomst staat klaar",
+    "agreement-reminder": "De overeenkomst wacht nog op je handtekening",
+    "agreement-signed": "Getekend — nu de eerste termijn",
     "deposit-ready": "We kunnen beginnen — de eerste termijn staat klaar",
+    "deposit-reminder": "De eerste termijn staat nog open",
     "deposit-received": "Ontvangen! We gaan jouw DogWare bouwen",
     "delivery-ready": "Je DogWare-omgeving is klaar",
     "final-ready": "De laatste termijn staat voor je klaar",
+    "final-reminder": "Nog één stap voor je livegang",
     "final-received": "Helemaal rond — bedankt!",
-    "subscription-started": "Welkom als vaste DogWare-klant",
+    "subscription-started": "Je DogWare-abonnement is geregeld",
+    "website-live": "Je website staat live 🎉",
+    "welcome-customer": "Welkom als vaste DogWare-klant",
     "charge-failed": "Je maandbetaling is nog niet gelukt",
   };
+  const link = ctaUrl ?? `${branding.siteUrl}/account`;
   return sendMail(type === "charge-failed" ? "notification" : "demo-ready", {
     to,
     subject: subjects[type],
     react: (
-      <CommerceEmail
-        type={type}
-        naam={naam.split(" ")[0]}
-        ctaUrl={`${branding.siteUrl}/account`}
-        vars={vars}
-      />
+      <CommerceEmail type={type} naam={naam.split(" ")[0]} ctaUrl={link} vars={vars} />
     ),
-    text: `${subjects[type]}${vars.amount ? ` — ${vars.amount}` : ""}. Bekijk het in je omgeving: ${branding.siteUrl}/account`,
+    text: `${subjects[type]}${vars.amount ? ` — ${vars.amount}` : ""}. Bekijk het in je omgeving: ${link}`,
   });
 }
 

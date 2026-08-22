@@ -6,10 +6,8 @@ import { JOURNEY_STAGES } from "@/lib/db/schema";
 import { STAGE_KLANT_LABEL, stepStateFor } from "@/lib/journey-stages";
 import { logout } from "@/app/actions/auth";
 import { BrandMark } from "@/components/brand";
-import { CustomerCommerce } from "@/components/commerce/customer-view";
 import { getCommerceForLead } from "@/lib/commerce";
-import { isMollieConfigured } from "@/lib/mollie";
-import { computeOneOff, computeOutstanding, euroFromCents } from "@/lib/money";
+import { portalUrl } from "@/lib/portal-access";
 import { cn } from "@/lib/cn";
 
 export const metadata: Metadata = {
@@ -36,47 +34,17 @@ export default async function AccountPage() {
       )[0]
     : undefined;
 
-  // Commerciële afspraak (voorstel/betalingen) — alleen tonen zodra er een is
+  /*
+   * De commerciële journey (voorstel, overeenkomst, betalingen) heeft een eigen
+   * persoonlijke omgeving op /traject/[token]. We bouwen die hier bewust niet
+   * na: één plek waar de klant zijn traject volgt voorkomt dat twee schermen
+   * iets anders beweren. Vanaf hier verwijzen we er alleen naartoe.
+   */
   const commerce = lead ? await getCommerceForLead(lead.id) : null;
-  let commerceView = null;
-  if (lead && commerce && commerce.status !== "DRAFT") {
-    const cfg = {
-      projectCents: commerce.projectCents, setupCents: commerce.setupCents,
-      discountType: commerce.discountType, discountValue: commerce.discountValue,
-      vatPercent: commerce.vatPercent, depositPercent: commerce.depositPercent,
-      monthlyCents: commerce.monthlyCents, freeMonths: commerce.freeMonths,
-      introDiscountPercent: commerce.introDiscountPercent, introDiscountMonths: commerce.introDiscountMonths,
-    };
-    const one = computeOneOff(cfg);
-    const paidRows = db
-      ? await db
-          .select({ n: schema.payments.amountCents })
-          .from(schema.payments)
-          .where(eq(schema.payments.commerceId, commerce.id))
-      : [];
-    // exacte betaalde som via aparte query zou beter zijn; hier volstaat status-check
-    const depositPaid = ["DEPOSIT_PAID", "BUILDING", "DELIVERY_READY", "FINAL_PAYMENT_PENDING", "FULLY_PAID", "SUBSCRIPTION_SCHEDULED", "ACTIVE_CUSTOMER"].includes(commerce.status);
-    const fullyPaid = ["FULLY_PAID", "SUBSCRIPTION_SCHEDULED", "ACTIVE_CUSTOMER"].includes(commerce.status);
-    const paidCents = depositPaid ? one.depositCents : 0;
-    commerceView = (
-      <CustomerCommerce
-        data={{
-          leadId: lead.id,
-          status: commerce.status,
-          total: euroFromCents(one.totalInclVatCents),
-          deposit: euroFromCents(one.depositCents),
-          outstanding: euroFromCents(computeOutstanding(cfg, paidCents)),
-          monthly: euroFromCents(Math.round(commerce.monthlyCents * (1 + commerce.vatPercent / 100))),
-          freeMonths: commerce.freeMonths,
-          accepted: Boolean(commerce.acceptedAt),
-          depositPaid,
-          fullyPaid,
-          mollieReady: isMollieConfigured(),
-        }}
-      />
-    );
-    void paidRows;
-  }
+  const trajectLink =
+    commerce?.portalToken && commerce.status !== "DRAFT"
+      ? portalUrl(commerce.portalToken)
+      : null;
 
   const current = lead?.stage ?? "aangevraagd";
   const websiteUrl = lead?.demoDomain
@@ -114,8 +82,26 @@ export default async function AccountPage() {
             : "Je bent veilig ingelogd. Je voorbeeld wordt voorbereid."}
         </p>
 
-        {/* Commerciële afspraak: voorstel, betalingen, volgende stap */}
-        {commerceView && <div className="mt-8">{commerceView}</div>}
+        {/* Verwijzing naar het persoonlijke traject — daar staat de echte stap */}
+        {trajectLink && (
+          <a
+            href={trajectLink}
+            className="mt-8 block overflow-hidden rounded-2xl bg-white shadow-lift ring-1 ring-ink/5 transition hover:-translate-y-0.5 hover:shadow-lift"
+          >
+            <span className="block h-1.5 bg-gradient-to-r from-brand to-sage" />
+            <span className="block p-6">
+              <span className="block text-lg font-extrabold tracking-tight text-ink">
+                Jouw nieuwe website met DogWare
+              </span>
+              <span className="mt-1.5 block text-[14px] leading-relaxed text-ink-500">
+                Je voorstel, de overeenkomst, je betalingen en de voortgang staan hier bij elkaar.
+              </span>
+              <span className="mt-4 inline-flex items-center gap-1.5 text-[14px] font-bold text-brand">
+                Bekijk je traject →
+              </span>
+            </span>
+          </a>
+        )}
 
         {/* Eenvoudige verticale journey */}
         <ol className="mt-8">

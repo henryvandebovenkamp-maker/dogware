@@ -438,7 +438,16 @@ export const LEAD_SOURCES = [
 ] as const;
 export type LeadSource = (typeof LEAD_SOURCES)[number];
 
-/** De vaste stappen van de klantreis, in volgorde. */
+/**
+ * De vaste stappen van de klantreis, in volgorde — één doorlopende journey van
+ * demo-aanvraag tot actieve klant. De bestaande demo-stappen (aangevraagd t/m
+ * gestart) zijn ongewijzigd gebleven, zodat bestaande aanvragen hun stage
+ * houden; de commerciële stappen zijn ertussen en erachter geplaatst.
+ *
+ * `offerte` = voorstel voorbereiden, `akkoord` = voorstel geaccepteerd,
+ * `gestart` = bouwfase. Die drie sleutels zijn bewust hergebruikt in plaats van
+ * vervangen: een migratie van bestaande rijen is dan niet nodig.
+ */
 export const JOURNEY_STAGES = [
   "aangevraagd",
   "voorbereiden",
@@ -447,11 +456,25 @@ export const JOURNEY_STAGES = [
   "bekeken",
   "feedback",
   "afspraak",
+  "demo-akkoord",
   "offerte",
+  "voorstel-verstuurd",
   "akkoord",
+  "overeenkomst",
+  "aanbetaling",
   "gestart",
+  "revisies",
+  "oplevering",
+  "restbetaling",
+  "mandaat",
+  "live",
+  "actief",
 ] as const;
 export type JourneyStage = (typeof JOURNEY_STAGES)[number];
+
+/** Wie een gebeurtenis veroorzaakte. Bepaalt de weergave in de tijdlijn. */
+export const EVENT_ACTORS = ["klant", "admin", "systeem"] as const;
+export type EventActor = (typeof EVENT_ACTORS)[number];
 
 /** Chronologisch logboek per aanvraag (de zichtbare tijdlijn). */
 export const journeyEvents = pgTable(
@@ -465,12 +488,27 @@ export const journeyEvents = pgTable(
     kind: text("kind").notNull(),
     /** Menselijke omschrijving voor de tijdlijn */
     label: text("label").notNull(),
+    /**
+     * Wie deze stap zette. Een echte kolom (niet alleen `meta`) omdat de
+     * tijdlijn erop filtert en sorteert, en omdat "wie deed dit" bij een
+     * commerciële journey achteraf reconstrueerbaar moet blijven.
+     */
+    actor: text("actor").$type<EventActor>().notNull().default("systeem"),
+    /**
+     * Strikt intern: nooit zichtbaar in de klantomgeving. De klantquery
+     * filtert hier hard op, zodat een interne notitie er niet per ongeluk
+     * doorheen glipt.
+     */
+    internal: boolean("internal").notNull().default(false),
     meta: jsonb("meta").$type<Record<string, unknown>>(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
   },
-  (t) => [index("journey_events_lead_idx").on(t.leadId, t.createdAt)],
+  (t) => [
+    index("journey_events_lead_idx").on(t.leadId, t.createdAt),
+    index("journey_events_public_idx").on(t.leadId, t.internal, t.createdAt),
+  ],
 );
 
 /** Interne, afvinkbare taken per aanvraag. */
@@ -557,16 +595,238 @@ export const commerce = pgTable(
     acceptedAt: timestamp("accepted_at", { withTimezone: true }),
     acceptedIpHash: text("accepted_ip_hash"),
 
+    /**
+     * Onraadbare sleutel voor de klantomgeving (/traject/[token]). Bewust
+     * roteerbaar door de beheerder, maar niet bij elke herinnering: anders
+     * sterft de link uit de eerste mail zodra er een reminder uitgaat.
+     */
+    portalToken: text("portal_token"),
+
     // Mollie recurring
     mollieCustomerId: text("mollie_customer_id"),
     mollieMandateId: text("mollie_mandate_id"),
     mandateStatus: text("mandate_status"),
+    mandateActivatedAt: timestamp("mandate_activated_at", { withTimezone: true }),
+    mollieSubscriptionId: text("mollie_subscription_id"),
+    subscriptionActivatedAt: timestamp("subscription_activated_at", { withTimezone: true }),
+
+    // Mijlpalen van de commerciële journey (voor de tijdlijn en rapportage)
+    buildStartedAt: timestamp("build_started_at", { withTimezone: true }),
+    deliveryReadyAt: timestamp("delivery_ready_at", { withTimezone: true }),
+    liveAt: timestamp("live_at", { withTimezone: true }),
+    activeCustomerAt: timestamp("active_customer_at", { withTimezone: true }),
 
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [uniqueIndex("commerce_lead_idx").on(t.leadId)],
+  (t) => [
+    uniqueIndex("commerce_lead_idx").on(t.leadId),
+    uniqueIndex("commerce_portal_token_idx").on(t.portalToken),
+  ],
 );
+
+/* =========================================================================
+ * Voorstellen — versiebeheer
+ *
+ * Een verstuurd voorstel is onveranderlijk. Wijzigt de afspraak daarna, dan
+ * ontstaat er een NIEUWE versie en gaat de vorige naar SUPERSEDED. Zo blijft
+ * jaren later reconstrueerbaar waar de klant precies op akkoord ging.
+ * ========================================================================= */
+
+export const PROPOSAL_STATUSES = [
+  "DRAFT",
+  "SENT",
+  "VIEWED",
+  "ACCEPTED",
+  "REJECTED",
+  "EXPIRED",
+  "SUPERSEDED",
+] as const;
+export type ProposalStatus = (typeof PROPOSAL_STATUSES)[number];
+
+export const proposals = pgTable(
+  "proposals",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    commerceId: uuid("commerce_id")
+      .notNull()
+      .references(() => commerce.id, { onDelete: "cascade" }),
+    /** Ook op de lead vastgelegd: de journey blijft de centrale draad. */
+    leadId: uuid("lead_id")
+      .notNull()
+      .references(() => leads.id, { onDelete: "cascade" }),
+    version: integer("version").notNull(),
+    status: text("status").$type<ProposalStatus>().notNull().default("DRAFT"),
+
+    // Inhoud
+    titel: text("titel").notNull().default(""),
+    intro: text("intro"),
+    omschrijving: text("omschrijving"),
+    /** Werkzaamheden — losse regels */
+    werkzaamheden: jsonb("werkzaamheden").$type<string[]>().notNull().default([]),
+    /** Modules/diensten — losse regels */
+    modules: jsonb("modules").$type<string[]>().notNull().default([]),
+    bijzonderheden: text("bijzonderheden"),
+    geldigTot: timestamp("geldig_tot", { withTimezone: true }),
+
+    /**
+     * Bevroren prijsopbouw op het moment van versturen: configuratie én de
+     * daaruit berekende bedragen. Nooit opnieuw berekenen uit de actuele
+     * commerce-rij — die kan intussen gewijzigd zijn.
+     */
+    pricing: jsonb("pricing").$type<Record<string, unknown>>().notNull().default({}),
+
+    createdByUserId: uuid("created_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+    firstViewedAt: timestamp("first_viewed_at", { withTimezone: true }),
+    lastViewedAt: timestamp("last_viewed_at", { withTimezone: true }),
+    viewCount: integer("view_count").notNull().default(0),
+
+    // Acceptatie — audittechnisch traceerbaar
+    acceptedAt: timestamp("accepted_at", { withTimezone: true }),
+    acceptedName: text("accepted_name"),
+    acceptedIpHash: text("accepted_ip_hash"),
+    acceptedUserAgent: text("accepted_user_agent"),
+    rejectedAt: timestamp("rejected_at", { withTimezone: true }),
+    rejectedReason: text("rejected_reason"),
+  },
+  (t) => [
+    uniqueIndex("proposals_version_idx").on(t.commerceId, t.version),
+    index("proposals_lead_idx").on(t.leadId, t.version),
+  ],
+);
+
+export type Proposal = typeof proposals.$inferSelect;
+export type NewProposal = typeof proposals.$inferInsert;
+
+/* =========================================================================
+ * Overeenkomsten — digitale ondertekening
+ *
+ * Altijd gekoppeld aan één proposal-versie. De voorwaardenversie én de
+ * prijzen worden bevroren, zodat een latere wijziging een reeds getekende
+ * overeenkomst nooit met terugwerkende kracht verandert.
+ * ========================================================================= */
+
+export const AGREEMENT_STATUSES = ["DRAFT", "SENT", "VIEWED", "SIGNED", "SUPERSEDED"] as const;
+export type AgreementStatus = (typeof AGREEMENT_STATUSES)[number];
+
+export const agreements = pgTable(
+  "agreements",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    commerceId: uuid("commerce_id")
+      .notNull()
+      .references(() => commerce.id, { onDelete: "cascade" }),
+    leadId: uuid("lead_id")
+      .notNull()
+      .references(() => leads.id, { onDelete: "cascade" }),
+    proposalId: uuid("proposal_id")
+      .notNull()
+      .references(() => proposals.id, { onDelete: "restrict" }),
+    /** Redundant vastgelegd zodat het versienummer leesbaar blijft in exports. */
+    proposalVersion: integer("proposal_version").notNull(),
+
+    status: text("status").$type<AgreementStatus>().notNull().default("DRAFT"),
+    /** Versie van de DogWare-voorwaarden, bijv. "dw-1.0". */
+    voorwaardenVersie: text("voorwaarden_versie").notNull(),
+    /** Bevroren prijzen + maandbedrag, identiek aan de proposal-versie. */
+    pricing: jsonb("pricing").$type<Record<string, unknown>>().notNull().default({}),
+
+    viewedAt: timestamp("viewed_at", { withTimezone: true }),
+    signedAt: timestamp("signed_at", { withTimezone: true }),
+
+    // Ondertekenaar
+    signerName: text("signer_name"),
+    signerRole: text("signer_role"),
+    signerEmail: text("signer_email"),
+    signerPhone: text("signer_phone"),
+    signerCompany: text("signer_company"),
+    signerAddress: text("signer_address"),
+    signerPostcode: text("signer_postcode"),
+    signerCity: text("signer_city"),
+    signerKvk: text("signer_kvk"),
+    signerVat: text("signer_vat"),
+
+    // Expliciete akkoorden — elk apart vastgelegd
+    agreesOpdracht: boolean("agrees_opdracht").notNull().default(false),
+    agreesInvestering: boolean("agrees_investering").notNull().default(false),
+    agreesTermijnen: boolean("agrees_termijnen").notNull().default(false),
+    agreesMaandbedrag: boolean("agrees_maandbedrag").notNull().default(false),
+    agreesVoorwaarden: boolean("agrees_voorwaarden").notNull().default(false),
+    agreesBevoegd: boolean("agrees_bevoegd").notNull().default(false),
+
+    signedIpHash: text("signed_ip_hash"),
+    signedUserAgent: text("signed_user_agent"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("agreements_commerce_idx").on(t.commerceId, t.createdAt),
+    index("agreements_lead_idx").on(t.leadId),
+  ],
+);
+
+export type Agreement = typeof agreements.$inferSelect;
+
+/* =========================================================================
+ * Documenten — facturen en vastgelegde stukken
+ *
+ * Geen tweede boekhouding: een documentregel is de registratie van iets dat
+ * elders al waar is (een betaling, een voorstelversie, een getekende
+ * overeenkomst), met een eigen onveranderlijk nummer.
+ * ========================================================================= */
+
+export const DOCUMENT_TYPES = [
+  "PROPOSAL",
+  "AGREEMENT",
+  "INVOICE_DEPOSIT",
+  "INVOICE_FINAL",
+  "INVOICE_SUBSCRIPTION",
+] as const;
+export type DocumentType = (typeof DOCUMENT_TYPES)[number];
+
+export const documents = pgTable(
+  "documents",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    leadId: uuid("lead_id")
+      .notNull()
+      .references(() => leads.id, { onDelete: "cascade" }),
+    commerceId: uuid("commerce_id")
+      .notNull()
+      .references(() => commerce.id, { onDelete: "cascade" }),
+    type: text("type").$type<DocumentType>().notNull(),
+    /** Documentnummer, bijv. "DW-2026-0001". Uniek en onveranderlijk. */
+    nummer: text("nummer").notNull(),
+    titel: text("titel").notNull(),
+
+    proposalId: uuid("proposal_id").references(() => proposals.id, { onDelete: "set null" }),
+    agreementId: uuid("agreement_id").references(() => agreements.id, { onDelete: "set null" }),
+    paymentId: uuid("payment_id"),
+
+    /** Bedragen in centen; bij niet-financiële documenten 0. */
+    netExVatCents: integer("net_ex_vat_cents").notNull().default(0),
+    vatCents: integer("vat_cents").notNull().default(0),
+    totalInclVatCents: integer("total_incl_vat_cents").notNull().default(0),
+    vatPercent: integer("vat_percent").notNull().default(21),
+
+    /** Volledige, bevroren inhoud voor latere weergave/PDF. */
+    snapshot: jsonb("snapshot").$type<Record<string, unknown>>().notNull().default({}),
+    /** Zichtbaar in de klantomgeving? Interne stukken staan hier op false. */
+    visibleToCustomer: boolean("visible_to_customer").notNull().default(true),
+    issuedAt: timestamp("issued_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("documents_nummer_idx").on(t.nummer),
+    index("documents_lead_idx").on(t.leadId, t.issuedAt),
+    index("documents_commerce_idx").on(t.commerceId, t.type),
+  ],
+);
+
+export type DogDocument = typeof documents.$inferSelect;
 
 export const PAYMENT_TYPES = [
   "DEPOSIT",
@@ -607,6 +867,21 @@ export const payments = pgTable(
     paidAt: timestamp("paid_at", { withTimezone: true }),
     /** Idempotentie: markeert of de 'betaald'-verwerking al is uitgevoerd */
     processedAt: timestamp("processed_at", { withTimezone: true }),
+
+    /**
+     * Waar deze betaling op gebaseerd is. Verplicht voor DEPOSIT en
+     * FINAL_PAYMENT: een termijn hoort altijd bij één voorstelversie en één
+     * getekende overeenkomst, ook als die later worden opgevolgd.
+     */
+    proposalId: uuid("proposal_id").references(() => proposals.id, { onDelete: "set null" }),
+    agreementId: uuid("agreement_id").references(() => agreements.id, { onDelete: "set null" }),
+    /** Onze eigen referentie richting Mollie/boekhouding, bijv. "DW-…-DEPOSIT". */
+    referentie: text("referentie"),
+    /** "oneoff" | "first" (mandaat vestigen) | "recurring" (incasso). */
+    sequenceType: text("sequence_type").$type<"oneoff" | "first" | "recurring">(),
+    mollieCustomerId: text("mollie_customer_id"),
+    mollieMandateId: text("mollie_mandate_id"),
+    failureReason: text("failure_reason"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
