@@ -685,7 +685,20 @@ export async function signAgreement(token: string, input: SignInput): Promise<Co
       signedIpHash: fp.ipHash,
       signedUserAgent: fp.userAgent,
     })
-    .where(and(eq(schema.agreements.id, agreement.id), eq(schema.agreements.status, "SENT")))
+    /*
+     * Elke nog-niet-getekende status mag ondertekend worden. Alleen op "SENT"
+     * filteren gaat mis: het openen van de contractpagina zet de status al op
+     * "VIEWED", en je moet een contract nu eenmaal openen om het te kunnen
+     * tekenen. De voorwaarde blijft wél staan — hij houdt een tweede,
+     * gelijktijdige poging tegen en voorkomt dat een SIGNED of SUPERSEDED
+     * overeenkomst opnieuw wordt overschreven.
+     */
+    .where(
+      and(
+        eq(schema.agreements.id, agreement.id),
+        inArray(schema.agreements.status, ["DRAFT", "SENT", "VIEWED"]),
+      ),
+    )
     .returning();
 
   // Geen rij terug? Dan heeft een gelijktijdige tweede poging al getekend.
