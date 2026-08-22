@@ -69,6 +69,46 @@ function opsomming(items: string[], leeg: string): string {
   return schoon.length ? schoon.join(", ") : leeg;
 }
 
+/**
+ * Zet de maatwerkafspraken om in losse, genummerde artikelen.
+ *
+ * Conventie: een lege regel begint een nieuwe bepaling. Eindigt de eerste
+ * regel van zo'n blok op een dubbele punt, dan is dat de kop van het artikel.
+ *
+ * Reden: afwijkende afspraken zijn contractueel het zwaarst — ze gaan vóór op
+ * de standaardtekst. Als één blok tekst zijn ze slecht te lezen en slecht aan
+ * te wijzen ("artikel 11.3" bestaat dan niet). Als losse artikelen zijn ze dat
+ * wel.
+ */
+function maatwerkArtikelen(bijzonderheden: string, hoofdstuk: number): Article[] {
+  const blokken = bijzonderheden
+    .split(/\n\s*\n/)
+    .map((b) => b.trim())
+    .filter(Boolean);
+
+  const artikelen: Article[] = [
+    {
+      n: `${hoofdstuk}.1`,
+      title: "Voorrang",
+      paragraphs: [
+        "In aanvulling op het bovenstaande zijn de volgende afspraken gemaakt. Bij tegenstrijdigheid met de voorgaande artikelen gaan deze aanvullende afspraken voor.",
+      ],
+    },
+  ];
+
+  blokken.forEach((blok, i) => {
+    const regels = blok.split("\n").map((r) => r.trim()).filter(Boolean);
+    const heeftKop = regels.length > 1 && regels[0].endsWith(":");
+    artikelen.push({
+      n: `${hoofdstuk}.${i + 2}`,
+      title: heeftKop ? regels[0].replace(/:$/, "") : "Afwijkende afspraak",
+      paragraphs: heeftKop ? regels.slice(1) : regels,
+    });
+  });
+
+  return artikelen;
+}
+
 /* =========================================================================
  * Versie 1.0 (actief)
  * ========================================================================= */
@@ -361,16 +401,7 @@ function buildV1(ctx: AgreementContext): Chapter[] {
     chapters.push({
       n: 11,
       title: "Aanvullende afspraken",
-      articles: [
-        {
-          n: "11.1",
-          title: "Afwijkende afspraken",
-          paragraphs: [
-            "In aanvulling op het bovenstaande zijn de volgende afspraken gemaakt. Bij tegenstrijdigheid met de voorgaande artikelen gaan deze aanvullende afspraken voor.",
-            ...bijzonder.split(/\n+/).map((r) => r.trim()).filter(Boolean),
-          ],
-        },
-      ],
+      articles: maatwerkArtikelen(bijzonder, 11),
     });
   }
 
