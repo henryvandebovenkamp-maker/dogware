@@ -72,6 +72,8 @@ export type OvereenkomstData = {
 
 export type BetalingRij = {
   id: string;
+  /** Factuurnummer van de bijbehorende factuur, als die er is. */
+  factuurNummer: string | null;
   type: string;
   status: string;
   bedrag: string;
@@ -284,6 +286,15 @@ export function CommerceSecties(props: {
                 {b.failureReason && (
                   <p className="mt-1 text-[12px] font-semibold text-brand-600">{b.failureReason}</p>
                 )}
+                {b.factuurNummer && (
+                  <Link
+                    href={`/admin/leads/${props.leadId}/factuur/${b.factuurNummer}`}
+                    className="mt-2 inline-flex items-center gap-1.5 text-[12px] font-bold text-brand hover:text-brand-600"
+                  >
+                    <Receipt className="h-3.5 w-3.5" />
+                    Factuur {b.factuurNummer} bekijken
+                  </Link>
+                )}
               </li>
             ))}
           </ul>
@@ -347,17 +358,36 @@ export function CommerceSecties(props: {
           <Leeg>Documenten worden automatisch vastgelegd bij versturen, tekenen en betalen.</Leeg>
         ) : (
           <ul className="space-y-1.5">
-            {props.documenten.map((d) => (
-              <li key={d.id} className="flex flex-wrap items-baseline justify-between gap-2 text-[13px]">
-                <span className="min-w-0">
-                  <span className="font-mono text-[11.5px] font-bold text-ink-500">{d.nummer}</span>{" "}
-                  <span className="text-ink-700">{d.titel}</span>
-                </span>
-                <span className="tabular-nums text-ink-500">
-                  {d.bedrag ?? ""} <span className="text-ink-300">{datum(d.issuedAt)}</span>
-                </span>
-              </li>
-            ))}
+            {props.documenten.map((d) => {
+              const isFactuur = d.type.startsWith("INVOICE");
+              const regel = (
+                <>
+                  <span className="min-w-0">
+                    <span className="font-mono text-[11.5px] font-bold text-ink-500">{d.nummer}</span>{" "}
+                    <span className={isFactuur ? "font-semibold text-brand" : "text-ink-700"}>
+                      {d.titel}
+                    </span>
+                  </span>
+                  <span className="tabular-nums text-ink-500">
+                    {d.bedrag ?? ""} <span className="text-ink-300">{datum(d.issuedAt)}</span>
+                  </span>
+                </>
+              );
+              return (
+                <li key={d.id} className="text-[13px]">
+                  {isFactuur ? (
+                    <Link
+                      href={`/admin/leads/${props.leadId}/factuur/${d.nummer}`}
+                      className="-mx-2 flex flex-wrap items-baseline justify-between gap-2 rounded-lg px-2 py-1 transition hover:bg-cream-100/70"
+                    >
+                      {regel}
+                    </Link>
+                  ) : (
+                    <span className="flex flex-wrap items-baseline justify-between gap-2">{regel}</span>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         )}
       </Sectie>

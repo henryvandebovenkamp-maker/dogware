@@ -74,6 +74,7 @@ export default async function TrajectPage({
         titel: d.titel,
         bedrag: d.totalInclVatCents > 0 ? euroFromCents(d.totalInclVatCents) : null,
         issuedAt: d.issuedAt.toISOString(),
+        isFactuur: d.type.startsWith("INVOICE"),
       }))}
       tijdlijn={tijdlijn.map(naarRij)}
       voorstel={{

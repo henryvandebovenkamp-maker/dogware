@@ -265,6 +265,7 @@ export default async function LeadDetailPage({
           }
           betalingen={payments.map((p) => ({
             id: p.id,
+            factuurNummer: documents.find((d) => d.paymentId === p.id)?.nummer ?? null,
             type: p.type,
             status: p.status,
             bedrag: euroFromCents(p.amountCents),

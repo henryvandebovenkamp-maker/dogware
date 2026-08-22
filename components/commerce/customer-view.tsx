@@ -64,6 +64,8 @@ export type DocumentRij = {
   titel: string;
   bedrag: string | null;
   issuedAt: string;
+  /** Alleen facturen zijn te openen; een voorstel staat al op de pagina zelf. */
+  isFactuur: boolean;
 };
 
 export type TijdlijnRij = { id: string; label: string; actor: string; createdAt: string };
@@ -141,27 +143,42 @@ export function TrajectShell({
               Jouw documenten
             </h2>
             <ul className="mt-3 space-y-2">
-              {documenten.map((d) => (
-                <li
-                  key={d.id}
-                  className="flex items-center gap-3 rounded-xl bg-white px-4 py-3 shadow-soft ring-1 ring-ink/5"
-                >
-                  <FileText className="h-4 w-4 shrink-0 text-ink-300" />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[13.5px] font-semibold text-ink">
-                      {d.titel}
+              {documenten.map((d) => {
+                const inhoud = (
+                  <>
+                    <FileText className="h-4 w-4 shrink-0 text-ink-300" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[13.5px] font-semibold text-ink">
+                        {d.titel}
+                      </span>
+                      <span className="block font-mono text-[11px] text-ink-300">
+                        {d.nummer} · {datum(d.issuedAt)}
+                      </span>
                     </span>
-                    <span className="block font-mono text-[11px] text-ink-300">
-                      {d.nummer} · {datum(d.issuedAt)}
-                    </span>
-                  </span>
-                  {d.bedrag && (
-                    <span className="shrink-0 text-[13px] font-extrabold tabular-nums text-ink">
-                      {d.bedrag}
-                    </span>
-                  )}
-                </li>
-              ))}
+                    {d.bedrag && (
+                      <span className="shrink-0 text-[13px] font-extrabold tabular-nums text-ink">
+                        {d.bedrag}
+                      </span>
+                    )}
+                  </>
+                );
+                const klas =
+                  "flex items-center gap-3 rounded-xl bg-white px-4 py-3 shadow-soft ring-1 ring-ink/5";
+                return (
+                  <li key={d.id}>
+                    {d.isFactuur && voorstel ? (
+                      <a
+                        href={`/traject/${voorstel.token}/factuur/${d.nummer}`}
+                        className={`${klas} transition hover:-translate-y-0.5 hover:shadow-lift`}
+                      >
+                        {inhoud}
+                      </a>
+                    ) : (
+                      <span className={klas}>{inhoud}</span>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           </section>
         )}
