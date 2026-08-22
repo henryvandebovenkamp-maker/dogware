@@ -2,6 +2,7 @@ import "server-only";
 import { and, count, countDistinct, desc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import type { LeadStatus, Partner } from "@/lib/db/schema";
+import { stageIndex } from "@/lib/journey-stages";
 
 /**
  * Datatoegang voor het partnerportaal.
@@ -90,9 +91,19 @@ export async function getPartnerLeads(partnerId: string) {
 
 /**
  * Commissie-overzicht — volledig server-side berekend.
- * Een verkoop = een journey die 'gestart' (project gestart) heeft bereikt.
- * Gereserveerd = akkoord gegeven maar nog niet gestart.
- * In behandeling = er loopt een gesprek/voorstel.
+ *
+ * De drie bakken worden bepaald met de PLAATS van de stage in de journey, niet
+ * met een opsomming van losse stages. Dat is bewust: bij een opsomming valt een
+ * aanvraag stilzwijkend uit alle tellers zodra hij een stage bereikt die
+ * niemand in het lijstje heeft gezet, en dan ziet de partner zijn aanbreng
+ * verdwijnen precies op het moment dat die vooruitgaat.
+ *
+ * In behandeling — vanaf de demo-afspraak tot het voorstel verstuurd is.
+ * Gereserveerd  — klant akkoord, overeenkomst en eerste termijn.
+ * Verkocht      — vanaf de bouwfase; hier is de commissie verdiend.
+ *
+ * Handmatig op "afgevallen" gezet telt nergens meer mee, ongeacht hoe ver de
+ * stage stond toen het afketste.
  */
 export async function getPartnerCommission(
   partnerId: string,
@@ -103,17 +114,23 @@ export async function getPartnerCommission(
     return { verkocht: 0, verdiendCents: 0, gereserveerd: 0, inBehandeling: 0 };
   }
   const rows = await db
-    .select({ stage: schema.leads.stage })
+    .select({ stage: schema.leads.stage, status: schema.leads.status })
     .from(schema.leads)
     .where(eq(schema.leads.affiliatePartnerId, partnerId));
+
+  const VANAF_BEHANDELING = stageIndex("afspraak");
+  const VANAF_GERESERVEERD = stageIndex("akkoord");
+  const VANAF_VERKOCHT = stageIndex("gestart");
 
   let verkocht = 0;
   let gereserveerd = 0;
   let inBehandeling = 0;
   for (const r of rows) {
-    if (r.stage === "gestart") verkocht += 1;
-    else if (r.stage === "akkoord") gereserveerd += 1;
-    else if (r.stage === "offerte" || r.stage === "afspraak") inBehandeling += 1;
+    if (r.status === "afgevallen") continue;
+    const i = stageIndex(r.stage);
+    if (i >= VANAF_VERKOCHT) verkocht += 1;
+    else if (i >= VANAF_GERESERVEERD) gereserveerd += 1;
+    else if (i >= VANAF_BEHANDELING) inBehandeling += 1;
   }
   return {
     verkocht,

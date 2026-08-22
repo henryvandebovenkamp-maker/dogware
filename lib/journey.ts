@@ -1,7 +1,13 @@
 import "server-only";
 import { and, asc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
-import type { EventActor, JourneyEvent, JourneyStage } from "@/lib/db/schema";
+import { LEAD_STATUSES } from "@/lib/db/schema";
+import type {
+  EventActor,
+  JourneyEvent,
+  JourneyStage,
+  LeadStatus,
+} from "@/lib/db/schema";
 import { STAGE_META, stageIndex } from "@/lib/journey-stages";
 
 /**
@@ -46,6 +52,53 @@ export async function logJourneyEvent(
 }
 
 /**
+ * Welke leadstatus hoort bij welke stage.
+ *
+ * `leads.stage` (twintig stappen, de echte klantreis) en `leads.status` (zes
+ * grove labels voor lijsten en het partnerportaal) beschrijven hetzelfde
+ * traject. Ze liepen uit elkaar omdat alleen `stage` automatisch meebewoog:
+ * een aanvraag kon op "Voorstel verstuurd" staan en tegelijk "Demo verstuurd"
+ * tonen. Deze tabel houdt ze gelijk.
+ */
+const STATUS_VOOR_STAGE: Record<JourneyStage, LeadStatus> = {
+  aangevraagd: "nieuw",
+  voorbereiden: "demo in de maak",
+  "demo-verstuurd": "demo verstuurd",
+  ingelogd: "demo verstuurd",
+  bekeken: "demo verstuurd",
+  feedback: "contact gehad",
+  afspraak: "contact gehad",
+  "demo-akkoord": "contact gehad",
+  offerte: "contact gehad",
+  "voorstel-verstuurd": "contact gehad",
+  akkoord: "klant geworden",
+  overeenkomst: "klant geworden",
+  aanbetaling: "klant geworden",
+  gestart: "klant geworden",
+  revisies: "klant geworden",
+  oplevering: "klant geworden",
+  restbetaling: "klant geworden",
+  mandaat: "klant geworden",
+  live: "klant geworden",
+  actief: "klant geworden",
+};
+
+/**
+ * De status die bij deze stage hoort, of `null` als er niets te wijzigen valt.
+ *
+ * Twee grendels. "afgevallen" is een menselijk oordeel en wordt nooit
+ * automatisch overschreven — een afgeketste aanvraag mag niet vanzelf weer
+ * "klant geworden" worden doordat er ergens een stage wordt gezet. En de
+ * status gaat alleen vooruit, net als de stage zelf.
+ */
+function statusVoorStage(stage: JourneyStage, huidig: LeadStatus): LeadStatus | null {
+  if (huidig === "afgevallen") return null;
+  const doel = STATUS_VOOR_STAGE[stage];
+  if (LEAD_STATUSES.indexOf(doel) <= LEAD_STATUSES.indexOf(huidig)) return null;
+  return doel;
+}
+
+/**
  * Zet de stage van een aanvraag. Gaat standaard alleen vooruit (automatische
  * overgangen mogen niet terugvallen), tenzij `force` is gezet (handmatige
  * correctie door de beheerder).
@@ -58,7 +111,7 @@ export async function setStage(
   const db = getDb();
   if (!db) return;
   const [lead] = await db
-    .select({ stage: schema.leads.stage })
+    .select({ stage: schema.leads.stage, status: schema.leads.status })
     .from(schema.leads)
     .where(eq(schema.leads.id, leadId))
     .limit(1);
@@ -66,9 +119,10 @@ export async function setStage(
   if (lead.stage === stage) return;
   if (!opts.force && stageIndex(stage) <= stageIndex(lead.stage)) return;
 
+  const status = statusVoorStage(stage, lead.status);
   await db
     .update(schema.leads)
-    .set({ stage })
+    .set(status ? { stage, status } : { stage })
     .where(eq(schema.leads.id, leadId));
   await logJourneyEvent(
     leadId,

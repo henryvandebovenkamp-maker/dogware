@@ -1,14 +1,15 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { JOURNEY_STAGES, type JourneyStage } from "@/lib/db/schema";
 import { getAdminActor } from "@/lib/admin-auth";
 import { logActivity } from "@/lib/audit";
 import { logJourneyEvent, setStage } from "@/lib/journey";
 import { grantRole } from "@/lib/auth/grant";
-import { sendDemoReady, sendPartnerDemoSent } from "@/lib/email/send";
+import { sendDemoReady } from "@/lib/email/send";
+import { notifyPartner } from "@/lib/partner-notify";
 
 export type JourneyActionState = {
   status: "idle" | "success" | "error";
@@ -150,16 +151,9 @@ export async function sendDemo(
   // lead gemaild, maar wél alsnog bij een re-send als het de vorige keer niet
   // is gelukt (of vóór deze feature bestond). De partner krijgt uitsluitend de
   // publieke voorbeeldwebsite te zien — nooit de portaal-/loginlink.
-  let partnerNotifyFailed = false;
-  if (lead.affiliatePartnerId) {
-    const result = await notifyPartnerDemoSent(db, {
-      leadId,
-      partnerId: lead.affiliatePartnerId,
-      publicDemoUrl: websiteUrl,
-      klantBedrijfsnaam: lead.bedrijfsnaam?.trim() || undefined,
-    });
-    partnerNotifyFailed = result === "failed";
-  }
+  const partnerNotifyFailed =
+    (await notifyPartner(leadId, "demo-verstuurd", { publicDemoUrl: websiteUrl })) ===
+    "failed";
 
   revalidatePath(`/admin/leads/${leadId}`);
   return {
@@ -168,105 +162,6 @@ export async function sendDemo(
       ? "Demo verstuurd — maar de partner kon niet automatisch worden gemaild. Probeer 'opnieuw versturen' of check de logs."
       : "Demo verstuurd en journey bijgewerkt.",
   };
-}
-
-/**
- * Stuurt de partner een persoonlijk "de demo is verstuurd"-berichtje en legt
- * dit vast in de timeline. Faalt nooit hard (throwt niet): de klant is al
- * gemaild. Idempotent: al eerder gestuurd → "skipped".
- *
- * @returns "sent" (nu verstuurd), "skipped" (al eerder gebeurd) of "failed"
- *          (geen e-mail bekend of verzenden mislukt — wordt gelogd).
- */
-async function notifyPartnerDemoSent(
-  db: NonNullable<ReturnType<typeof getDb>>,
-  {
-    leadId,
-    partnerId,
-    publicDemoUrl,
-    klantBedrijfsnaam,
-  }: {
-    leadId: string;
-    partnerId: string;
-    publicDemoUrl: string;
-    klantBedrijfsnaam?: string;
-  },
-): Promise<"sent" | "skipped" | "failed"> {
-  try {
-    // Al eerder geïnformeerd? Dan niets doen (voorkomt dubbele berichten).
-    const [existing] = await db
-      .select({ id: schema.journeyEvents.id })
-      .from(schema.journeyEvents)
-      .where(
-        and(
-          eq(schema.journeyEvents.leadId, leadId),
-          eq(schema.journeyEvents.kind, "partner_notified"),
-        ),
-      )
-      .limit(1);
-    if (existing) return "skipped";
-
-    const [partner] = await db
-      .select({
-        voornaam: schema.partners.voornaam,
-        naam: schema.users.naam,
-        email: schema.users.email,
-      })
-      .from(schema.partners)
-      .leftJoin(schema.users, eq(schema.users.id, schema.partners.userId))
-      .where(eq(schema.partners.id, partnerId))
-      .limit(1);
-
-    if (!partner?.email) {
-      console.error(
-        JSON.stringify({ evt: "partner_notify.no_email", leadId, partnerId }),
-      );
-      return "failed";
-    }
-
-    const firstName =
-      partner.voornaam?.trim() ||
-      partner.naam?.trim().split(/\s+/)[0] ||
-      "partner";
-
-    const mail = await sendPartnerDemoSent(
-      partner.email,
-      firstName,
-      publicDemoUrl,
-      klantBedrijfsnaam,
-    );
-    if (!mail.ok) {
-      console.error(
-        JSON.stringify({
-          evt: "partner_notify.mail_failed",
-          leadId,
-          partnerId,
-          error: mail.error.message,
-        }),
-      );
-      return "failed";
-    }
-
-    await logJourneyEvent(
-      leadId,
-      "partner_notified",
-      `Partner automatisch geïnformeerd: ${partner.email}`,
-      { partnerId },
-    );
-    return "sent";
-  } catch (err) {
-    // Bewust nooit throwen: de klant is al gemaild. Wel loggen zodat het
-    // zichtbaar is en niet stil verdwijnt.
-    console.error(
-      JSON.stringify({
-        evt: "partner_notify.exception",
-        leadId,
-        partnerId,
-        error: err instanceof Error ? err.message : String(err),
-      }),
-    );
-    return "failed";
-  }
 }
 
 /* ---------- Stage handmatig aanpassen ---------- */

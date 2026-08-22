@@ -10,6 +10,10 @@ import { NotificationEmail } from "./templates/notification";
 import { GroeiBerichtEmail } from "./templates/groei-bericht";
 import { PartnerActivatedEmail } from "./templates/partner-activated";
 import { PartnerDemoSentEmail } from "./templates/partner-demo-sent";
+import {
+  PartnerMilestoneEmail,
+  type PartnerMilestone,
+} from "./templates/partner-milestone";
 import { PartnerInviteEmail } from "./templates/partner-invite";
 import { PartnerAddedEmail } from "./templates/partner-added";
 import { MagicLoginEmail } from "./templates/magic-login";
@@ -208,6 +212,53 @@ export async function sendPartnerDemoSent(
       `Bedankt dat je DogWare hebt aanbevolen, dat waardeer ik enorm.\n\n` +
       (demoUrl ? `Bekijk de demo (voorbeeldwebsite): ${demoUrl}\n\n` : "") +
       `Zodra ik een reactie krijg of we een vervolgstap zetten, laat ik het je natuurlijk weten.\n\n` +
+      `Met kwispelende groet,\nHenry van de Bovenkamp\nDogWare\n${branding.phone}`,
+  });
+}
+
+/**
+ * Voortgangsbericht aan de partner ná de demo: voorstel verstuurd, klant
+ * akkoord, overeenkomst getekend.
+ *
+ * Bewust zonder klantlink en zonder bedragen — de enige knop wijst naar de
+ * eigen partneromgeving. Zie de template voor de reden.
+ *
+ * @param companyName alleen meesturen als die is ingevuld — nooit verzinnen.
+ */
+export async function sendPartnerMilestone(
+  to: string,
+  partnerFirstName: string,
+  milestone: PartnerMilestone,
+  companyName?: string,
+): Promise<MailResult> {
+  const onderwerpen: Record<PartnerMilestone, string> = {
+    "voorstel-verstuurd": "Update: het voorstel is verstuurd",
+    "voorstel-akkoord": "Mooi nieuws! Het voorstel is geaccepteerd \u{1F389}",
+    "overeenkomst-getekend": "Het is rond — de overeenkomst is getekend \u{1F58A}\uFE0F",
+  };
+  const kern: Record<PartnerMilestone, string> = {
+    "voorstel-verstuurd":
+      "heeft zojuist het voorstel ontvangen. Nu even afwachten wat ze ervan vinden.",
+    "voorstel-akkoord":
+      "is akkoord met het voorstel. De samenwerkingsovereenkomst staat voor ze klaar om te tekenen.",
+    "overeenkomst-getekend":
+      "heeft de samenwerkingsovereenkomst getekend. Je commissie staat vanaf nu als gereserveerd in je partneromgeving.",
+  };
+  const wie = companyName?.trim() || "De klant die jij aanbracht";
+  return sendMail("partner-milestone", {
+    to,
+    subject: onderwerpen[milestone],
+    react: (
+      <PartnerMilestoneEmail
+        partnerFirstName={partnerFirstName}
+        milestone={milestone}
+        companyName={companyName}
+      />
+    ),
+    text:
+      `Hi ${partnerFirstName},\n\n` +
+      `${wie} ${kern[milestone]}\n\n` +
+      `Je partneromgeving: ${branding.siteUrl}/partner\n\n` +
       `Met kwispelende groet,\nHenry van de Bovenkamp\nDogWare\n${branding.phone}`,
   });
 }

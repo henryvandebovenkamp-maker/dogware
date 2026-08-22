@@ -29,6 +29,7 @@ import {
 } from "@/lib/proposals";
 import { agreementPricing, ensureAgreement, getCurrentAgreement, isSigned } from "@/lib/agreements";
 import { registerDocument } from "@/lib/documents";
+import { notifyPartner } from "@/lib/partner-notify";
 import { createMolliePayment, isMollieConfigured } from "@/lib/mollie";
 import { computeOutstanding, euroFromCents } from "@/lib/money";
 import { newPortalToken, portalUrl, requestFingerprint, resolvePortal } from "@/lib/portal-access";
@@ -267,6 +268,9 @@ export async function sendProposal(
 
   const link = commerce.portalToken ? portalUrl(commerce.portalToken) : undefined;
   const gelukt = await mailAndLog(lead, "proposal-sent", {}, link);
+
+  // Aangebracht door een partner? Die hoort te weten dat zijn aanbreng vordert.
+  await notifyPartner(leadId, "voorstel-verstuurd");
 
   await logActivity({
     actorUserId: ctx.actorId,
@@ -583,6 +587,7 @@ export async function acceptProposal(
   }
 
   await mailAndLog(lead, "proposal-accepted", {}, `${portalUrl(token)}/overeenkomst`);
+  await notifyPartner(lead.id, "voorstel-akkoord");
   revalidatePath(`/traject/${token}`);
   refresh(lead.id);
   return OK();
@@ -743,6 +748,7 @@ export async function signAgreement(token: string, input: SignInput): Promise<Co
 
   const L = pricingLabels(agreementPricing(definitief));
   await mailAndLog(lead, "agreement-signed", { amount: L.deposit }, portalUrl(token));
+  await notifyPartner(lead.id, "overeenkomst-getekend");
 
   revalidatePath(`/traject/${token}`);
   refresh(lead.id);
