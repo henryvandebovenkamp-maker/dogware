@@ -29,6 +29,8 @@ const LEAD = "b9d22bef-c6bd-43eb-a858-6497e750a3ba";
 const LEEG: JourneySnapshot = {
   stage: "demo-verstuurd",
   commerceStatus: "DRAFT",
+  demoVerstuurd: true,
+  demoLinksKlaar: true,
   heeftConcept: false,
   voorstelVerstuurd: false,
   voorstelBekeken: false,
@@ -82,6 +84,33 @@ describe("1. de journey-stappen zijn compleet en consistent", () => {
 });
 
 describe("2. de volgende stap volgt de werkelijkheid, niet de stage", () => {
+  it("begint bij het versturen van het voorbeeld", () => {
+    const n = nextAction(
+      { ...LEEG, stage: "aangevraagd", demoVerstuurd: false, demoLinksKlaar: false },
+      LEAD,
+    );
+    assert.equal(n.cta?.action, "demo-versturen");
+    assert.equal(n.cta?.href, `/admin/leads/${LEAD}#voorbeeld`);
+    assert.equal(n.waitingOn, "admin");
+  });
+
+  it("blijft op versturen staan zolang de mail niet weg is, ook met links", () => {
+    const n = nextAction(
+      { ...LEEG, stage: "voorbereiden", demoVerstuurd: false, demoLinksKlaar: true },
+      LEAD,
+    );
+    assert.equal(n.cta?.action, "demo-versturen");
+    assert.match(n.volgende, /demolink en de inloglink/i);
+  });
+
+  it("stuurt niemand terug naar de demo zodra de klant wil doorgaan", () => {
+    const n = nextAction(
+      { ...LEEG, stage: "demo-akkoord", demoVerstuurd: false, demoLinksKlaar: false },
+      LEAD,
+    );
+    assert.equal(n.cta?.action, "voorstel-maken");
+  });
+
   it("vraagt eerst om 'klant wil doorgaan'", () => {
     const n = nextAction(LEEG, LEAD);
     assert.equal(n.cta?.action, "demo-akkoord");

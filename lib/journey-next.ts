@@ -31,6 +31,7 @@ export type NextAction = {
 };
 
 export type NextActionKey =
+  | "demo-versturen"
   | "demo-akkoord"
   | "voorstel-maken"
   | "voorstel-bewerken"
@@ -46,6 +47,10 @@ export type NextActionKey =
 export type JourneySnapshot = {
   stage: JourneyStage;
   commerceStatus: CommerceStatus | null;
+  /** Is het voorbeeld (demolink + inloglink) al naar de klant gemaild? */
+  demoVerstuurd: boolean;
+  /** Staan beide links klaar? Zonder die twee kan er niets verstuurd worden. */
+  demoLinksKlaar: boolean;
   /** Bestaat er een concept-voorstel dat nog niet verstuurd is? */
   heeftConcept: boolean;
   /** Is er ooit een voorstel verstuurd? */
@@ -166,8 +171,30 @@ export function nextAction(s: JourneySnapshot, leadId: string): NextAction {
     };
   }
 
+  // De demofase — de eerste echte handeling van de beheerder: het voorbeeld
+  // klaarzetten en de twee links (de demolink naar de voorbeeldwebsite en de
+  // inloglink naar het demoportaal) naar de klant mailen. Dit staat bewust ná
+  // "demo-akkoord": wie al heeft vastgelegd dat de klant doorwil, wordt niet
+  // teruggestuurd naar de demo — maar zolang dat niet zo is, is dit de stap.
+  if (!s.demoVerstuurd) {
+    return {
+      situatie: s.demoLinksKlaar
+        ? "De links staan klaar, maar het voorbeeld is nog niet verstuurd."
+        : "De aanvraag is binnen; het voorbeeld is nog niet verstuurd.",
+      volgende: s.demoLinksKlaar
+        ? "Verstuur de demolink en de inloglink naar de klant."
+        : "Zet de voorbeeldwebsite klaar en vul de demolink en de inloglink in.",
+      cta: {
+        label: s.demoLinksKlaar ? "Voorbeeld versturen" : "Voorbeeld klaarzetten",
+        action: "demo-versturen",
+        href: `${base}#voorbeeld`,
+      },
+      waitingOn: "admin",
+    };
+  }
+
   return {
-    situatie: "De demo loopt nog.",
+    situatie: "Het voorbeeld is verstuurd; de klant kijkt rond.",
     volgende: "Zodra de klant aangeeft door te willen, maak je het voorstel.",
     cta: { label: "Klant wil doorgaan", action: "demo-akkoord" },
     waitingOn: "klant",

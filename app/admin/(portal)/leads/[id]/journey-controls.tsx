@@ -44,8 +44,9 @@ function CopyButton({ value, label }: { value: string; label: string }) {
 }
 
 /**
- * Extreem eenvoudig "Voorbeeld versturen"-scherm:
- * drie velden, kopieerknoppen en één verstuurknop. Meer niet.
+ * Extreem eenvoudig "Voorbeeld versturen"-scherm: de twee links die de klant
+ * krijgt (de demolink naar de voorbeeldwebsite en de inloglink naar het
+ * demoportaal), het mailadres waarmee ze inlogt, en één verstuurknop.
  */
 export function DemoPanel({
   leadId,
@@ -70,17 +71,39 @@ export function DemoPanel({
   const [p, setP] = useState(portaal);
   const [e, setE] = useState(loginEmail || klantEmail);
 
+  // Beide links zijn verplicht: de mail draagt ze allebei.
+  const compleet = w.trim() !== "" && p.trim() !== "" && e.trim() !== "";
+
   return (
     <div className="space-y-4">
       <form action={saveAction} className="space-y-3">
         <input type="hidden" name="leadId" value={leadId} />
-        <Field label="Voorbeeldwebsite URL" name="website" value={w} onChange={setW} placeholder="https://voorbeeld.example.nl" />
-        <Field label="Demoportaal URL" name="portaal" value={p} onChange={setP} placeholder="https://portaal.example.nl" />
-        <Field label="Login e-mailadres" name="loginEmail" value={e} onChange={setE} placeholder={klantEmail} type="email" />
+        <Field
+          label="Demolink — de voorbeeldwebsite"
+          name="website"
+          value={w}
+          onChange={setW}
+          placeholder="https://voorbeeld.example.nl"
+        />
+        <Field
+          label="Inloglink — het demoportaal"
+          name="portaal"
+          value={p}
+          onChange={setP}
+          placeholder="https://portaal.example.nl"
+        />
+        <Field
+          label="Login e-mailadres"
+          name="loginEmail"
+          value={e}
+          onChange={setE}
+          placeholder={klantEmail}
+          type="email"
+        />
 
         <div className="flex flex-wrap gap-2">
-          <CopyButton value={w} label="Kopieer website-link" />
-          <CopyButton value={p} label="Kopieer portaal-link" />
+          <CopyButton value={w} label="Kopieer demolink" />
+          <CopyButton value={p} label="Kopieer inloglink" />
           <CopyButton value={e} label="Kopieer login" />
         </div>
 
@@ -99,12 +122,26 @@ export function DemoPanel({
         <input type="hidden" name="website" value={w} />
         <input type="hidden" name="portaal" value={p} />
         <input type="hidden" name="loginEmail" value={e} />
+        <p className="mb-3 text-[12px] leading-relaxed text-ink-500">
+          De klant krijgt één mail met beide links: de demolink naar haar
+          voorbeeldwebsite en de inloglink naar het demoportaal. Inloggen gaat
+          zonder wachtwoord, met het adres hierboven.
+        </p>
+        {!compleet && (
+          <p className="mb-3 text-[12px] font-semibold text-brand-600">
+            Vul eerst allebei de links in — zonder die twee gaat de mail niet weg.
+          </p>
+        )}
         <button
           type="submit"
-          disabled={sending}
+          disabled={sending || !compleet}
           className="w-full rounded-full bg-brand px-5 py-3 text-[14px] font-bold text-white shadow-glow transition-all hover:-translate-y-0.5 hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:translate-y-0"
         >
-          {sending ? "Versturen…" : alSent ? "Voorbeeld opnieuw versturen" : "Verstuur e-mail"}
+          {sending
+            ? "Versturen…"
+            : alSent
+              ? "Demo opnieuw versturen"
+              : "Demo versturen (demolink + inloglink)"}
         </button>
         <Feedback state={sendState} />
       </form>

@@ -75,6 +75,13 @@ export default async function LeadsPage() {
                     </span>
                   </span>
                   <span className="flex items-center gap-2.5">
+                    {/* Het voorbeeld is de eerste stap van elke aanvraag; zolang
+                        het niet verstuurd is, hoort dat hier te staan. */}
+                    {!lead.demoSentAt && lead.status !== "afgevallen" && (
+                      <span className="rounded-full bg-brand-100 px-3 py-1 text-xs font-bold text-brand-600">
+                        Demo versturen
+                      </span>
+                    )}
                     {lead.diensten.slice(0, 2).map((d) => (
                       <span
                         key={d}

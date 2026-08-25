@@ -141,9 +141,14 @@ export default async function LeadDetailPage({
     (p) => p.type === "FINAL_PAYMENT" && p.status === "PAID",
   );
 
+  const demoVerstuurd = Boolean(lead.demoSentAt);
+  const demoLinksKlaar = Boolean(lead.demoDomain?.trim() && lead.demoPortalUrl?.trim());
+
   const snapshot: JourneySnapshot = {
     stage: lead.stage,
     commerceStatus: commerce.status,
+    demoVerstuurd,
+    demoLinksKlaar,
     heeftConcept: Boolean(draft),
     voorstelVerstuurd: proposals.some((p) => p.sentAt),
     voorstelBekeken: proposals.some((p) => p.firstViewedAt),
@@ -199,6 +204,36 @@ export default async function LeadDetailPage({
       <div className="mt-4">
         <NextActionPanel leadId={id} next={volgende} />
       </div>
+
+      {/* Het voorbeeld: demolink + inloglink. Staat bewust hoog — dit is de
+          eerste stap van elke aanvraag en blijft daarna bereikbaar om opnieuw
+          te versturen. */}
+      <section id="voorbeeld" className="mt-4 scroll-mt-6">
+        <div className="rounded-2xl bg-white p-5 shadow-soft ring-1 ring-ink/5">
+          <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="text-[13px] font-bold uppercase tracking-wide text-ink-300">
+              Voorbeeld versturen
+            </h2>
+            <p className="text-[12px] font-semibold text-ink-300">
+              {lead.demoSentAt
+                ? `Verstuurd op ${lead.demoSentAt.toLocaleDateString("nl-NL", {
+                    day: "numeric",
+                    month: "long",
+                    year: "numeric",
+                  })}`
+                : "Nog niet verstuurd"}
+            </p>
+          </div>
+          <DemoPanel
+            leadId={lead.id}
+            website={lead.demoDomain ?? ""}
+            portaal={lead.demoPortalUrl ?? ""}
+            loginEmail={lead.demoLoginEmail ?? ""}
+            klantEmail={lead.email}
+            alSent={demoVerstuurd}
+          />
+        </div>
+      </section>
 
       {!isMollieConfigured() && (
         <p className="mt-3 rounded-xl bg-brand-50 px-4 py-2.5 text-[12.5px] font-semibold text-brand-600 ring-1 ring-brand/10">
@@ -423,23 +458,6 @@ export default async function LeadDetailPage({
               bestaandePartnerId={eigenPartner?.id ?? null}
             />
           </div>
-        </div>
-      </section>
-
-      {/* Voorbeeldwebsite (demofase) */}
-      <section className="mt-8">
-        <h2 className="mb-3 text-[13px] font-bold uppercase tracking-wide text-ink-300">
-          Voorbeeldwebsite
-        </h2>
-        <div className="rounded-2xl bg-white p-5 shadow-soft ring-1 ring-ink/5">
-          <DemoPanel
-            leadId={lead.id}
-            website={lead.demoDomain ?? ""}
-            portaal={lead.demoPortalUrl ?? ""}
-            loginEmail={lead.demoLoginEmail ?? ""}
-            klantEmail={lead.email}
-            alSent={Boolean(lead.demoSentAt)}
-          />
         </div>
       </section>
 
