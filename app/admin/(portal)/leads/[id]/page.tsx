@@ -22,7 +22,6 @@ import { listDocuments } from "@/lib/documents";
 import { computeOutstanding, euroFromCents } from "@/lib/money";
 import { isMollieConfigured } from "@/lib/mollie";
 import { portalUrl } from "@/lib/portal-access";
-import { bouwprompt } from "@/lib/bouwprompt";
 import { entityReady } from "@/lib/legal-entity";
 import { findPartnerByUserId, findUserByEmail } from "@/lib/partner-activation";
 import { JourneyBar } from "@/components/commerce/journey-bar";
@@ -238,7 +237,7 @@ export default async function LeadDetailPage({
           {/* De opdracht voor het klantproject. Levert alleen tekst op — het
               bouwen zelf gebeurt in dat aparte project, niet hier. */}
           <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-cream-100 pt-4">
-            <BouwpromptKnop bedrijfsnaam={lead.bedrijfsnaam} prompt={bouwprompt(lead)} />
+            <BouwpromptKnop leadId={lead.id} bedrijfsnaam={lead.bedrijfsnaam} />
             <p className="text-[12px] text-ink-300">
               De opdracht voor Claude in het nieuwe klantproject, gevuld met deze aanvraag.
             </p>

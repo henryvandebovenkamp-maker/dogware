@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { LEAD_STATUSES, type LeadStatus } from "@/lib/db/schema";
 import { getAdminActor } from "@/lib/admin-auth";
+import { bouwprompt } from "@/lib/bouwprompt";
 
 export type UpdateLeadState = {
   status: "idle" | "success" | "error";
@@ -47,4 +48,33 @@ export async function updateLead(
   revalidatePath(`/admin/leads/${id}`);
   revalidatePath("/admin/leads");
   return { status: "success", message: "Opgeslagen." };
+}
+
+/**
+ * De bouwprompt voor deze aanvraag, op het moment dat je erom vraagt.
+ *
+ * Bewust een action en geen prop op de pagina. Ten eerste is de prompt lang;
+ * die bij elke paginaweergave meesturen is zonde voor iets waar je zelden op
+ * klikt. Ten tweede — en dat is de echte reden — leest hij zo de aanvraag
+ * opnieuw. Pas je vanmiddag de plaats aan of voeg je een dienst toe, dan zegt
+ * de prompt dat vanmiddag ook. Er wordt niets opgeslagen en niets bevroren.
+ */
+export async function haalBouwprompt(
+  leadId: string,
+): Promise<{ ok: true; prompt: string } | { ok: false; message: string }> {
+  const actor = await getAdminActor();
+  if (!actor) return { ok: false, message: "Geen toegang." };
+
+  const db = getDb();
+  if (!db) return { ok: false, message: "Database niet geconfigureerd." };
+
+  const [lead] = await db
+    .select()
+    .from(schema.leads)
+    .where(eq(schema.leads.id, leadId))
+    .limit(1);
+
+  if (!lead) return { ok: false, message: "Aanvraag niet gevonden." };
+
+  return { ok: true, prompt: bouwprompt(lead) };
 }
