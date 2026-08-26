@@ -22,6 +22,7 @@ import { listDocuments } from "@/lib/documents";
 import { computeOutstanding, euroFromCents } from "@/lib/money";
 import { isMollieConfigured } from "@/lib/mollie";
 import { portalUrl } from "@/lib/portal-access";
+import { bouwprompt } from "@/lib/bouwprompt";
 import { entityReady } from "@/lib/legal-entity";
 import { findPartnerByUserId, findUserByEmail } from "@/lib/partner-activation";
 import { JourneyBar } from "@/components/commerce/journey-bar";
@@ -31,6 +32,7 @@ import { LeadAdminForm } from "./lead-admin-form";
 import { ReassignForm } from "./reassign-form";
 import { StageControl, DemoPanel } from "./journey-controls";
 import { PartnerActivatePanel } from "./partner-activate";
+import { BouwpromptKnop } from "./bouwprompt-knop";
 
 export const metadata: Metadata = {
   title: "Aanvraag",
@@ -232,6 +234,15 @@ export default async function LeadDetailPage({
             klantEmail={lead.email}
             alSent={demoVerstuurd}
           />
+
+          {/* De opdracht voor het klantproject. Levert alleen tekst op — het
+              bouwen zelf gebeurt in dat aparte project, niet hier. */}
+          <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-cream-100 pt-4">
+            <BouwpromptKnop bedrijfsnaam={lead.bedrijfsnaam} prompt={bouwprompt(lead)} />
+            <p className="text-[12px] text-ink-300">
+              De opdracht voor Claude in het nieuwe klantproject, gevuld met deze aanvraag.
+            </p>
+          </div>
         </div>
       </section>
 
