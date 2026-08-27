@@ -206,23 +206,35 @@ export default async function LeadDetailPage({
         <NextActionPanel leadId={id} next={volgende} />
       </div>
 
-      {/* Het voorbeeld: demolink + inloglink. Staat bewust hoog — dit is de
-          eerste stap van elke aanvraag en blijft daarna bereikbaar om opnieuw
-          te versturen. */}
+      {/* De demo: demolink + inloglink. Staat bewust hoog — dit is de eerste
+          stap van elke aanvraag en blijft daarna bereikbaar om de mail te
+          bekijken, te testen en opnieuw te versturen. */}
       <section id="voorbeeld" className="mt-4 scroll-mt-6">
         <div className="rounded-2xl bg-white p-5 shadow-soft ring-1 ring-ink/5">
           <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
             <h2 className="text-[13px] font-bold uppercase tracking-wide text-ink-300">
-              Voorbeeld versturen
+              Demo versturen
             </h2>
-            <p className="text-[12px] font-semibold text-ink-300">
+            <p
+              className={`text-[12px] font-semibold ${
+                lead.demoSentAt
+                  ? "text-ink-300"
+                  : demoLinksKlaar
+                    ? "text-sage-600"
+                    : "text-ink-300"
+              }`}
+            >
               {lead.demoSentAt
                 ? `Verstuurd op ${lead.demoSentAt.toLocaleDateString("nl-NL", {
                     day: "numeric",
                     month: "long",
                     year: "numeric",
-                  })}`
-                : "Nog niet verstuurd"}
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })} aan ${lead.demoLoginEmail ?? lead.email}`
+                : demoLinksKlaar
+                  ? "Demo klaar om te versturen"
+                  : "Nog niet verstuurd"}
             </p>
           </div>
           <DemoPanel

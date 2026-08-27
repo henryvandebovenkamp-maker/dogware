@@ -1,4 +1,5 @@
 import "server-only";
+import type { ReactNode } from "react";
 import { render } from "@react-email/render";
 import { Resend } from "resend";
 import type { MailError, MailOptions, MailResult, MailType } from "./types";
@@ -50,6 +51,25 @@ export function isEmailSandbox(): boolean {
 /** Is de mailservice volledig geconfigureerd? */
 export function isEmailConfigured(): boolean {
   return getConfig() !== null;
+}
+
+/**
+ * Rendert een React-Email-template naar HTML mét de actuele logo-URL.
+ *
+ * De Super Admin kan een eigen e-maillogo instellen. Die override zit niet in
+ * de templates zelf (dat zou elke template een databasecontext geven), maar
+ * wordt hier in de gerenderde HTML omgewisseld. Zowel het versturen als de
+ * preview in de admin gaat hier doorheen, zodat een preview per definitie laat
+ * zien wat de ontvanger krijgt.
+ */
+export async function renderMailHtml(react: ReactNode): Promise<string> {
+  const html = await render(react);
+  const emailLogoUrl = await getEmailLogoUrl();
+  const defaultLogo = defaultEmailLogoUrl();
+  if (emailLogoUrl && emailLogoUrl !== defaultLogo) {
+    return html.split(defaultLogo).join(emailLogoUrl);
+  }
+  return html;
 }
 
 function validate(options: MailOptions): MailError | null {
@@ -132,10 +152,8 @@ export async function sendMail(
   let htmlToSend = options.html;
   if (options.react) {
     const emailLogoUrl = await getEmailLogoUrl();
-    const defaultLogo = defaultEmailLogoUrl();
-    if (emailLogoUrl && emailLogoUrl !== defaultLogo) {
-      const rendered = await render(options.react);
-      htmlToSend = rendered.split(defaultLogo).join(emailLogoUrl);
+    if (emailLogoUrl && emailLogoUrl !== defaultEmailLogoUrl()) {
+      htmlToSend = await renderMailHtml(options.react);
       reactToSend = undefined; // niet dubbel: óf react óf html
     }
   }

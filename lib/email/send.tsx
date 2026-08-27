@@ -1,5 +1,5 @@
 import "server-only";
-import { sendMail } from "./service";
+import { renderMailHtml, sendMail } from "./service";
 import type { MailResult } from "./types";
 import type { IntakeData } from "@/lib/intake";
 import { DemoConfirmationEmail } from "./templates/demo-confirmation";
@@ -17,7 +17,12 @@ import {
 import { PartnerInviteEmail } from "./templates/partner-invite";
 import { PartnerAddedEmail } from "./templates/partner-added";
 import { MagicLoginEmail } from "./templates/magic-login";
-import { DemoReadyEmail } from "./templates/demo-ready";
+import {
+  DemoReadyEmail,
+  demoReadySubject,
+  DEMO_READY_TEMPLATE_VERSION,
+  type DemoReadyContent,
+} from "./templates/demo-ready";
 import { CommerceEmail, type CommerceMailType } from "./templates/commerce";
 import { branding } from "@/lib/branding";
 import { WelcomeEmail } from "./templates/welcome";
@@ -286,51 +291,121 @@ export async function sendMagicLogin(
   });
 }
 
-/** Warme mail: de voorbeeldwebsite staat klaar (met passwordless magic login). */
+/* ---------- "Jouw persoonlijke DogWare-demo staat klaar" ---------- */
+
+export type { DemoReadyContent };
+export { DEMO_READY_TEMPLATE_VERSION, demoReadySubject };
+
 /**
- * Persoonlijk eerste voorbeeld. Alle inhoud komt uit de aanvraag:
- * @param firstName    voornaam uit de aanvraag
- * @param portaalUrl   link naar het demoportaal (login met het bekende mailadres)
- * @param demoUrl      link naar de voorbeeldwebsite (optioneel)
- * @param modules      door de klant geselecteerde onderdelen (leesbare labels)
- * @param bedrijfsnaam alleen meesturen als die is ingevuld — nooit verzinnen
+ * De platte-tekstversie van de demo-mail.
+ *
+ * Niet optioneel: een mail die alleen uit HTML bestaat is een spamsignaal, en
+ * sommige mailclients tonen niets anders. Hij volgt dezelfde volgorde als de
+ * HTML, met dezelfde links — zodat een klant in tekstweergave niets mist.
+ */
+/** Nette Nederlandse opsomming met kleine letter, gelijk aan de HTML-versie. */
+function nlOpsomming(items: string[]): string {
+  const laag = items.map((i) =>
+    i === i.toUpperCase() ? i : i.charAt(0).toLowerCase() + i.slice(1),
+  );
+  if (laag.length <= 1) return laag[0] ?? "";
+  return `${laag.slice(0, -1).join(", ")} en ${laag[laag.length - 1]}`;
+}
+
+function demoReadyText(data: DemoReadyContent): string {
+  const naam = data.firstName?.trim();
+  const bedrijf = data.bedrijfsnaam?.trim();
+  const login = data.loginEmail?.trim();
+  const onderdelen = [...(data.diensten ?? []), ...(data.functies ?? [])]
+    .map((m) => m.trim())
+    .filter(Boolean);
+
+  return [
+    naam ? `Hoi ${naam},` : "Hoi,",
+    "",
+    "Ik ben alvast voor je aan de slag gegaan: je persoonlijke DogWare-demo staat klaar.",
+    "",
+    bedrijf
+      ? `Op basis van wat ik van ${bedrijf} weet, heb ik een eerste versie gemaakt van hoe jouw website en jouw omgeving eruit zouden kunnen zien.`
+      : "Op basis van je aanvraag heb ik een eerste versie gemaakt van hoe jouw website en jouw omgeving eruit zouden kunnen zien.",
+    "",
+    data.demoUrl ? `Bekijk jouw demo: ${data.demoUrl}` : "",
+    "",
+    "Zie het vooral als een eerste indruk, niet als een definitief ontwerp. De uitstraling, de kleuren, de foto's, de teksten, de pagina's — het staat allemaal nog open. Word je enthousiast van de richting, dan kijk ik graag samen met je hoe we het helemaal naar jouw wens maken.",
+    "",
+    data.portaalUrl
+      ? [
+          "ER ZIT MEER ACHTER DAN EEN WEBSITE",
+          `Je kijkt niet alleen naar een website. In de demo kun je ook ervaren hoe DogWare achter die website${bedrijf ? ` voor ${bedrijf}` : ""} kan werken.`,
+          "",
+          `Log in in jouw demoportaal: ${data.portaalUrl}`,
+          login
+            ? `Log in met ${login} — hetzelfde adres als in je aanvraag. Je krijgt een inlogmail van me, dus je hoeft geen wachtwoord te onthouden.`
+            : "Log in met het e-mailadres waarmee je de demo hebt aangevraagd. Je krijgt een inlogmail, dus je hoeft geen wachtwoord te onthouden.",
+          onderdelen.length
+            ? `Zo krijg je een beeld van hoe ${nlOpsomming(onderdelen)} straks vanuit één omgeving kunnen samenwerken.`
+            : "",
+          "",
+        ].join("\n")
+      : "",
+    "MIS JE IETS?",
+    `Dat is juist waardevolle feedback. DogWare wordt voor ${bedrijf || "jouw bedrijf"} ingericht: niet alleen de uitstraling kan anders, ook de functionaliteit. Is er iets wat je nodig hebt om makkelijker te werken, dan hoor ik dat graag. Meestal kunnen we het gewoon bouwen.`,
+    "",
+    "Ik ben vooral heel benieuwd wat je ervan vindt. Wat spreekt je aan? Wat zou je anders willen? En mis je nog iets waarvan je denkt: als dát erin zou zitten, werd het pas echt interessant voor mij?",
+    "",
+    "Je mag gewoon op deze mail reageren. Kijk je liever even samen? Bel of app me, dan plannen we een moment en lopen we de demo rustig samen door.",
+    branding.phone,
+    "",
+    "Kwispelende groet,",
+    "",
+    "Henry van de Bovenkamp",
+    "DogWare",
+  ]
+    .filter((regel, i, alle) => !(regel === "" && alle[i - 1] === ""))
+    .join("\n");
+}
+
+/**
+ * De demo-mail aan de potentiële klant.
+ *
+ * Alle inhoud komt uit de aanvraag (zie `DemoReadyContent`) — deze functie
+ * verzint niets en vult niets aan. Ontbreekt de demo- of portaal-URL, dan
+ * vervalt dat blok in de mail; de admin-actie hoort dat vóór verzending al af
+ * te vangen, zodat een klant nooit een halve mail krijgt.
+ *
+ * @param opts.test  Testmail: het onderwerp krijgt "TEST — " ervoor. De
+ *                   aanroeper is verantwoordelijk voor het níét bijwerken van
+ *                   de journey; deze functie raakt geen enkele status aan.
  */
 export async function sendDemoReady(
   to: string,
-  firstName: string,
-  portaalUrl: string,
-  demoUrl?: string,
-  modules: string[] = [],
-  bedrijfsnaam?: string,
+  data: DemoReadyContent,
+  opts: { test?: boolean } = {},
 ): Promise<MailResult> {
-  const gekozen = modules.map((m) => m.trim()).filter(Boolean);
   return sendMail("demo-ready", {
     to,
-    subject: `Je persoonlijke DogWare-voorbeeld staat klaar, ${firstName}`,
-    react: (
-      <DemoReadyEmail
-        firstName={firstName}
-        bedrijfsnaam={bedrijfsnaam}
-        modules={gekozen}
-        demoUrl={demoUrl}
-        portaalUrl={portaalUrl}
-      />
-    ),
-    text:
-      `Hi ${firstName},\n\n` +
-      `Bedankt voor je aanvraag! Ik ben meteen even voor je aan de slag gegaan.\n\n` +
-      (gekozen.length
-        ? `Ik zag dat je vooral interesse hebt in ${gekozen.join(", ")}, dus daar heb ik in dit eerste voorbeeld alvast extra aandacht aan besteed. Zo krijg je direct een goed beeld van wat er allemaal mogelijk is.\n\n`
-        : `Ik heb goed naar je aanvraag gekeken en daar in dit eerste voorbeeld alvast extra aandacht aan besteed. Zo krijg je direct een goed beeld van wat er allemaal mogelijk is.\n\n`) +
-      (demoUrl ? `Bekijk jouw voorbeeldwebsite: ${demoUrl}\n\n` : "") +
-      `Ben je ook benieuwd hoe de beheeromgeving werkt? Log in met hetzelfde e-mailadres waarmee je de demo hebt aangevraagd. Je ontvangt automatisch een e-mail waarmee je veilig kunt inloggen. Simpel en zonder wachtwoord.\n` +
-      `Inloggen in jouw demo: ${portaalUrl}\n\n` +
-      `Kijk er rustig even doorheen. Grote kans dat je meteen ideeën of vragen krijgt.\n\n` +
-      `Vind je het leuk om alles even samen door te nemen? Bel me gerust of stuur even een appje. In ongeveer 15 minuten laat ik je zien hoe alles werkt en kun je al je vragen stellen.\n` +
-      `06-83853373\n\n` +
-      `Veel kijkplezier!\n\n` +
-      `Met vriendelijke groet,\nHenry van de Bovenkamp\nDogWare`,
+    subject: demoReadySubject({ test: opts.test }),
+    react: <DemoReadyEmail {...data} />,
+    text: opts.test
+      ? `TEST — deze mail is een testverzending.\n\n${demoReadyText(data)}`
+      : demoReadyText(data),
   });
+}
+
+/**
+ * De demo-mail renderen zonder hem te versturen — voor de preview in de admin.
+ * Gebruikt exact dezelfde template, hetzelfde onderwerp en dezelfde logo-logica
+ * als het echte versturen, zodat een preview geen aparte waarheid wordt.
+ */
+export async function renderDemoReady(
+  data: DemoReadyContent,
+  opts: { test?: boolean } = {},
+): Promise<{ subject: string; html: string; text: string }> {
+  return {
+    subject: demoReadySubject({ test: opts.test }),
+    html: await renderMailHtml(<DemoReadyEmail {...data} />),
+    text: demoReadyText(data),
+  };
 }
 
 /** Commerciële journey-mails (voorstel, betalingen, abonnement). */
