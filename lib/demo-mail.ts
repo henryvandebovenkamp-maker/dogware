@@ -1,6 +1,7 @@
 import "server-only";
 import type { Lead } from "@/lib/db/schema";
 import type { DemoReadyContent } from "@/lib/email/send";
+import { voornaamUitAanvraag } from "@/lib/voornaam";
 
 /**
  * De inhoud van de demo-mail, afgeleid uit één aanvraag.
@@ -57,7 +58,7 @@ export function demoMailOpzet(
 
   return {
     data: {
-      firstName: lead.naam.trim().split(/\s+/)[0] || undefined,
+      firstName: voornaamUitAanvraag(lead.naam, lead.bedrijfsnaam),
       bedrijfsnaam: lead.bedrijfsnaam?.trim() || undefined,
       demoUrl: website || undefined,
       portaalUrl: portaal || undefined,
