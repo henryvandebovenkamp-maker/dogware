@@ -3,6 +3,7 @@ import { EmailLayout, Signature, emailColors, paragraph, strong } from "./base";
 import { legalFooterLine } from "@/lib/legal-entity";
 
 export type CommerceMailType =
+  | "demo-reminder"
   | "proposal-sent"
   | "proposal-reminder"
   | "proposal-accepted"
@@ -32,6 +33,14 @@ const COPY: Record<
       "Bekijk het rustig in je eigen omgeving. Klopt alles? Dan kun je er met één klik akkoord op geven.",
     ],
     cta: "Bekijk je voorstel",
+  },
+  "demo-reminder": {
+    heading: (n) => `Heb je al even kunnen kijken, ${n}?`,
+    body: () => [
+      "Een tijdje terug heb ik je een voorbeeld van jouw eigen DogWare-omgeving gestuurd. Ik ben benieuwd wat je ervan vond — en of het een beetje aansluit bij hoe jij werkt.",
+      "Geen haast en geen verplichting. Loop je ergens tegenaan, of wil je iets aangepast zien? Antwoord gerust op deze mail of bel me even, dan kijken we er samen naar.",
+    ],
+    cta: "Bekijk je voorbeeld",
   },
   "proposal-reminder": {
     heading: (n) => `Even een herinnering, ${n}`,
@@ -212,6 +221,7 @@ export function CommerceEmail({
 /** Afsluiting afgestemd op de toon per mailtype. */
 const SIGN: Record<CommerceMailType, { groet: string; regel?: string }> = {
   "proposal-sent": { groet: "Hartelijke groet,", regel: "Ik denk graag met je mee." },
+  "demo-reminder": { groet: "Hartelijke groet," },
   "proposal-reminder": { groet: "Hartelijke groet," },
   "proposal-accepted": { groet: "Hartelijke groet,", regel: "Wat fijn dat we samen gaan bouwen." },
   "agreement-ready": { groet: "Met vriendelijke groet," },

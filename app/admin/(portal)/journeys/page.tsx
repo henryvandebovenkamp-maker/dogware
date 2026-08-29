@@ -3,6 +3,7 @@ import { count, desc, eq, isNotNull, sql } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { JOURNEY_STAGES, type JourneyStage } from "@/lib/db/schema";
 import { STAGE_META } from "@/lib/journey";
+import { bakjeVanStage } from "@/lib/aanvragen";
 import { LeadStatusBadge } from "../leads/status-badge";
 
 export const metadata = { title: "Demo Journeys" };
@@ -55,7 +56,11 @@ export default async function JourneysPage() {
     <div className="mx-auto max-w-5xl">
       <h1 className="text-2xl font-extrabold tracking-tight text-ink">Demo Journeys</h1>
       <p className="mt-1 text-sm text-ink-500">
-        Het centrale verkoopproces — waar bevindt elke aanvraag zich?
+        De cijfers achter het verkoopproces. Het dagelijkse werk staat bij{" "}
+        <Link href="/admin/leads" className="font-semibold text-brand hover:text-brand-600">
+          Aanvragen
+        </Link>
+        .
       </p>
 
       {/* Kerncijfers */}
@@ -73,7 +78,7 @@ export default async function JourneysPage() {
           {JOURNEY_STAGES.map((stage) => (
             <Link
               key={stage}
-              href={`/admin/journeys/${stage}`}
+              href={`/admin/leads?bakje=${bakjeVanStage(stage)}`}
               className="rounded-2xl bg-white p-4 shadow-soft ring-1 ring-ink/5 transition hover:-translate-y-0.5 hover:shadow-lift"
             >
               <p className="text-2xl font-extrabold text-ink">{countBy.get(stage) ?? 0}</p>

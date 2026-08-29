@@ -6,6 +6,7 @@ import { ArrowLeft, ExternalLink } from "lucide-react";
 import { getDb, schema } from "@/lib/db";
 import { STAGE_META } from "@/lib/journey-stages";
 import { getTimeline } from "@/lib/journey";
+import { leidAf } from "@/lib/aanvragen";
 import { nextAction, type JourneySnapshot } from "@/lib/journey-next";
 import {
   ensureCommerce,
@@ -26,6 +27,7 @@ import { entityReady } from "@/lib/legal-entity";
 import { findPartnerByUserId, findUserByEmail } from "@/lib/partner-activation";
 import { JourneyBar } from "@/components/commerce/journey-bar";
 import { NextActionPanel } from "@/components/commerce/next-action";
+import { OpvolgenPanel } from "@/components/commerce/opvolgen-panel";
 import { CommerceSecties } from "@/components/commerce/admin-panel";
 import { LeadAdminForm } from "./lead-admin-form";
 import { ReassignForm } from "./reassign-form";
@@ -164,6 +166,21 @@ export default async function LeadDetailPage({
   };
   const volgende = nextAction(snapshot, id);
 
+  /**
+   * Of deze aanvraag stilligt. Het laatste klantcontact komt uit de tijdlijn
+   * die hierboven toch al is geladen — geen extra query. Alleen gebeurtenissen
+   * van de klant tellen: de demomail zelf logt als systeem, en een
+   * statuscorrectie door de beheerder is geen reactie.
+   */
+  const laatsteContactAt =
+    [...events]
+      .reverse()
+      .find((e) => e.actor === "klant" || e.kind === "internal_note")?.createdAt ?? null;
+  const afleiding = leidAf(
+    { id, stage: lead.stage, status: lead.status, demoSentAt: lead.demoSentAt, laatsteContactAt, snapshot },
+    new Date(),
+  );
+
   const persoon = await findUserByEmail(lead.email);
   const eigenPartner = persoon ? await findPartnerByUserId(persoon.id) : null;
   const klantLink = commerce.portalToken ? portalUrl(commerce.portalToken) : null;
@@ -200,6 +217,19 @@ export default async function LeadDetailPage({
       <div className="mt-6 rounded-2xl bg-white p-5 shadow-soft ring-1 ring-ink/5">
         <JourneyBar current={lead.stage} />
       </div>
+
+      {/* Ligt deze aanvraag stil? Dan gaat dat vóór de gewone volgende stap. */}
+      {afleiding.bakje === "opvolgen" && (
+        <div className="mt-4">
+          <OpvolgenPanel
+            leadId={id}
+            reden={afleiding.reden}
+            telefoon={lead.telefoon}
+            email={lead.email}
+            naam={lead.naam}
+          />
+        </div>
+      )}
 
       {/* Wat moet ik nu doen? */}
       <div className="mt-4">

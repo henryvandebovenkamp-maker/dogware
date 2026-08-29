@@ -465,6 +465,9 @@ export async function sendCommerceMail(
   ctaUrl?: string,
 ): Promise<MailResult> {
   const subjects: Record<CommerceMailType, string> = {
+    // Bewust een vraag en geen aankondiging: dit is de eerste keer dat we
+    // iemand aanstoten die nog niets van zich heeft laten horen.
+    "demo-reminder": "Heb je je DogWare-voorbeeld al kunnen bekijken?",
     "proposal-sent": "Je persoonlijke voorstel van DogWare",
     "proposal-reminder": "Je voorstel staat nog voor je klaar",
     "proposal-accepted": "Je akkoord is binnen — nu de overeenkomst",

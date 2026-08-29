@@ -303,6 +303,7 @@ export async function sendReminder(
   const outstanding = computeOutstanding(snap.config, await paidTotal(commerce.id));
 
   const map: Record<string, { type: Parameters<typeof mailAndLog>[1]; vars: { amount?: string } }> = {
+    demo: { type: "demo-reminder", vars: {} },
     voorstel: { type: "proposal-reminder", vars: {} },
     overeenkomst: { type: "agreement-reminder", vars: {} },
     aanbetaling: { type: "deposit-reminder", vars: { amount: L.deposit } },
@@ -311,12 +312,19 @@ export async function sendReminder(
   const keuze = map[soort];
   if (!keuze) return FOUT("Onbekende herinnering.");
 
-  const gelukt = await mailAndLog(
-    lead,
-    keuze.type,
-    keuze.vars,
-    soort === "overeenkomst" ? (link ? `${link}/overeenkomst` : undefined) : link,
-  );
+  // Waar de knop in de mail heen wijst. Bij een demo-herinnering is dat het
+  // voorbeeld zelf — daar gaat de vraag over. Zonder demolink valt hij terug
+  // op het portaal, want een mail zonder bestemming heeft geen zin.
+  const bestemming =
+    soort === "demo"
+      ? (lead.demoDomain?.trim() || lead.demoPortalUrl?.trim() || link)
+      : soort === "overeenkomst"
+        ? link
+          ? `${link}/overeenkomst`
+          : undefined
+        : link;
+
+  const gelukt = await mailAndLog(lead, keuze.type, keuze.vars, bestemming);
   refresh(leadId);
   return gelukt ? OK("Herinnering verstuurd.") : FOUT("De mail kon niet worden verzonden.");
 }

@@ -207,6 +207,15 @@ export function stagesVanBakje(bakje: Bakje): JourneyStage[] {
 }
 
 /**
+ * In welk bakje een stage valt. Let op: dit is de indeling op papier. Of een
+ * aanvraag daadwerkelijk in "opvolgen" belandt hangt af van stilte en volgt uit
+ * `leidAf`, niet uit de stage alleen.
+ */
+export function bakjeVanStage(stage: JourneyStage): Bakje {
+  return BAKJE_VOOR_STAGE[stage];
+}
+
+/**
  * De volgorde van "Actie nodig", hoogste eerst.
  *
  * Opvolging gaat vóór al het andere: dat zijn de aanvragen die stilvallen als
