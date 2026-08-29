@@ -31,6 +31,15 @@ export type Aanvraag = {
   afleiding: AanvraagAfleiding;
   /** Laatste keer dat de klant zelf iets deed. */
   laatsteContactAt: Date | null;
+  /**
+   * Het commerciële dossier, of null als dat er nog niet is. De klantenpagina
+   * leest hieruit het maandbedrag en de opleverdata; de aanvragenlijst niet.
+   */
+  commerce: {
+    maandbedragCenten: number;
+    opleveringKlaarAt: Date | null;
+    liveAt: Date | null;
+  } | null;
 };
 
 /** Gebeurtenissen die tellen als "de klant heeft van zich laten horen". */
@@ -144,6 +153,13 @@ export async function laadAanvragen(nu: Date = new Date()): Promise<Aanvraag[] |
     return {
       lead,
       laatsteContactAt,
+      commerce: commerce
+        ? {
+            maandbedragCenten: commerce.monthlyCents,
+            opleveringKlaarAt: commerce.deliveryReadyAt,
+            liveAt: commerce.liveAt,
+          }
+        : null,
       afleiding: leidAf(
         {
           id: lead.id,
@@ -157,6 +173,11 @@ export async function laadAanvragen(nu: Date = new Date()): Promise<Aanvraag[] |
       ),
     };
   });
+}
+
+/** Wie er inmiddels klant is: de eerste betaling is binnen. */
+export function alleenKlanten(aanvragen: readonly Aanvraag[]): Aanvraag[] {
+  return aanvragen.filter((a) => a.afleiding.klant);
 }
 
 /** Aantal aanvragen dat vandaag om een handeling vraagt. */

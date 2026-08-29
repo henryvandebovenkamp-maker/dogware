@@ -107,6 +107,15 @@ export type AanvraagInput = {
 
 export type AanvraagAfleiding = {
   bakje: Bakje;
+  /**
+   * Is dit inmiddels een klant?
+   *
+   * Afgeleid uit de eerste betaling en niet uit de status "klant geworden".
+   * Een betaling is een feit; een status is iets dat iemand vergeet bij te
+   * werken. Let op dat dit losstaat van het bakje: wie betaald heeft maar nog
+   * gebouwd wordt, is commercieel klant én operationeel in de bouwfase.
+   */
+  klant: boolean;
   /** Vraagt deze aanvraag vandaag om een handeling van de beheerder? */
   actieNodig: boolean;
   /** Eén regel waarom, in gewone taal. Leeg als er niets hoeft. */
@@ -128,11 +137,13 @@ export type AanvraagAfleiding = {
 export function leidAf(a: AanvraagInput, nu: Date): AanvraagAfleiding {
   const actie = nextAction(a.snapshot, a.id);
   const dagenSindsDemo = a.demoSentAt ? dagenTussen(a.demoSentAt, nu) : null;
+  const klant = a.snapshot.aanbetalingBetaald;
 
   // Afgevallen: uit beeld, nooit actie.
   if (a.status === "afgevallen") {
     return {
       bakje: BAKJE_VOOR_STAGE[a.stage],
+      klant,
       actieNodig: false,
       reden: "",
       dagenSindsDemo,
@@ -144,7 +155,7 @@ export function leidAf(a: AanvraagInput, nu: Date): AanvraagAfleiding {
 
   // Klant: het commerciële traject is geslaagd en vraagt niets meer.
   if (bakje === "klant") {
-    return { bakje, actieNodig: false, reden: "", dagenSindsDemo, actie };
+    return { bakje, klant, actieNodig: false, reden: "", dagenSindsDemo, actie };
   }
 
   // Stilte na een verstuurde demo weegt zwaarder dan "wachten op de klant":
@@ -158,6 +169,7 @@ export function leidAf(a: AanvraagInput, nu: Date): AanvraagAfleiding {
   if (stilte) {
     return {
       bakje: "opvolgen",
+      klant,
       actieNodig: true,
       reden: `Demo ${dagenSindsDemo} dagen geleden verstuurd, nog geen reactie`,
       dagenSindsDemo,
@@ -169,6 +181,7 @@ export function leidAf(a: AanvraagInput, nu: Date): AanvraagAfleiding {
   if (actie.waitingOn === "admin") {
     return {
       bakje,
+      klant,
       actieNodig: true,
       reden: actie.volgende,
       dagenSindsDemo,
@@ -176,7 +189,7 @@ export function leidAf(a: AanvraagInput, nu: Date): AanvraagAfleiding {
     };
   }
 
-  return { bakje, actieNodig: false, reden: "", dagenSindsDemo, actie };
+  return { bakje, klant, actieNodig: false, reden: "", dagenSindsDemo, actie };
 }
 
 /* ---------------------------------------------------------------- tellen -- */

@@ -266,3 +266,40 @@ describe("7. de volgorde van Actie nodig", () => {
     assert.equal(sleutel("nieuw", null), 0);
   });
 });
+
+describe("8. klant word je door te betalen", () => {
+  const metBetaling = (betaald: boolean, over: Partial<AanvraagInput> = {}) =>
+    leidAf(
+      aanvraag({
+        stage: "gestart",
+        status: "demo verstuurd",
+        demoSentAt: dagenGeleden(40),
+        snapshot: snapshot({
+          stage: "gestart",
+          demoVerstuurd: true,
+          voorstelGeaccepteerd: true,
+          overeenkomstGetekend: true,
+          aanbetalingBetaald: betaald,
+        }),
+        ...over,
+      }),
+      NU,
+    );
+
+  it("telt iemand als klant zodra de eerste termijn binnen is", () => {
+    // The Happy Dogs: betaald en in de bouwfase. Commercieel klant,
+    // operationeel nog bezig — dat zijn twee verschillende dingen.
+    const a = metBetaling(true);
+    assert.equal(a.klant, true);
+    assert.equal(a.bakje, "bouw");
+  });
+
+  it("telt iemand zonder betaling niet als klant, wat de status ook zegt", () => {
+    const a = metBetaling(false, { status: "klant geworden" });
+    assert.equal(a.klant, false);
+  });
+
+  it("laat een nieuwe aanvraag geen klant zijn", () => {
+    assert.equal(leidAf(aanvraag(), NU).klant, false);
+  });
+});
