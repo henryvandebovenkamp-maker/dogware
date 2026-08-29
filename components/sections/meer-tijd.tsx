@@ -1,8 +1,9 @@
 import Image from "next/image";
+import Link from "next/link";
+import { ArrowRight, PawPrint } from "lucide-react";
 import { Container, Eyebrow } from "@/components/ui";
 import { photoExists } from "@/components/photo";
 import { Reveal } from "@/components/reveal";
-import { PawPrint } from "lucide-react";
 
 /**
  * De adempauze in het productblok.
@@ -13,8 +14,9 @@ import { PawPrint } from "lucide-react";
  * systeem bestaat: niet om meer functies te hebben, maar om iemand zijn dag
  * terug te geven.
  *
- * Bewust klein gehouden — py-16 in plaats van de gebruikelijke py-20/28, geen
- * kaart eromheen en geen call-to-action. Het is een rustpunt, geen extra hero.
+ * Bewust klein gehouden — py-16 in plaats van de gebruikelijke py-20/28 en geen
+ * kaart eromheen. Het is een rustpunt, geen extra hero. De verwijzing eronder
+ * is daarom een tekstlink en geen knop.
  *
  * Het beeld ernaast is `rustig-moment.jpg`: gehurkt naast een ontspannen hond
  * in de avondzon. Die foto stond eerder in de fotostrip van het verhaalblok,
@@ -52,6 +54,17 @@ export function MeerTijd() {
           hoeft er &apos;s avonds niet meer voor achter een scherm te kruipen —
           die uren gaan terug naar de honden en de mensen die bij je komen.
         </p>
+      </Reveal>
+      {/* Bewust een tekstlink en geen knop: dit is een rustpunt, geen extra
+          conversiemoment naast de demo-CTA die hier vlakbij al staat. */}
+      <Reveal delay={0.15}>
+        <Link
+          href="/#oplossingen"
+          className="group mt-6 inline-flex items-center gap-1.5 text-[15px] font-bold text-brand transition-colors hover:text-brand-600"
+        >
+          Ontdek wat DogWare voor mij regelt
+          <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+        </Link>
       </Reveal>
     </div>
   );

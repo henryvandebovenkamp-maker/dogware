@@ -25,19 +25,25 @@ branchekiezer (ook op mobiel).
 
 ## Waar de homepage fotografie toont
 
-Bewust op maar twee plekken, zodat DogWare een platformmerk blijft en geen
-hondenfotografie-site wordt:
+Verspreid, nooit als blok bij elkaar — vier branchefoto's naast elkaar leest als
+stockfotografie, uit elkaar getrokken leest het als herkenning. Van boven naar
+beneden:
 
-1. **Bovenaan** — het ronde `henry-avatar.jpg` in de hero én in het compacte
-   "Gebouwd vanuit de praktijk"-blokje eronder. Eén gezicht, binnen enkele
-   seconden zichtbaar.
-2. **In het verhaal** (`#verhaal`) — het portret plus de fotostrip van drie
-   (`rustig-moment`, `groep-buiten`, `blij-baasje`).
+1. **Hero en het blokje eronder** — het ronde `henry-avatar.jpg`. Eén gezicht,
+   binnen enkele seconden zichtbaar.
+2. **Het verhaal** (`#verhaal`) — `henry-portret.jpg`, `training-veld.jpg` en
+   een strip van twee (`groep-buiten`, `blij-baasje`).
+3. **Praktijkmoment trimsalon** — na "Zo werkt het".
+4. **Praktijkmoment hondenschool** — na de oplossingen.
+5. **Rustpunt** (`rustig-moment.jpg`) — tussen facturen en het teamportaal.
+6. **Praktijkmoment uitlaatservice** — vlak voor de klantvoorbeelden.
 
-Wil je de fotostrip in het verhaal aanvullen met vakwerk uit een ándere branche
-(bijvoorbeeld een trimmer aan de trimtafel), vervang dan één van die drie
-bestanden — voeg er geen vierde sectie aan de homepage toe. Meer beeld erbij
-verschuift de balans te ver richting sfeer en te ver weg van het platform.
+Daarna volgen alleen nog de drie klantwebsites in "DogWare in de praktijk". Die
+zijn geen sfeerbeeld maar bewijs, en horen dus niet in dit rijtje.
+
+Voeg hier niet zomaar een zevende beeldmoment aan toe: de balans zit nu rond
+tweederde platform, eenderde mens en hond. Meer beeld verschuift dat te ver
+richting sfeer.
 
 ## Nog aan te leveren (deze plekken staan al klaar)
 
@@ -58,13 +64,26 @@ Wat er op zo'n foto hoort: een rustig moment waarin een hondenprofessional even
 alle tijd heeft voor één hond. Geen scherm, geen administratie — dat is precies
 het punt van de sectie.
 
-**Branchekaarten op de homepage.** De negen `branche-*.jpg` hieronder zijn nu
-tijdelijke merkvlakken, dus de kaarten tonen bewust alleen hun icoon. Vervang
-je zo'n bestand door echte fotografie, zet dan de slug in
-`BRANCHES_MET_ECHTE_FOTO` in `lib/branches.ts` — anders blijft de kaart zonder
-beeld. Doe dat het liefst voor alle negen tegelijk: een kaart met foto is ruim
-190px hoger, en in een rij rekken de andere kaarten mee. Met maar een paar
-foto's krijg je op tabletbreedte een scheve rij.
+**Vier branchefoto's staan er inmiddels wél.** `branche-trimsalon.jpg`,
+`branche-hondenschool.jpg`, `branche-uitlaatservice.jpg` en
+`branche-dagopvang.jpg` zijn geen merkvlak meer maar echte beelden. Ze doen op
+twee plekken werk tegelijk:
+
+1. de bijbehorende branchelandingspagina toont ze als sfeerbeeld;
+2. drie ervan staan als praktijkmoment verspreid over de homepage — trimsalon
+   na "Zo werkt het", hondenschool na de oplossingen, uitlaatservice vlak voor
+   de klantvoorbeelden.
+
+Ze zijn 768x512 (3:2). Het kader op de site is óók 3:2, dus er wordt niets
+weggesneden en gezicht, hond en handeling blijven overal in beeld. Let op: op
+een scherm met dubbele pixeldichtheid worden ze op groot formaat iets zacht.
+Lever je ze ooit opnieuw aan, mik dan op minimaal 1600px breed per foto.
+
+**De vijf overige branches** (pension, gedragstherapie, dierenverzorging,
+chipservice, webshop) hebben nog een merkvlak. De branchekaarten op de homepage
+tonen daarom bewust géén foto's: met vier van de negen voorzien wordt één rij
+scheef. `BRANCHES_MET_ECHTE_FOTO` in `lib/branches.ts` blijft leeg tot alle
+negen er zijn.
 
 ## Wat er wél en niet op een foto mag staan
 
@@ -105,10 +124,11 @@ herkenbaar maken.
 | `branche-chipservice.jpg`       | /chipservice-software         | Pup wordt gechipt                      | Liggend 4:3 |
 | `branche-webshop.jpg`           | /webshop-software             | Assortiment riemen, snacks, speelgoed  | Liggend 4:3 |
 
-**Deze negen staan er nu als tijdelijke afbeelding.** Het zijn gegenereerde
-merkvlakken, geen foto's: een zacht verloop met een pootafdruk, de branchenaam
-en onderin de tekst `TIJDELIJKE AFBEELDING`. Zo ziet een branchepagina er af
-uit, maar zie je in één oogopslag welke nog vervangen moeten worden.
+**Vier hiervan zijn inmiddels echte foto's** — hondenschool, trimsalon,
+uitlaatservice en dagopvang. **De overige vijf staan er nog als tijdelijke
+afbeelding**: gegenereerde merkvlakken, geen foto's, met een zacht verloop, een
+pootafdruk, de branchenaam en onderin de tekst `TIJDELIJKE AFBEELDING`. Zo ziet
+zo'n branchepagina er af uit, maar zie je in één oogopslag welke nog moeten.
 
 Vervangen doe je door simpelweg je eigen `.jpg` op dezelfde naam te zetten —
 verder is er niets aan te passen. Liggend 4:3 werkt het beste; het vlak op de
