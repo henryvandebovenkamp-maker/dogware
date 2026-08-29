@@ -22,7 +22,7 @@ const NAV = [
   { href: "/admin", label: "Overzicht", Icon: GlyphPaw },
   { href: "/admin/groei", label: "Groei", Icon: GlyphSpark },
   { href: "/admin/journeys", label: "Demo Journeys", Icon: GlyphSpark },
-  { href: "/admin/leads", label: "Demo-aanvragen", Icon: GlyphClients },
+  { href: "/admin/leads", label: "Aanvragen", Icon: GlyphClients },
   { href: "/admin/partners", label: "Partners", Icon: GlyphTeam },
   { href: "/admin/referrals", label: "Referrals", Icon: GlyphSpark },
   { href: "/admin/klanten", label: "Klanten", Icon: GlyphPortal },

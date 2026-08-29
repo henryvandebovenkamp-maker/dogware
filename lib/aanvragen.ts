@@ -207,9 +207,16 @@ export function stagesVanBakje(bakje: Bakje): JourneyStage[] {
 }
 
 /**
- * De volgorde waarin "Actie nodig" gesorteerd wordt: het langst stilliggend
- * bovenaan. Zonder demo-datum vallen ze daarna, op aanvraagdatum.
+ * De volgorde van "Actie nodig", hoogste eerst.
+ *
+ * Opvolging gaat vóór al het andere: dat zijn de aanvragen die stilvallen als
+ * niemand er iets aan doet, en waar wachten je een klant kost. Pas daarna komt
+ * werk dat gewoon nog gedaan moet worden — een bouwfase die al loopt, is niet
+ * urgent omdat de demo lang geleden is verstuurd.
+ *
+ * Binnen elke groep telt hoe lang het al duurt.
  */
 export function urgentieSleutel(a: AanvraagAfleiding): number {
-  return a.dagenSindsDemo ?? -1;
+  const dagen = a.dagenSindsDemo ?? 0;
+  return a.bakje === "opvolgen" ? 100_000 + dagen : dagen;
 }

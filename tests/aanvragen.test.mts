@@ -8,6 +8,8 @@ import {
   leidAf,
   stagesVanBakje,
   telPerBakje,
+  urgentieSleutel,
+  type AanvraagAfleiding,
   type AanvraagInput,
   type Bakje,
 } from "@/lib/aanvragen";
@@ -243,5 +245,24 @@ describe("6. dagen tellen zoals een mens dat doet", () => {
   it("rondt naar beneden af op hele dagen", () => {
     assert.equal(dagenTussen(new Date("2026-08-26T23:00:00Z"), NU), 2);
     assert.equal(dagenTussen(new Date("2026-08-29T11:00:00Z"), NU), 0);
+  });
+});
+
+describe("7. de volgorde van Actie nodig", () => {
+  const sleutel = (bakje: Bakje, dagenSindsDemo: number | null) =>
+    urgentieSleutel({ bakje, dagenSindsDemo } as AanvraagAfleiding);
+
+  it("zet opvolging boven werk dat gewoon nog moet gebeuren", () => {
+    // Een bouwfase waarvan de demo lang geleden is, is niet urgenter dan een
+    // aanvraag die al drie dagen stil ligt. Dat was hij eerst wel.
+    assert.ok(sleutel("opvolgen", 3) > sleutel("bouw", 41));
+  });
+
+  it("sorteert binnen opvolging op hoe lang het al duurt", () => {
+    assert.ok(sleutel("opvolgen", 31) > sleutel("opvolgen", 3));
+  });
+
+  it("valt terug op nul als er nog geen demo verstuurd is", () => {
+    assert.equal(sleutel("nieuw", null), 0);
   });
 });
