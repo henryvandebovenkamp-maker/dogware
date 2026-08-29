@@ -11,7 +11,15 @@ import { cn } from "@/lib/cn";
  */
 const PHOTO_DIR = path.join(process.cwd(), "public", "photos");
 
-function photoExists(file: string) {
+/**
+ * Staat de échte foto er al? Alleen bruikbaar in servercomponenten.
+ *
+ * Secties die zonder foto beter gewoon tekst kunnen tonen gebruiken dit, in
+ * plaats van een placeholderkaart op de publieke homepage te zetten. De
+ * placeholder van `Photo` is bedoeld om te laten zien wélke foto ergens hoort
+ * — nuttig tijdens het inrichten, niet op een live commerciële pagina.
+ */
+export function photoExists(file: string) {
   try {
     return fs.existsSync(path.join(PHOTO_DIR, file));
   } catch {
@@ -26,6 +34,7 @@ export function Photo({
   tone = "warm",
   sizes = "(min-width: 1024px) 33vw, 100vw",
   position,
+  priority,
   className,
 }: {
   /** Bestandsnaam in /public/photos, bijv. "training-veld.jpg" */
@@ -37,6 +46,8 @@ export function Photo({
   sizes?: string;
   /** Tailwind object-position klasse, bijv. "object-left" als het onderwerp niet gecentreerd staat */
   position?: string;
+  /** Zet dit alleen voor een foto die bovenaan het scherm staat: die is de LCP en mag niet lazy laden. */
+  priority?: boolean;
   className?: string;
 }) {
   if (photoExists(file)) {
@@ -52,6 +63,7 @@ export function Photo({
           alt={alt}
           fill
           sizes={sizes}
+          priority={priority}
           className={cn("object-cover", position)}
         />
       </div>

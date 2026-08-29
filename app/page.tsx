@@ -2,6 +2,7 @@ import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { BrancheSwitcher } from "@/components/branche/branche-switcher";
 import { Hero } from "@/components/sections/hero";
+import { FounderNote } from "@/components/sections/founder-note";
 import { Problem } from "@/components/sections/problem";
 import { Story } from "@/components/sections/story";
 import { Vision } from "@/components/sections/vision";
@@ -14,8 +15,10 @@ import { Modules } from "@/components/sections/modules";
 import { Webshop } from "@/components/sections/webshop";
 import { Payments } from "@/components/sections/payments";
 import { Invoicing } from "@/components/sections/invoicing";
+import { MeerTijd } from "@/components/sections/meer-tijd";
 import { TeamPortal } from "@/components/sections/team-portal";
 import { Difference } from "@/components/sections/difference";
+import { Showcase } from "@/components/sections/showcase";
 import { PromiseSection } from "@/components/sections/promise";
 import { Results } from "@/components/sections/results";
 import { Testimonials } from "@/components/sections/testimonials";
@@ -27,6 +30,14 @@ import { FinalCta } from "@/components/sections/final-cta";
  * administratie") via het oplossingenblok. Een keuze in de branchekiezer laat
  * hero, problem, solution, modules, results, testimonials en de CTA meebewegen,
  * zonder de pagina te herladen.
+ *
+ * Direct onder de branchekiezer staat een piepklein vertrouwenssignaal
+ * (FounderNote): wie zit er achter DogWare. Het volledige verhaal blijft waar
+ * het stond (Story, `#verhaal`); FounderNote is alleen de brug ernaartoe.
+ *
+ * Showcase staat direct na Difference (`#verschil`): daar gaat het gesprek
+ * over websites, en daar hoort het bewijs — drie echte klanten met drie
+ * volstrekt eigen sites — dus vlak voor de belofte en de afsluiting.
  */
 export default function Home() {
   return (
@@ -35,6 +46,7 @@ export default function Home() {
       <main className="relative z-10 flex-1">
         <Hero />
         <BrancheSwitcher />
+        <FounderNote />
         <Problem />
         <Story />
         <Vision />
@@ -47,8 +59,10 @@ export default function Home() {
         <Webshop />
         <Payments />
         <Invoicing />
+        <MeerTijd />
         <TeamPortal />
         <Difference />
+        <Showcase />
         <PromiseSection />
         <Results />
         <Testimonials />
