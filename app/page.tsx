@@ -2,6 +2,8 @@ import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { BrancheSwitcher } from "@/components/branche/branche-switcher";
 import { Hero } from "@/components/sections/hero";
+import { KozenVoorHonden } from "@/components/sections/kozen-voor-honden";
+import { Herkenning } from "@/components/sections/herkenning";
 import { FounderNote } from "@/components/sections/founder-note";
 import { Problem } from "@/components/sections/problem";
 import { Story } from "@/components/sections/story";
@@ -19,26 +21,32 @@ import { MeerTijd } from "@/components/sections/meer-tijd";
 import { TeamPortal } from "@/components/sections/team-portal";
 import { Difference } from "@/components/sections/difference";
 import { Showcase } from "@/components/sections/showcase";
-import { PraktijkMoment } from "@/components/sections/praktijk-moment";
 import { PromiseSection } from "@/components/sections/promise";
 import { Results } from "@/components/sections/results";
 import { Testimonials } from "@/components/sections/testimonials";
 import { FinalCta } from "@/components/sections/final-cta";
 
 /**
- * De homepage kent twee ingangen: herkenning ("ik heb een trimsalon") via de
+ * De homepage vertelt eerst waaróm iemand DogWare zou willen, en pas daarna wat
+ * het doet.
+ *
+ * De bovenkant liep eerder van software naar functionaliteit naar meer
+ * functionaliteit; een mens kwam pas ver naar beneden in beeld. Dat is te laat
+ * voor advertentieverkeer, waar iemand DogWare nog helemaal niet kent. De
+ * volgorde is daarom: het vak (KozenVoorHonden), jezelf herkennen
+ * (BrancheSwitcher en Herkenning), en daarna pas het probleem, de oplossing en
+ * het platform.
+ *
+ * Twee ingangen blijven bestaan: herkenning ("ik heb een trimsalon") via de
  * branchekiezer en de branchekaarten, en behoefte ("ik wil minder
  * administratie") via het oplossingenblok. Een keuze in de branchekiezer laat
- * hero, problem, solution, modules, results, testimonials en de CTA meebewegen,
- * zonder de pagina te herladen.
+ * de secties eronder meebewegen, zonder de pagina te herladen — de hero niet,
+ * die blijft altijd voor het hele vak spreken.
  *
- * Direct onder de branchekiezer staat een piepklein vertrouwenssignaal
- * (FounderNote): wie zit er achter DogWare. Het volledige verhaal blijft waar
- * het stond (Story, `#verhaal`); FounderNote is alleen de brug ernaartoe.
- *
- * Showcase staat direct na Difference (`#verschil`): daar gaat het gesprek
- * over websites, en daar hoort het bewijs — drie echte klanten met drie
- * volstrekt eigen sites — dus vlak voor de belofte en de afsluiting.
+ * Het verhaal van Henry (`#verhaal`) staat bewust helemaal onderaan, vlak voor
+ * de demo-aanvraag: wie tot daar is gekomen, wil weten wie er achter dit ding
+ * zit voordat hij zijn gegevens achterlaat. FounderNote hoog op de pagina is de
+ * korte brug ernaartoe.
  */
 export default function Home() {
   return (
@@ -46,32 +54,16 @@ export default function Home() {
       <SiteHeader />
       <main className="relative z-10 flex-1">
         <Hero />
+        <KozenVoorHonden />
         <BrancheSwitcher />
+        <Herkenning />
         <FounderNote />
         <Problem />
-        <Story />
         <Vision />
         <Solution />
-        <PraktijkMoment
-          foto="branche-trimsalon.jpg"
-          alt="Een trimmer verzorgt rustig de vacht van een hond op de trimtafel"
-          eyebrow="In de praktijk"
-          titel="Een afspraak die zichzelf inplant."
-          tekst="Terwijl jij met je handen in een vacht zit, boekt de volgende klant online een plek, krijgt hij een bevestiging en staat de afspraak al in je agenda."
-          melding={{ titel: "Nieuwe afspraak", detail: "Dinsdag 10:30 · automatisch bevestigd" }}
-        />
         <Ecosystem />
         <BrancheCards />
         <NeedCards />
-        <PraktijkMoment
-          foto="branche-hondenschool.jpg"
-          alt="Een hondentrainer oefent samen met een eigenaar en haar hond op het veld"
-          eyebrow="In de praktijk"
-          titel="Jij geeft les. De administratie loopt vanzelf mee."
-          tekst="Cursisten kiezen zelf hun groep, vullen de gegevens van hun hond in en betalen direct. Jij ziet alleen nog wie er komt."
-          melding={{ titel: "Cursus volgeboekt", detail: "8 van 8 plekken · betaald met iDEAL" }}
-          spiegel
-        />
         <ClientDog />
         <Modules />
         <Webshop />
@@ -80,18 +72,11 @@ export default function Home() {
         <MeerTijd />
         <TeamPortal />
         <Difference />
-        <PraktijkMoment
-          foto="branche-uitlaatservice.jpg"
-          alt="Een uitlaatservice onderweg met een rustige groep honden over de heide"
-          eyebrow="In de praktijk"
-          titel="Buiten zijn, terwijl morgen al geregeld is."
-          tekst="Routes, groepen en capaciteit staan klaar voordat je de bus instapt. Klanten geven zelf hun dagen door, de facturatie loopt door zonder dat je eraan denkt."
-          melding={{ titel: "Planning voor morgen staat klaar", detail: "8 wandelingen · routes gepland" }}
-        />
         <Showcase />
         <PromiseSection />
         <Results />
         <Testimonials />
+        <Story />
         <FinalCta />
       </main>
       <SiteFooter />

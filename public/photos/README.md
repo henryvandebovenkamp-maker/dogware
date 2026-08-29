@@ -25,25 +25,25 @@ branchekiezer (ook op mobiel).
 
 ## Waar de homepage fotografie toont
 
-Verspreid, nooit als blok bij elkaar — vier branchefoto's naast elkaar leest als
-stockfotografie, uit elkaar getrokken leest het als herkenning. Van boven naar
-beneden:
+De volgorde vertelt eerst waaróm iemand DogWare zou willen en pas daarna wat het
+doet. Fotografie draagt dat begin: het vak staat in beeld voordat er iets over
+software is gezegd. Van boven naar beneden:
 
-1. **Hero en het blokje eronder** — het ronde `henry-avatar.jpg`. Eén gezicht,
-   binnen enkele seconden zichtbaar.
-2. **Het verhaal** (`#verhaal`) — `henry-portret.jpg`, `training-veld.jpg` en
-   een strip van twee (`groep-buiten`, `blij-baasje`).
-3. **Praktijkmoment trimsalon** — na "Zo werkt het".
-4. **Praktijkmoment hondenschool** — na de oplossingen.
+1. **Hero** — het ronde `henry-avatar.jpg` in de zwevende kaart.
+2. **"Jij koos voor werken met honden"** — `branche-uitlaatservice.jpg`, groot.
+   Dit is de enige foto vlak onder de vouw en laadt daarom met voorrang.
+3. **"Waarschijnlijk lijkt jouw dag hier het meest op"** — `hondenschool`,
+   `trimsalon` en `dagopvang`, ongelijk van formaat en op verschillende hoogte.
+4. **Het blokje "Gebouwd vanuit de praktijk"** — nogmaals `henry-avatar.jpg`.
 5. **Rustpunt** (`rustig-moment.jpg`) — tussen facturen en het teamportaal.
-6. **Praktijkmoment uitlaatservice** — vlak voor de klantvoorbeelden.
+6. **DogWare in de praktijk** — de drie klantwebsites. Geen sfeerbeeld maar
+   bewijs; ze horen niet in dit rijtje thuis.
+7. **Het verhaal van Henry** (`#verhaal`) — portret, `training-veld` en een
+   strip van twee, vlak voor de demo-aanvraag.
 
-Daarna volgen alleen nog de drie klantwebsites in "DogWare in de praktijk". Die
-zijn geen sfeerbeeld maar bewijs, en horen dus niet in dit rijtje.
-
-Voeg hier niet zomaar een zevende beeldmoment aan toe: de balans zit nu rond
-tweederde platform, eenderde mens en hond. Meer beeld verschuift dat te ver
-richting sfeer.
+Punt 2 en 3 zorgen dat een bezoeker binnen anderhalf tot twee schermen zijn
+eigen vak ziet. Voeg hier niet zomaar een achtste beeldmoment aan toe: de balans
+zit nu rond tweederde platform, eenderde mens en hond.
 
 ## Nog aan te leveren (deze plekken staan al klaar)
 
