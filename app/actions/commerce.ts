@@ -468,6 +468,48 @@ export async function addInternalNote(
   return OK("Notitie opgeslagen.");
 }
 
+/**
+ * Nieuwe taak bij een aanvraag.
+ *
+ * De deadline is optioneel: niet elke taak heeft er een, en een verzonnen datum
+ * is erger dan geen datum — dan gaat de kleur "te laat" niets meer betekenen.
+ *
+ * De taak komt op naam van wie hem aanmaakt. Met één beheerder is dat weinig
+ * spannend, maar het staat vast op het moment dat het gebeurt in plaats van
+ * achteraf gereconstrueerd te moeten worden.
+ */
+export async function addTask(
+  _prev: CommerceState,
+  formData: FormData,
+): Promise<CommerceState> {
+  const leadId = String(formData.get("leadId") ?? "");
+  const label = String(formData.get("label") ?? "").trim().slice(0, 200);
+  const deadline = String(formData.get("dueAt") ?? "").trim();
+
+  const ctx = await adminContext(leadId);
+  if (!ctx) return FOUT("Geen toegang.");
+  if (!label) return FOUT("Geef de taak een omschrijving.");
+
+  // Een datum uit een date-input is lokale tijd zonder tijd erbij; eind van de
+  // dag is wat iemand bedoelt met "af op 3 september".
+  let dueAt: Date | null = null;
+  if (deadline) {
+    const d = new Date(`${deadline}T23:59:59`);
+    if (Number.isNaN(d.getTime())) return FOUT("Die datum begrijp ik niet.");
+    dueAt = d;
+  }
+
+  const db = getDb()!;
+  await db.insert(schema.journeyTasks).values({
+    leadId,
+    label,
+    dueAt,
+    assigneeUserId: ctx.actorId,
+  });
+  refresh(leadId);
+  return OK("Taak toegevoegd.");
+}
+
 /** Taak afvinken of terugzetten. */
 export async function toggleTask(
   _prev: CommerceState,

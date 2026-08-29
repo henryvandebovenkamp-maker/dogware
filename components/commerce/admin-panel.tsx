@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import {
   addInternalNote,
+  addTask,
   retryMandate,
   rotatePortalToken,
   toggleTask,
@@ -104,7 +105,26 @@ export type DocumentRij = {
   issuedAt: string;
 };
 
-export type TaakRij = { id: string; label: string; done: boolean };
+export type TaakRij = {
+  id: string;
+  label: string;
+  done: boolean;
+  /** ISO-datum van de deadline, of null als de taak er geen heeft. */
+  dueAt: string | null;
+  /** Deadline verstreken en nog niet af. */
+  teLaat: boolean;
+};
+
+/** Eén verstuurde mail, voor het logboek bij de aanvraag. */
+export type MailRij = {
+  id: string;
+  soort: string;
+  onderwerp: string;
+  ontvanger: string;
+  gelukt: boolean;
+  fout: string | null;
+  verstuurdOp: string;
+};
 
 export type TijdlijnRij = {
   id: string;
@@ -146,6 +166,7 @@ export function CommerceSecties(props: {
   abonnement: AbonnementData;
   documenten: DocumentRij[];
   taken: TaakRij[];
+  mails: MailRij[];
   tijdlijn: TijdlijnRij[];
   bouw: BouwData;
 }) {
@@ -401,8 +422,60 @@ export function CommerceSecties(props: {
         {props.taken.length > 0 && (
           <ul className="mt-4 space-y-1.5">
             {props.taken.map((t) => (
-              <li key={t.id}>
+              <li key={t.id} className="flex flex-wrap items-center gap-x-2">
                 <TaakKnop leadId={props.leadId} taak={t} />
+                {t.dueAt && (
+                  <span
+                    className={cn(
+                      "text-[11px] font-semibold",
+                      t.teLaat ? "text-brand-600" : "text-ink-300",
+                    )}
+                  >
+                    {t.teLaat ? "te laat · " : ""}
+                    {new Date(t.dueAt).toLocaleDateString("nl-NL", {
+                      day: "numeric",
+                      month: "short",
+                    })}
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+        <TaakToevoegen leadId={props.leadId} />
+      </Sectie>
+
+      <Sectie titel="Verstuurde e-mail" icon={<Check className="h-4 w-4" />}>
+        {props.mails.length === 0 ? (
+          <p className="text-[12.5px] leading-relaxed text-ink-500">
+            Nog geen mail vastgelegd. Het logboek vult zich vanaf de eerstvolgende
+            mail die vanuit dit dossier wordt verstuurd; wat daarvóór is
+            verstuurd staat alleen op de tijdlijn.
+          </p>
+        ) : (
+          <ul className="space-y-1.5">
+            {props.mails.map((m) => (
+              <li
+                key={m.id}
+                className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 border-b border-cream-100 pb-1.5 last:border-0"
+              >
+                <span className="text-[12.5px] font-semibold text-ink">
+                  {m.onderwerp}
+                </span>
+                <span className="text-[11px] text-ink-300">
+                  {new Date(m.verstuurdOp).toLocaleString("nl-NL", {
+                    day: "numeric",
+                    month: "short",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}{" "}
+                  · {m.ontvanger}
+                </span>
+                {!m.gelukt && (
+                  <span className="text-[11px] font-bold text-brand-600">
+                    mislukt{m.fout ? ` — ${m.fout}` : ""}
+                  </span>
+                )}
               </li>
             ))}
           </ul>
@@ -671,6 +744,49 @@ function MiniForm({
   );
 }
 
+/**
+ * Een taak erbij. De deadline is optioneel en staat er bewust naast in plaats
+ * van als verplicht veld: de meeste taken zijn "doen wanneer het uitkomt", en
+ * een datum die je moet invullen om verder te komen wordt een verzonnen datum.
+ */
+function TaakToevoegen({ leadId }: { leadId: string }) {
+  const [state, formAction, pending] = useActionState(addTask, IDLE);
+  return (
+    <form action={formAction} className="mt-3 flex flex-wrap items-center gap-2">
+      <input type="hidden" name="leadId" value={leadId} />
+      <input
+        name="label"
+        required
+        placeholder="Nieuwe taak"
+        className="min-w-0 flex-1 basis-40 rounded-lg border border-cream-200 bg-white px-2.5 py-1.5 text-[12.5px] text-ink outline-none transition placeholder:text-ink-300 focus:border-brand"
+      />
+      <input
+        name="dueAt"
+        type="date"
+        aria-label="Deadline (optioneel)"
+        className="rounded-lg border border-cream-200 bg-white px-2.5 py-1.5 text-[12.5px] text-ink-700 outline-none transition focus:border-brand"
+      />
+      <button
+        type="submit"
+        disabled={pending}
+        className="rounded-lg bg-ink px-3 py-1.5 text-[12.5px] font-bold text-cream transition hover:bg-ink-700 disabled:opacity-60"
+      >
+        {pending ? "…" : "Toevoegen"}
+      </button>
+      {state.message && (
+        <span
+          className={cn(
+            "basis-full text-[11.5px] font-semibold",
+            state.status === "error" ? "text-brand-600" : "text-sage-600",
+          )}
+        >
+          {state.message}
+        </span>
+      )}
+    </form>
+  );
+}
+
 function TaakKnop({ leadId, taak }: { leadId: string; taak: TaakRij }) {
   const [, formAction, pending] = useActionState(toggleTask, IDLE);
   return (
@@ -680,7 +796,7 @@ function TaakKnop({ leadId, taak }: { leadId: string; taak: TaakRij }) {
       <button
         type="submit"
         disabled={pending}
-        className="flex w-full items-center gap-2.5 rounded-lg px-1 py-1 text-left transition hover:bg-cream-100/70 disabled:opacity-60"
+        className="flex items-center gap-2.5 rounded-lg px-1 py-1 text-left transition hover:bg-cream-100/70 disabled:opacity-60"
       >
         <span
           className={cn(

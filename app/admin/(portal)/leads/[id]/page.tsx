@@ -90,6 +90,7 @@ export default async function LeadDetailPage({
     allePartners,
     events,
     tasks,
+    mails,
     proposals,
     draft,
     actiefVoorstel,
@@ -119,6 +120,12 @@ export default async function LeadDetailPage({
       .from(schema.journeyTasks)
       .where(eq(schema.journeyTasks.leadId, id))
       .orderBy(asc(schema.journeyTasks.createdAt)),
+    db
+      .select()
+      .from(schema.emails)
+      .where(eq(schema.emails.leadId, id))
+      .orderBy(desc(schema.emails.createdAt))
+      .limit(50),
     listProposals(commerce.id),
     getDraftProposal(commerce.id),
     getActiveProposal(commerce.id),
@@ -380,7 +387,24 @@ export default async function LeadDetailPage({
             bedrag: d.totalInclVatCents > 0 ? euroFromCents(d.totalInclVatCents) : null,
             issuedAt: d.issuedAt.toISOString(),
           }))}
-          taken={tasks.map((t) => ({ id: t.id, label: t.label, done: t.done }))}
+          taken={tasks.map((t) => ({
+            id: t.id,
+            label: t.label,
+            done: t.done,
+            dueAt: t.dueAt?.toISOString() ?? null,
+            // Te laat telt alleen als hij ook nog openstaat; een afgevinkte
+            // taak die ooit over datum was hoeft niet rood te blijven.
+            teLaat: Boolean(t.dueAt && !t.done && t.dueAt < new Date()),
+          }))}
+          mails={mails.map((m) => ({
+            id: m.id,
+            soort: m.soort,
+            onderwerp: m.onderwerp,
+            ontvanger: m.ontvanger,
+            gelukt: m.status === "SENT",
+            fout: m.fout,
+            verstuurdOp: m.createdAt.toISOString(),
+          }))}
           tijdlijn={events
             .slice()
             .reverse()
