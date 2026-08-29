@@ -7,13 +7,13 @@ import { Button } from "@/components/ui";
 import { DashboardMock } from "@/components/dashboard-mock";
 import { Reveal } from "@/components/reveal";
 import { useBrancheContent } from "@/components/branche/branche-context";
-import { demoHref } from "@/lib/branches";
+import { demoHref, positioneringContent } from "@/lib/branches";
 import { cn } from "@/lib/cn";
 
 /**
- * Zachte wissel wanneer de bezoeker een andere branche kiest. Bewust zonder
- * AnimatePresence: door alleen de `key` te wisselen vervangt React de tekst in
- * dezelfde commit, zodat de kop nooit even inklapt.
+ * Zachte opkomst van de kop en de subtekst. Bewust zonder AnimatePresence:
+ * door alleen de `key` te wisselen vervangt React de tekst in dezelfde commit,
+ * zodat de kop nooit even inklapt.
  */
 const SWAP = {
   initial: { opacity: 0, y: 8 },
@@ -30,7 +30,21 @@ export function HeroView({
   /** Serverzijdig gerenderd avatarfotootje */
   avatar: ReactNode;
 }) {
-  const c = useBrancheContent(branche);
+  /**
+   * Twee bronnen, bewust gescheiden:
+   *
+   * `c` bepaalt WAT de hero zegt — kop, subtekst, chips, notificatie en het
+   * dashboardvoorbeeld. Dat is de kernpositionering en volgt daarom nooit de
+   * onthouden branchekeuze: op de homepage staat er altijd "hondenbedrijf",
+   * op een branchelandingspagina altijd die ene branche.
+   *
+   * `keuze` bepaalt alleen WAAR de knoppen naartoe gaan. Heeft de bezoeker
+   * hieronder een branche aangeklikt, dan mag de demoflow daar gewoon op
+   * voorsorteren en verwijst "Bekijk voorbeeld" naar die landingspagina. Dat
+   * verandert de boodschap niet, alleen de vervolgstap.
+   */
+  const c = positioneringContent(branche);
+  const keuze = useBrancheContent(branche);
   const isLanding = Boolean(branche);
 
   return (
@@ -94,12 +108,12 @@ export function HeroView({
               {/* items-start houdt de knoppen op mobiel zo breed als hun tekst;
                   in een kolom-flex zouden ze anders het hele scherm vullen. */}
               <div className="mt-9 flex flex-col items-start gap-2.5 sm:flex-row sm:items-center sm:gap-3">
-                <Button href={demoHref(c)} variant="primary" size="lg">
+                <Button href={demoHref(keuze)} variant="primary" size="lg">
                   Laat mijn voorbeeld maken
                   <ArrowRight className="h-3.5 w-3.5 transition-transform duration-150 ease-out group-hover:translate-x-0.5" />
                 </Button>
                 <Button
-                  href={!isLanding && "path" in c ? c.path : "#oplossing"}
+                  href={!isLanding && "path" in keuze ? keuze.path : "#oplossing"}
                   variant="ghost"
                   size="lg"
                 >

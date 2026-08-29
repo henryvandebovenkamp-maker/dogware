@@ -1485,19 +1485,23 @@ export const ALGEMEEN: Omit<Branche, "slug" | "path" | "seo" | "faq" | "kaartTek
     kopAccent: "hondenbedrijf",
     kopNa: "nodig heeft.",
     sub: "Je website, planning, klanten, betalingen en communicatie in één veilige omgeving. Geen losse systemen, geen updates en geen technisch gedoe. Jij zorgt voor de honden. DogWare zorgt voor de rest.",
+    // Een dwarsdoorsnede van het platform, niet van één vak. Elke term hoort
+    // bij een module die de site elders ook echt laat zien: planning, klanten,
+    // online boeken, klantportaal, facturen, iDEAL, communicatie en webshop.
+    // "Website" staat er bewust niet bij — dat is de kop al.
     chips: [
-      "Website",
       "Planning",
       "Klanten",
-      "Facturen",
-      "Agenda",
-      "Betalingen",
-      "E-mail",
+      "Online boeken",
       "Klantportaal",
+      "Facturen",
+      "iDEAL",
+      "Communicatie",
+      "Webshop",
     ],
     notificatie: {
-      titel: "Nieuwe inschrijving",
-      tekst: "Puppycursus · automatisch verwerkt",
+      titel: "Nieuwe boeking",
+      tekst: "Automatisch in de planning gezet",
     },
   },
   dashboard: {
@@ -1583,6 +1587,35 @@ export const ALGEMEEN: Omit<Branche, "slug" | "path" | "seo" | "faq" | "kaartTek
 /** Alles waar de secties uit lezen: een echte branche óf de algemene variant. */
 export type BrancheContent = Branche | typeof ALGEMEEN;
 
+/**
+ * Van welke branches is `photo` inmiddels échte fotografie?
+ *
+ * In /public/photos staat voor elke branche een bestand, maar dat zijn nu nog
+ * gegenereerde merkvlakken met de tekst "TIJDELIJKE AFBEELDING" (zie
+ * scripts/generate-branche-placeholders.mjs). Het bestand bestaat dus wél,
+ * waardoor de code zelf niet kan zien of het een foto of een plaatshouder is.
+ *
+ * Vandaar deze lijst. Alleen branches die hier staan krijgen een beeld op de
+ * branchekaarten van de homepage; de rest houdt de bestaande kaart met icoon.
+ * Zo komt er nooit een merkvlak op de commerciële voorpagina terecht.
+ *
+ * **Zo zet je een foto aan:** vervang `/public/photos/branche-<slug>.jpg` door
+ * echte fotografie (liggend 4:3) en zet de slug hieronder in de lijst. Meer is
+ * er niet nodig — de kaart pakt het beeld dan vanzelf op. Lees eerst de eisen
+ * aan de inhoud van een foto in public/photos/README.md; op een prikband of
+ * strak getrokken lijn zit niemand in deze branche te wachten.
+ *
+ * **Doe het het liefst voor alle negen tegelijk.** Een kaart mét foto is ruim
+ * 190px hoger dan een kaart zonder, en in een raster rekt de hele rij mee naar
+ * de hoogste kaart. Staat er in een rij één foto tussen kaarten zonder, dan
+ * krijgen die een flinke lege ruimte onder hun tekst. Opgemeten: bij precies
+ * hondenschool + trimsalon + uitlaatservice klopt het op desktop (drie
+ * kolommen vormen exact de bovenste rij), maar op tablet (twee kolommen) valt
+ * uitlaatservice in een rij met dagopvang en oogt die rij scheef. Alle negen
+ * voorzien is daarom de enige indeling die op élke breedte klopt.
+ */
+export const BRANCHES_MET_ECHTE_FOTO: readonly BrancheSlug[] = [];
+
 export const BRANCHE_BY_SLUG = new Map<string, Branche>(
   BRANCHES.map((b) => [b.slug, b]),
 );
@@ -1599,6 +1632,32 @@ export function getBranche(slug: string | null | undefined): Branche | null {
 /** De inhoud voor een (eventueel lege) branchekeuze — nooit null. */
 export function brancheContent(slug: string | null | undefined): BrancheContent {
   return getBranche(slug) ?? ALGEMEEN;
+}
+
+/**
+ * De inhoud voor de KERNPOSITIONERING van een pagina: de hero en het
+ * dashboardvoorbeeld daarin.
+ *
+ * Verschilt bewust van `brancheContent`/`useBrancheContent`: die kijken óók
+ * naar de branche die de bezoeker ooit in de branchekiezer aanklikte en die in
+ * localStorage bewaard blijft. Voor de secties lager op de pagina is dat
+ * precies de bedoeling. Voor de hero is het schadelijk: dan opent dogware.nl
+ * voor een terugkerende bezoeker met "De laatste website die jouw chipservice
+ * nodig heeft", en concludeert een trimsalon of hondenschool dat DogWare niet
+ * voor hem bedoeld is.
+ *
+ * Daarom telt hier UITSLUITEND een expliciete slug. Die geven alleen de
+ * branchelandingspagina's mee (`<Hero branche={...} />`); díe mogen en moeten
+ * specifiek zijn. De publieke homepage geeft niets mee en krijgt dus altijd
+ * ALGEMEEN — ongeacht localStorage, sessie, rol of queryparameters.
+ *
+ * Zet dit nooit terug naar de onthouden keuze;
+ * tests/homepage-positionering.test.mts bewaakt deze regel.
+ */
+export function positioneringContent(
+  override?: string | null,
+): BrancheContent {
+  return override ? brancheContent(override) : ALGEMEEN;
 }
 
 /** Link naar de demoflow, met de branche al voorgeselecteerd. */

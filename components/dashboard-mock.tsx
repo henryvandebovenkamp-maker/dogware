@@ -11,7 +11,7 @@ import {
   ShoppingBag,
   Users,
 } from "lucide-react";
-import { useBrancheContent } from "@/components/branche/branche-context";
+import { positioneringContent } from "@/lib/branches";
 
 const NAV = [
   { icon: LayoutGrid, label: "Dashboard", active: true },
@@ -31,11 +31,16 @@ const toneMap: Record<string, string> = {
 };
 
 /**
- * Het dashboardvoorbeeld in de hero. De planning beweegt mee met de gekozen
- * branche, zodat een trimsalon geen puppycursussen in zijn agenda ziet staan.
+ * Het dashboardvoorbeeld in de hero.
+ *
+ * De planning hoort bij de kernpositionering en volgt daarom `branche` — de
+ * slug die een landingspagina expliciet meegeeft — en nooit de branchekeuze
+ * die de bezoeker ooit onthouden liet staan. Op de homepage toont de agenda
+ * dus altijd een dwarsdoorsnede van het vak (puppycursus, gedragsconsult,
+ * uitlaatronde, trimbehandeling); een branchepagina toont zijn eigen dag.
  */
 export function DashboardMock({ branche }: { branche?: string }) {
-  const { dashboard } = useBrancheContent(branche);
+  const { dashboard } = positioneringContent(branche);
 
   return (
     <div className="relative overflow-hidden rounded-[1.6rem] bg-white shadow-lift ring-1 ring-ink/5">
