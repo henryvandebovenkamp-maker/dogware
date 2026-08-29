@@ -2,6 +2,7 @@ import { strict as assert } from "node:assert";
 import { describe, it } from "node:test";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 /**
  * Structuurbewaking van HQ.
@@ -13,7 +14,13 @@ import { join } from "node:path";
  * ze hier vast.
  */
 
-const wortel = new URL("..", import.meta.url).pathname;
+// fileURLToPath en niet `.pathname`: die tweede geeft de URL-vorm terug, met
+// %20 voor elke spatie. Op een pad zonder spaties valt dat nooit op, en in een
+// map die er wél een heeft bestaat de map ineens niet — dan faalt dit bestand
+// bij het inlezen, vóór de eerste assertie. Deze bewaking (elk HQ-pad hoort
+// zelfstandig opnieuw te controleren) stond daardoor stil op precies het soort
+// omgeving waar niemand hem verdacht.
+const wortel = fileURLToPath(new URL("..", import.meta.url));
 const lees = (p: string) => readFileSync(join(wortel, p), "utf8");
 
 function alleBestanden(map: string, uit: string[] = []): string[] {

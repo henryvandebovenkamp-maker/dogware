@@ -270,6 +270,47 @@ describe("bouwprompt — modules", () => {
     assert.ok(!uit.slice(0, uit.indexOf("Die tweede lijst")).includes("(uitlaatservice)"));
   });
 
+  it("eist dat een actieve dienst compleet actief is, niet alleen een menu-item", () => {
+    // "Aan" is de helft van de regel. De andere helft is dat de dienst
+    // daadwerkelijk werkt: een module die alleen in het menu staat leverde in de
+    // praktijk een klant op die een dienst zag en niets kon aanvragen.
+    const p = bouwprompt({ ...LEEG, diensten: ["Uitlaatservice"] });
+    assert.match(p, /Activeer uitsluitend de diensten die uit de klantintake volgen\./);
+    assert.match(p, /volledig gekoppeld zijn aan hun bestaande\s+Dogware-module en relevante automatische e-mails/);
+    assert.match(p, /Een module die alleen in het menu staat is niet geleverd\./);
+    assert.match(p, /Controleer dit expliciet tijdens de eindtest\./);
+  });
+
+  it("verbiedt dienstspecifieke mail en directe routes van een uitgezette dienst", () => {
+    // Een verborgen knop is geen slot. Dit is precies de fout die de master zelf
+    // had: zeven routebomen van uitgeschakelde diensten bleven bereikbaar voor
+    // wie het adres kende, en oude geplande taken bleven mailen.
+    const p = bouwprompt({ ...LEEG, diensten: ["Uitlaatservice"] });
+    assert.match(p, /mogen geen dienstspecifieke automatische e-mails versturen/);
+    assert.match(p, /Een\s+verborgen menu-item is daarvoor niet genoeg/);
+    assert.match(p, /een oude geplande taak of een API-aanroep/);
+  });
+
+  it("laat generieke mail met rust", () => {
+    // De omgekeerde fout is net zo duur: wie de dienstregel te breed toepast
+    // sluit iemand buiten zijn eigen account omdat een module uitstaat.
+    const p = bouwprompt({ ...LEEG, diensten: ["Uitlaatservice"] });
+    assert.match(p, /account, inloglink, factuur, betaling en\s+contact horen bij geen enkele dienst/);
+    assert.match(p, /mogen nooit stilvallen doordat een\s+module uitstaat/);
+  });
+
+  it("zet de dienstregels ook in de acceptatielijst", () => {
+    // De regel bovenin wordt gelezen tijdens het bouwen; de acceptatielijst
+    // wordt afgevinkt bij het opleveren. Alleen het eerste is te makkelijk te
+    // vergeten als het uur laat is.
+    const p = bouwprompt({ ...LEEG, diensten: ["Uitlaatservice"] });
+    const acc = p.slice(p.indexOf("## 26. ACCEPTATIE"));
+    assert.match(acc, /rechtstreeks ingetypt adres niet/);
+    assert.match(acc, /echte 404/);
+    assert.match(acc, /geen enkele niet-aangevraagde dienst verstuurt een dienstspecifieke automatische/);
+    assert.match(acc, /onafhankelijk van/);
+  });
+
   it("koppelt de eigen woorden van de klant aan de technische module", () => {
     const p = bouwprompt({ ...LEEG, diensten: ["Hondenoppas aan huis"] });
     assert.ok(p.includes('"Hondenoppas aan huis" → Dierenverzorging aan huis (dierenverzorging)'));

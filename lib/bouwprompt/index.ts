@@ -220,7 +220,29 @@ ${keuze.uitgeschakeld.map((m) => `- ${MODULES[m]} (${m})`).join("\n")}
 
 Die tweede lijst is geen restje. De code van die modules zit in de master, maar
 deze klant heeft er niet om gevraagd: ze horen niet in het menu, niet in de
-routes, niet in de e-mails en niet in de beheeromgeving.${onbekend}`;
+routes, niet in de e-mails en niet in de beheeromgeving.
+
+Activeer uitsluitend de diensten die uit de klantintake volgen.
+
+Alle geselecteerde diensten moeten volledig gekoppeld zijn aan hun bestaande
+Dogware-module en relevante automatische e-mails. Aan betekent hier: de
+beheerpagina's, de navigatie, de aanvraag- of boekingsflow, het klantportaal, de
+personeelskant, de facturatie en de bijbehorende automatische e-mails doen het
+echt. Een module die alleen in het menu staat is niet geleverd.
+
+Niet-geselecteerde diensten mogen niet operationeel zichtbaar of beschikbaar
+zijn en mogen geen dienstspecifieke automatische e-mails versturen. Een
+verborgen menu-item is daarvoor niet genoeg: een rechtstreeks ingetypt adres,
+een oude geplande taak of een API-aanroep hoort er evenmin langs te komen. De
+master regelt dit centraal — het moduleregister met requireModule voor de
+routes, de modulepoort voor de e-mail en cronModuleGuard voor de
+achtergrondtaken. Gebruik die, en schrijf geen eigen controle per scherm.
+
+Generieke e-mail blijft hier buiten: account, inloglink, factuur, betaling en
+contact horen bij geen enkele dienst en mogen nooit stilvallen doordat een
+module uitstaat.
+
+Controleer dit expliciet tijdens de eindtest.${onbekend}`;
 }
 
 /** De gewenste functies — eerst zoeken, dan pas bouwen. */
@@ -363,7 +385,16 @@ function acceptatie(lead: Lead, keuze: Modulekeuze): string {
     specifiek.push(
       "[ ] geen enkele niet-aangevraagde module is zichtbaar in menu, routes, e-mails of beheer",
     );
+    specifiek.push(
+      "[ ] een niet-aangevraagde dienst is ook via een rechtstreeks ingetypt adres niet\n    bereikbaar — niet verborgen, maar een echte 404",
+    );
+    specifiek.push(
+      "[ ] geen enkele niet-aangevraagde dienst verstuurt een dienstspecifieke automatische\n    e-mail, ook niet vanuit een geplande taak of een API-aanroep",
+    );
   }
+  specifiek.push(
+    "[ ] account-, inlog-, factuur-, betaal- en contactmail werken, onafhankelijk van\n    welke dienst aan of uit staat",
+  );
 
   return `## 26. ACCEPTATIE
 
