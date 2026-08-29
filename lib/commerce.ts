@@ -2,7 +2,7 @@ import "server-only";
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import type { Commerce, CommerceStatus, JourneyStage, Lead, Payment } from "@/lib/db/schema";
-import { logJourneyEvent, setStage } from "@/lib/journey";
+import { logEmail, logJourneyEvent, setStage } from "@/lib/journey";
 import {
   createMollieSubscription,
   ensureMollieCustomer,
@@ -13,7 +13,7 @@ import {
 } from "@/lib/mollie";
 import { euroFromCents, firstChargeDate } from "@/lib/money";
 import { registerInvoiceForPayment } from "@/lib/documents";
-import { sendCommerceMail } from "@/lib/email/send";
+import { COMMERCE_SUBJECTS, sendCommerceMail } from "@/lib/email/send";
 import { portalUrl } from "@/lib/portal-access";
 
 /**
@@ -425,6 +425,14 @@ export async function mailAndLog(
   ctaUrl?: string,
 ): Promise<boolean> {
   const mail = await sendCommerceMail(type, lead.email, lead.naam, vars, ctaUrl);
+  await logEmail(lead.id, {
+    soort: type,
+    ontvanger: lead.email,
+    onderwerp: COMMERCE_SUBJECTS[type],
+    ok: mail.ok,
+    providerId: mail.ok ? mail.id : undefined,
+    fout: mail.ok ? undefined : mail.error.message,
+  });
   await logJourneyEvent(
     lead.id,
     mail.ok ? "email_sent" : "email_failed",

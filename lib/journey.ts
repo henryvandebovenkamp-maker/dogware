@@ -99,6 +99,53 @@ function statusVoorStage(stage: JourneyStage, huidig: LeadStatus): LeadStatus | 
 }
 
 /**
+ * Legt een verstuurde mail vast bij de aanvraag.
+ *
+ * Naast de tijdlijnregel, niet in plaats daarvan: de tijdlijn vertelt het
+ * verhaal, dit logboek beantwoordt de vraag "wat heb ik die klant precies
+ * gestuurd, en kwam het aan?".
+ *
+ * Ook een mislukte verzending wordt vastgelegd. Juist die wil je terugvinden —
+ * een mail die er nooit uitging verklaart waarom het stil bleef.
+ *
+ * Blokkeert nooit de hoofdhandeling: een logboek dat een betaling of een
+ * verstuurd voorstel kan laten mislukken is erger dan een gat in het logboek.
+ */
+export async function logEmail(
+  leadId: string,
+  gegevens: {
+    soort: string;
+    ontvanger: string;
+    onderwerp: string;
+    ok: boolean;
+    providerId?: string;
+    fout?: string;
+  },
+): Promise<void> {
+  const db = getDb();
+  if (!db) return;
+  try {
+    await db.insert(schema.emails).values({
+      leadId,
+      soort: gegevens.soort,
+      ontvanger: gegevens.ontvanger,
+      onderwerp: gegevens.onderwerp,
+      status: gegevens.ok ? "SENT" : "FAILED",
+      providerId: gegevens.providerId ?? null,
+      fout: gegevens.fout ?? null,
+    });
+  } catch (err) {
+    console.error(
+      JSON.stringify({
+        evt: "email_log.error",
+        at: new Date().toISOString(),
+        error: err instanceof Error ? err.message : "onbekend",
+      }),
+    );
+  }
+}
+
+/**
  * Zet de stage van een aanvraag. Gaat standaard alleen vooruit (automatische
  * overgangen mogen niet terugvallen), tenzij `force` is gezet (handmatige
  * correctie door de beheerder).

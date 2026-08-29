@@ -452,6 +452,35 @@ export async function renderDemoReady(
 }
 
 /** Commerciële journey-mails (voorstel, betalingen, abonnement). */
+/**
+ * De onderwerpregel per commerciële mail.
+ *
+ * Staat op modulniveau en niet in de functie, omdat het e-maillogboek het
+ * onderwerp moet kunnen vastleggen zonder de mail opnieuw op te bouwen.
+ */
+export const COMMERCE_SUBJECTS: Record<CommerceMailType, string> = {
+  // Bewust een vraag en geen aankondiging: dit is de eerste keer dat we
+  // iemand aanstoten die nog niets van zich heeft laten horen.
+  "demo-reminder": "Heb je je DogWare-voorbeeld al kunnen bekijken?",
+  "proposal-sent": "Je persoonlijke voorstel van DogWare",
+  "proposal-reminder": "Je voorstel staat nog voor je klaar",
+  "proposal-accepted": "Je akkoord is binnen — nu de overeenkomst",
+  "agreement-ready": "De samenwerkingsovereenkomst staat klaar",
+  "agreement-reminder": "De overeenkomst wacht nog op je handtekening",
+  "agreement-signed": "Getekend — nu de eerste termijn",
+  "deposit-ready": "We kunnen beginnen — de eerste termijn staat klaar",
+  "deposit-reminder": "De eerste termijn staat nog open",
+  "deposit-received": "Ontvangen! We gaan jouw DogWare bouwen",
+  "delivery-ready": "Je DogWare-omgeving is klaar",
+  "final-ready": "De laatste termijn staat voor je klaar",
+  "final-reminder": "Nog één stap voor je livegang",
+  "final-received": "Helemaal rond — bedankt!",
+  "subscription-started": "Je DogWare-abonnement is geregeld",
+  "website-live": "Je website staat live 🎉",
+  "welcome-customer": "Welkom als vaste DogWare-klant",
+  "charge-failed": "Je maandbetaling is nog niet gelukt",
+};
+
 export async function sendCommerceMail(
   type: CommerceMailType,
   to: string,
@@ -464,28 +493,7 @@ export async function sendCommerceMail(
    */
   ctaUrl?: string,
 ): Promise<MailResult> {
-  const subjects: Record<CommerceMailType, string> = {
-    // Bewust een vraag en geen aankondiging: dit is de eerste keer dat we
-    // iemand aanstoten die nog niets van zich heeft laten horen.
-    "demo-reminder": "Heb je je DogWare-voorbeeld al kunnen bekijken?",
-    "proposal-sent": "Je persoonlijke voorstel van DogWare",
-    "proposal-reminder": "Je voorstel staat nog voor je klaar",
-    "proposal-accepted": "Je akkoord is binnen — nu de overeenkomst",
-    "agreement-ready": "De samenwerkingsovereenkomst staat klaar",
-    "agreement-reminder": "De overeenkomst wacht nog op je handtekening",
-    "agreement-signed": "Getekend — nu de eerste termijn",
-    "deposit-ready": "We kunnen beginnen — de eerste termijn staat klaar",
-    "deposit-reminder": "De eerste termijn staat nog open",
-    "deposit-received": "Ontvangen! We gaan jouw DogWare bouwen",
-    "delivery-ready": "Je DogWare-omgeving is klaar",
-    "final-ready": "De laatste termijn staat voor je klaar",
-    "final-reminder": "Nog één stap voor je livegang",
-    "final-received": "Helemaal rond — bedankt!",
-    "subscription-started": "Je DogWare-abonnement is geregeld",
-    "website-live": "Je website staat live 🎉",
-    "welcome-customer": "Welkom als vaste DogWare-klant",
-    "charge-failed": "Je maandbetaling is nog niet gelukt",
-  };
+  const subjects = COMMERCE_SUBJECTS;
   const link = ctaUrl ?? `${branding.siteUrl}/account`;
   return sendMail(type === "charge-failed" ? "notification" : "demo-ready", {
     to,

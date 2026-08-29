@@ -522,6 +522,19 @@ export const journeyTasks = pgTable(
     label: text("label").notNull(),
     done: boolean("done").notNull().default(false),
     doneAt: timestamp("done_at", { withTimezone: true }),
+    /**
+     * Wanneer de taak af moet zijn. Leeg = geen datum; niet elke taak heeft er
+     * een en een verzonnen deadline is erger dan geen.
+     */
+    dueAt: timestamp("due_at", { withTimezone: true }),
+    /**
+     * Wie hem oppakt. Verwijst naar een echte gebruiker in plaats van een
+     * losse naamtekst, zodat een taak niet blijft hangen bij iemand die niet
+     * meer bestaat. Leeg = van het huis.
+     */
+    assigneeUserId: uuid("assignee_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -531,6 +544,47 @@ export const journeyTasks = pgTable(
 
 export type JourneyEvent = typeof journeyEvents.$inferSelect;
 export type JourneyTask = typeof journeyTasks.$inferSelect;
+
+/**
+ * Verzonden e-mail per aanvraag.
+ *
+ * Tot nu toe was een verstuurde mail alleen een regel in de tijdlijn: je zag
+ * dát er iets uitging, niet wát. Bij een vraag als "wat heb ik die klant ook
+ * alweer gestuurd?" hielp dat niet.
+ *
+ * Bewust geen tweede mailsysteem: het versturen blijft volledig bij Resend en
+ * lib/email. Dit is uitsluitend een logboek dat ná de verzendpoging wordt
+ * weggeschreven — ook als die mislukt, want juist dán wil je het weten.
+ *
+ * De inhoud wordt niet opgeslagen. Een mail opnieuw opbouwen uit het sjabloon
+ * geeft altijd de actuele versie, en een kopie van elke verstuurde HTML in de
+ * database levert vooral opslag en een privacyvraag op.
+ */
+export const emails = pgTable(
+  "emails",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    leadId: uuid("lead_id")
+      .notNull()
+      .references(() => leads.id, { onDelete: "cascade" }),
+    /** Machinecode van het mailtype, bijv. "demo-ready" of "proposal-sent". */
+    soort: text("soort").notNull(),
+    ontvanger: text("ontvanger").notNull(),
+    onderwerp: text("onderwerp").notNull(),
+    /** "SENT" of "FAILED" — de uitkomst van de verzendpoging. */
+    status: text("status").notNull(),
+    /** Id bij Resend, om een aflevering later te kunnen opzoeken. */
+    providerId: text("provider_id"),
+    /** Waarom het misging, als het misging. */
+    fout: text("fout"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [index("emails_lead_idx").on(t.leadId, t.createdAt)],
+);
+
+export type EmailLog = typeof emails.$inferSelect;
 
 /* =========================================================================
  * Commerciële journey — afspraak, betalingen, abonnement (Mollie)
