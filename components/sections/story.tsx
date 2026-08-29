@@ -106,29 +106,25 @@ export function Story() {
           </div>
         </div>
 
-        {/* Fotostrip: het echte werk */}
-        <div className="mt-16 grid gap-4 sm:mt-20 sm:grid-cols-3">
+        {/* Fotostrip: het echte werk.
+            Twee in plaats van drie: `rustig-moment.jpg` staat nu verderop bij
+            "Minder tijd kwijt aan regelen". Vijf van de zes foto's van de site
+            zaten in dit ene blok; verdeeld over de pagina doen ze meer werk. */}
+        <div className="mt-16 grid gap-4 sm:mt-20 sm:grid-cols-2">
           {[
-            {
-              file: "rustig-moment.jpg",
-              alt: "Rustig moment samen met een hond op het strand",
-              label: "Even alle tijd voor één",
-              tone: "warm" as const,
-              delay: 0,
-            },
             {
               file: "groep-buiten.jpg",
               alt: "In het bos met de hele groep honden",
               label: "Gewoon, buiten zijn",
               tone: "sage" as const,
-              delay: 0.06,
+              delay: 0,
             },
             {
               file: "blij-baasje.jpg",
               alt: "Een blij baasje samen onderweg met een hond",
               label: "Een blij baasje",
               tone: "warm" as const,
-              delay: 0.12,
+              delay: 0.06,
             },
           ].map((p) => (
             <Reveal key={p.file} delay={p.delay}>
@@ -137,7 +133,7 @@ export function Story() {
                 alt={p.alt}
                 label={p.label}
                 tone={p.tone}
-                sizes="(min-width: 640px) 33vw, 100vw"
+                sizes="(min-width: 640px) 50vw, 100vw"
                 className="aspect-[4/3] w-full transition-transform duration-300 hover:-translate-y-1"
               />
             </Reveal>

@@ -16,19 +16,24 @@ import { PawPrint } from "lucide-react";
  * Bewust klein gehouden — py-16 in plaats van de gebruikelijke py-20/28, geen
  * kaart eromheen en geen call-to-action. Het is een rustpunt, geen extra hero.
  *
- * De foto is optioneel en dat is een ontwerpkeuze, geen tijdelijke oplossing:
- * zolang `meer-tijd.jpg` ontbreekt staat de boodschap gecentreerd en oogt de
- * sectie af. Zodra het bestand er is, verschijnt het beeld ernaast. Zo komt er
- * nooit een lege plaatshouder op een live pagina te staan. Zie
- * public/photos/README.md voor wat er op die foto hoort te staan.
+ * Het beeld ernaast is `rustig-moment.jpg`: gehurkt naast een ontspannen hond
+ * in de avondzon. Die foto stond eerder in de fotostrip van het verhaalblok,
+ * waar vijf van de zes foto's van de site bij elkaar zaten. Hier doet hij meer
+ * werk — precies op het punt waar de pagina uitlegt waaróm dit systeem bestaat,
+ * en verdeeld over de pagina in plaats van opgestapeld in één sectie.
+ *
+ * Ligt er later een foto die specifiek voor deze plek gemaakt is, zet die dan
+ * neer als `meer-tijd.jpg`; die krijgt dan vanzelf voorrang. En ontbreken ze
+ * allebei, dan staat de boodschap gewoon gecentreerd en oogt de sectie af — er
+ * komt nooit een lege plaatshouder op een live pagina te staan.
  */
-const FOTO = "meer-tijd.jpg";
+const FOTOS = ["meer-tijd.jpg", "rustig-moment.jpg"] as const;
 
 export function MeerTijd() {
-  const metFoto = photoExists(FOTO);
+  const foto = FOTOS.find(photoExists);
 
   const tekst = (
-    <div className={metFoto ? "" : "mx-auto max-w-3xl text-center"}>
+    <div className={foto ? "" : "mx-auto max-w-3xl text-center"}>
       <Reveal>
         <Eyebrow tone="sage">
           <PawPrint className="h-3.5 w-3.5" />
@@ -60,15 +65,15 @@ export function MeerTijd() {
       </div>
 
       <Container>
-        {metFoto ? (
+        {foto ? (
           <div className="grid items-center gap-10 lg:grid-cols-[1fr_1.05fr] lg:gap-14">
             <Reveal>
               {/* Liggend op mobiel zodat het geen half scherm inneemt, iets
                   staander vanaf lg waar de ruimte er wel is. */}
               <div className="relative aspect-[4/3] w-full overflow-hidden rounded-3xl shadow-soft ring-1 ring-ink/5 sm:aspect-[16/10] lg:aspect-[5/4]">
                 <Image
-                  src={`/photos/${FOTO}`}
-                  alt="Een hondenprofessional heeft rustig de tijd voor een hond"
+                  src={`/photos/${foto}`}
+                  alt="Een hondenprofessional zit gehurkt naast een rustige hond in de avondzon"
                   fill
                   sizes="(min-width: 1024px) 45vw, 100vw"
                   className="object-cover object-center"

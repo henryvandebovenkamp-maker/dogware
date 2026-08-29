@@ -49,9 +49,14 @@ Zodra het bestand er is, verschijnt het beeld vanzelf.
 | --------------- | ------------------------------------------------------ | ----------- |
 | `meer-tijd.jpg` | De rustsectie "Minder tijd kwijt aan regelen" op de homepage, tussen de facturen- en teamsecties | Liggend 4:3 |
 
-Voor `meer-tijd.jpg` werkt een rustig moment het beste: een hondenprofessional
-die even alle tijd heeft voor één hond. Geen scherm, geen administratie — dat
-is precies het punt van de sectie.
+Deze plek is **niet leeg**: er staat nu `rustig-moment.jpg`, die eerder in de
+fotostrip van het verhaalblok zat. Zet je hier ooit een foto neer die specifiek
+voor deze sectie gemaakt is, noem hem dan `meer-tijd.jpg` — die krijgt vanzelf
+voorrang, zonder dat er iets in de code hoeft te veranderen.
+
+Wat er op zo'n foto hoort: een rustig moment waarin een hondenprofessional even
+alle tijd heeft voor één hond. Geen scherm, geen administratie — dat is precies
+het punt van de sectie.
 
 **Branchekaarten op de homepage.** De negen `branche-*.jpg` hieronder zijn nu
 tijdelijke merkvlakken, dus de kaarten tonen bewust alleen hun icoon. Vervang
