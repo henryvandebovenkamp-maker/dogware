@@ -6,6 +6,11 @@ import { DemoConfirmationEmail } from "./templates/demo-confirmation";
 import { DemoRequestEmail, type DemoRequestData } from "./templates/demo-request";
 import { IntakeConfirmationEmail } from "./templates/intake-confirmation";
 import { IntakeNotificationEmail } from "./templates/intake-notification";
+import {
+  ContactMessageEmail,
+  type ContactMessageData,
+} from "./templates/contact-message";
+import { ContactConfirmationEmail } from "./templates/contact-confirmation";
 import { NotificationEmail } from "./templates/notification";
 import { GroeiBerichtEmail } from "./templates/groei-bericht";
 import { PartnerActivatedEmail } from "./templates/partner-activated";
@@ -105,6 +110,44 @@ export async function sendIntakeConfirmation(
     subject: "Jouw persoonlijke DogWare-voorbeeld is onderweg 🐾",
     react: <IntakeConfirmationEmail naam={naam} />,
     text: `Hoi ${naam},\n\nBedankt voor je aanvraag! Binnen 24 uur ontvang je geen offerte, maar een kosteloos voorbeeld van hoe jouw eigen DogWare-omgeving eruit kan zien. Je zit nergens aan vast.\n\nHartelijke groet,\nHenry van de Bovenkamp\nDogWare`,
+  });
+}
+
+/** Interne mail: een bezoeker vulde het contactformulier in. */
+export async function sendContactNotification(
+  data: ContactMessageData,
+): Promise<MailResult> {
+  const internal = process.env.EMAIL_INTERNAL;
+  if (!internal) {
+    return {
+      ok: false,
+      error: {
+        code: "NOT_CONFIGURED",
+        message: "EMAIL_INTERNAL ontbreekt in de environment variables.",
+      },
+    };
+  }
+  return sendMail("contact-message", {
+    to: internal,
+    subject: `Bericht via de website: ${data.naam}`,
+    react: <ContactMessageEmail {...data} />,
+    // Zo is antwoorden vanuit de mailbox meteen antwoorden aan de bezoeker.
+    replyTo: data.email,
+    text: `Bericht via het contactformulier.\nNaam: ${data.naam}\nE-mail: ${data.email}${data.telefoon ? `\nTelefoon: ${data.telefoon}` : ""}${data.herkomst ? `\nPagina: ${data.herkomst}` : ""}\n\n${data.bericht}`,
+  });
+}
+
+/** Persoonlijke bevestiging aan wie het contactformulier invulde. */
+export async function sendContactConfirmation(
+  to: string,
+  naam: string,
+  bericht: string,
+): Promise<MailResult> {
+  return sendMail("contact-confirmation", {
+    to,
+    subject: "Je bericht is binnen 🐾",
+    react: <ContactConfirmationEmail naam={naam} bericht={bericht} />,
+    text: `Hoi ${naam},\n\nBedankt voor je bericht. Het komt rechtstreeks bij mij binnen, niet bij een helpdesk. Je krijgt gewoon antwoord van mij.\n\nHartelijke groet,\nHenry van de Bovenkamp\nDogWare`,
   });
 }
 

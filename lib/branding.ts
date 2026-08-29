@@ -37,6 +37,18 @@ export const branding = {
   phone: "06-83853373",
   /** Zelfde nummer als tel:-link (internationaal formaat). */
   phoneTel: "+31683853373",
+  /**
+   * Publiek contactadres: hier mailt een bezoeker Henry rechtstreeks.
+   *
+   * Bewust hier en nergens anders — de contactpagina, de footer en toekomstige
+   * mails lezen allemaal deze waarde. Dit staat los van EMAIL_INTERNAL (de
+   * server-side ontvanger van notificaties) en van legalEntity.email (het
+   * adres van OneDaySite op facturen en overeenkomsten).
+   */
+  contactEmail: "henry@dogware.nl",
+
+  /** Wanneer je normaal gesproken antwoord krijgt — één plek, ook voor mails. */
+  responseTime: "Meestal binnen een paar uur, uiterlijk de volgende werkdag",
 
   /** Merk-kleuren (gelijk aan de tokens in globals.css) */
   colors: {

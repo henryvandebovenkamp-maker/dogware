@@ -1,6 +1,8 @@
 import Link from "next/link";
+import { Mail, Phone } from "lucide-react";
 import { Logo } from "@/components/brand";
 import { Container } from "@/components/ui";
+import { branding } from "@/lib/branding";
 import { BRANCHES } from "@/lib/branches";
 import { NEEDS } from "@/lib/needs";
 
@@ -25,7 +27,7 @@ const COLS = [
       { label: "Alle branches", href: "/#branches" },
       { label: "Demo aanvragen", href: "/demo" },
       { label: "Partner inloggen", href: "/partner/login" },
-      { label: "Contact", href: "/demo" },
+      { label: "Contact", href: "/contact" },
     ],
   },
 ];
@@ -41,6 +43,24 @@ export function SiteFooter() {
               Het complete bedrijfsplatform voor de hondenbranche. Meer tijd voor
               honden. Minder tijd achter een scherm.
             </p>
+
+            {/* Direct contact — geen formulier nodig als je liever gewoon belt. */}
+            <div className="mt-5 flex flex-col gap-2">
+              <a
+                href={`mailto:${branding.contactEmail}`}
+                className="inline-flex items-center gap-2 text-sm font-semibold text-ink-700 transition-colors hover:text-brand"
+              >
+                <Mail className="h-4 w-4 text-brand" />
+                {branding.contactEmail}
+              </a>
+              <a
+                href={`tel:${branding.phoneTel}`}
+                className="inline-flex items-center gap-2 text-sm font-semibold text-ink-700 transition-colors hover:text-brand"
+              >
+                <Phone className="h-4 w-4 text-brand" />
+                {branding.phone}
+              </a>
+            </div>
           </div>
 
           {COLS.map((col) => (
