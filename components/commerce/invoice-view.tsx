@@ -12,6 +12,10 @@ import { PrintKnop } from "./print-button";
  * beheerder anders uitziet dan voor de ontvanger is geen factuur maar een
  * weergave. Alleen de terugweg en de interne waarschuwing verschillen.
  *
+ * Alles wat hier getoond wordt komt uit de BEVROREN momentopname van het
+ * document (zie lib/documents.ts). Verhuist de klant volgend jaar, dan blijft
+ * deze factuur het adres tonen dat er destijds op stond.
+ *
  * Geen PDF-generator. De browser maakt er met "Print → Bewaar als PDF" een
  * echte PDF van; de print-stijlen hieronder zorgen dat er dan geen navigatie
  * of knoppen op het papier belanden. Dat scheelt een afhankelijkheid die we
@@ -29,6 +33,7 @@ export function Factuur({
   const f = factuur;
   const datum = (d: Date) =>
     d.toLocaleDateString("nl-NL", { day: "numeric", month: "long", year: "numeric" });
+  const kop = f.isCreditnota ? "Creditnota" : "Factuur";
 
   return (
     <div className="min-h-screen bg-cream px-5 py-8 print:bg-white print:p-0">
@@ -47,9 +52,10 @@ export function Factuur({
         {toonInterneWaarschuwing && f.leverancier.ontbreekt.length > 0 && (
           <p className="mb-4 rounded-xl bg-brand-50 px-4 py-3 text-[12.5px] leading-relaxed text-brand-600 ring-1 ring-brand/10 print:hidden">
             <span className="font-bold">Nog niet compleet:</span>{" "}
-            {f.leverancier.ontbreekt.join(" en ")} ontbreekt op deze factuur. Een Nederlandse
-            factuur hoort dit te vermelden — vul het aan in{" "}
-            <code className="font-mono text-[11.5px]">lib/legal-entity.ts</code>.
+            {f.leverancier.ontbreekt.join(" en ")} ontbrak toen deze factuur werd uitgegeven. Een
+            Nederlandse factuur hoort dit te vermelden — vul het aan in{" "}
+            <code className="font-mono text-[11.5px]">lib/legal-entity.ts</code>. Bestaande
+            facturen blijven bewust ongewijzigd.
           </p>
         )}
 
@@ -63,19 +69,30 @@ export function Factuur({
                 {f.leverancier.adresregels.map((r) => (
                   <div key={r}>{r}</div>
                 ))}
-                <div>{f.leverancier.email}</div>
-                <div>{f.leverancier.telefoon}</div>
+                {f.leverancier.land && <div>{f.leverancier.land}</div>}
+                {f.leverancier.email && <div>{f.leverancier.email}</div>}
+                {f.leverancier.telefoon && <div>{f.leverancier.telefoon}</div>}
                 {f.leverancier.kvk && <div>KvK {f.leverancier.kvk}</div>}
                 {f.leverancier.btw && <div>Btw {f.leverancier.btw}</div>}
               </div>
             </div>
             <div className="text-right">
-              <h1 className="text-[26px] font-extrabold tracking-tight text-ink">Factuur</h1>
+              <h1 className="text-[26px] font-extrabold tracking-tight text-ink">{kop}</h1>
               <p className="mt-1 font-mono text-[13px] font-bold text-ink-700">{f.nummer}</p>
               <p className="mt-2 text-[12.5px] text-ink-500">Factuurdatum {datum(f.datum)}</p>
-              {f.betaling.betaald && (
+              {f.vervaldatum && (
+                <p className="text-[12.5px] text-ink-500">
+                  Vervaldatum {datum(f.vervaldatum)}
+                </p>
+              )}
+              {f.betaling.betaald && !f.isCreditnota && (
                 <span className="mt-3 inline-block rounded-full bg-sage-100 px-3 py-1 text-[11.5px] font-bold uppercase tracking-wide text-sage-600">
                   Voldaan
+                </span>
+              )}
+              {f.status === "GECREDITEERD" && (
+                <span className="mt-3 inline-block rounded-full bg-cream-200 px-3 py-1 text-[11.5px] font-bold uppercase tracking-wide text-ink-500">
+                  Gecrediteerd
                 </span>
               )}
             </div>
@@ -83,54 +100,64 @@ export function Factuur({
 
           {/* Aan wie */}
           <section className="border-b border-cream-200 py-7">
-            <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-ink-300">Factuur aan</p>
-            <p className="mt-2 text-[15px] font-extrabold text-ink">{f.klant.bedrijfsnaam}</p>
+            <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-ink-300">
+              {kop} aan
+            </p>
+            <p className="mt-2 text-[15px] font-extrabold text-ink">{f.klant.naam}</p>
             <div className="mt-0.5 text-[13px] leading-relaxed text-ink-500">
               {f.klant.contactpersoon && <div>t.a.v. {f.klant.contactpersoon}</div>}
               {f.klant.adresregels.map((r) => (
                 <div key={r}>{r}</div>
               ))}
+              {f.klant.land && <div>{f.klant.land}</div>}
+              {f.klant.email && <div>{f.klant.email}</div>}
               {f.klant.kvk && <div>KvK {f.klant.kvk}</div>}
               {f.klant.btw && <div>Btw {f.klant.btw}</div>}
             </div>
           </section>
 
-          {/* De regel */}
+          {/* De regels */}
           <section className="py-7">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr className="border-b border-cream-200">
-                  <th className="pb-2.5 text-left text-[11px] font-bold uppercase tracking-[0.1em] text-ink-300">
-                    Omschrijving
-                  </th>
-                  <th className="pb-2.5 text-right text-[11px] font-bold uppercase tracking-[0.1em] text-ink-300">
-                    Excl. btw
-                  </th>
-                  <th className="pb-2.5 text-right text-[11px] font-bold uppercase tracking-[0.1em] text-ink-300">
-                    Btw
-                  </th>
-                  <th className="pb-2.5 text-right text-[11px] font-bold uppercase tracking-[0.1em] text-ink-300">
-                    Incl. btw
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td className="py-4 pr-4 align-top text-[14px] leading-relaxed text-ink-700">
-                    {f.omschrijving}
-                  </td>
-                  <td className="py-4 text-right align-top text-[14px] tabular-nums text-ink-700">
-                    {euroFromCents(f.bedragen.exclCents)}
-                  </td>
-                  <td className="py-4 text-right align-top text-[14px] tabular-nums text-ink-700">
-                    {f.bedragen.btwPercent}%
-                  </td>
-                  <td className="py-4 text-right align-top text-[14px] font-semibold tabular-nums text-ink">
-                    {euroFromCents(f.bedragen.inclCents)}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+            {/* Op een smal scherm mag de tabel schuiven, de pagina niet */}
+            <div className="-mx-1 overflow-x-auto px-1 print:overflow-visible">
+              <table className="w-full min-w-[440px] border-collapse">
+                <thead>
+                  <tr className="border-b border-cream-200">
+                    <Kop>Omschrijving</Kop>
+                    <Kop rechts>Aantal</Kop>
+                    <Kop rechts>Prijs</Kop>
+                    <Kop rechts>Btw</Kop>
+                    <Kop rechts>Totaal</Kop>
+                  </tr>
+                </thead>
+                <tbody>
+                  {f.regels.map((r, i) => (
+                    <tr key={`${r.omschrijving}-${i}`} className="align-top">
+                      <td className="py-4 pr-4 text-[14px] leading-relaxed text-ink-700">
+                        <span className="font-semibold text-ink">{r.omschrijving}</span>
+                        {r.toelichting && (
+                          <span className="mt-0.5 block text-[12.5px] text-ink-500">
+                            {r.toelichting}
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-4 pl-2 text-right text-[14px] tabular-nums text-ink-700">
+                        {r.aantal}
+                      </td>
+                      <td className="py-4 pl-2 text-right text-[14px] tabular-nums text-ink-700">
+                        {euroFromCents(r.prijsExVatCents)}
+                      </td>
+                      <td className="py-4 pl-2 text-right text-[14px] tabular-nums text-ink-700">
+                        {r.vatPercent}%
+                      </td>
+                      <td className="py-4 pl-2 text-right text-[14px] font-semibold tabular-nums text-ink">
+                        {euroFromCents(r.regelExVatCents)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
 
             {/* Totalen */}
             <div className="mt-2 flex justify-end border-t border-cream-200 pt-4">
@@ -142,7 +169,7 @@ export function Factuur({
                 />
                 <div className="border-t border-ink/10 pt-2">
                   <Regel
-                    label="Totaal"
+                    label="Totaal incl. btw"
                     value={euroFromCents(f.bedragen.inclCents)}
                     groot
                   />
@@ -153,31 +180,56 @@ export function Factuur({
 
           {/* Betaling */}
           <footer className="border-t border-cream-200 pt-6">
-            {f.betaling.betaald && f.betaling.betaaldOp ? (
+            {f.isCreditnota ? (
               <p className="text-[13px] leading-relaxed text-ink-500">
-                <span className="font-bold text-ink">Reeds voldaan</span> op{" "}
-                {datum(f.betaling.betaaldOp)} via iDEAL. Dit bedrag hoeft niet meer te worden
+                <span className="font-bold text-ink">Creditnota.</span> Deze nota boekt factuur{" "}
+                {f.betaling.referentie ?? "hierboven"} tegen. Er hoeft niets te worden
                 overgemaakt.
+              </p>
+            ) : f.betaling.betaald ? (
+              <p className="text-[13px] leading-relaxed text-ink-500">
+                <span className="font-bold text-ink">Reeds voldaan</span>
+                {f.betaling.betaaldOp && ` op ${datum(f.betaling.betaaldOp)}`}
+                {f.betaling.methode && ` via ${f.betaling.methode}`}. Dit bedrag hoeft niet meer
+                te worden overgemaakt.
               </p>
             ) : (
               <p className="text-[13px] leading-relaxed text-ink-500">
-                Deze factuur is nog niet voldaan.
+                Deze factuur staat nog open
+                {f.vervaldatum && ` en vervalt op ${datum(f.vervaldatum)}`}.
+                {f.leverancier.iban &&
+                  ` Je kunt het bedrag overmaken naar ${f.leverancier.iban} t.n.v. ${f.leverancier.naam}, onder vermelding van ${f.nummer}.`}
               </p>
             )}
-            {(f.betaling.referentie || f.betaling.molliePaymentId) && (
+            {(f.betaling.referentie || f.betaling.molliePaymentId) && !f.isCreditnota && (
               <p className="mt-1.5 font-mono text-[11px] text-ink-300">
                 {f.betaling.referentie}
                 {f.betaling.molliePaymentId && ` · ${f.betaling.molliePaymentId}`}
               </p>
             )}
             <p className="mt-5 text-[11.5px] leading-relaxed text-ink-300">
-              DogWare is een dienst van {f.leverancier.naam}. Vragen over deze factuur? Mail{" "}
+              DogWare is een dienst van {f.leverancier.naam}
+              {f.leverancier.kvk && ` · KvK ${f.leverancier.kvk}`}
+              {f.leverancier.btw && ` · btw ${f.leverancier.btw}`}
+              {f.leverancier.iban && ` · ${f.leverancier.iban}`}. Vragen over deze factuur? Mail{" "}
               {f.leverancier.email}.
             </p>
           </footer>
         </article>
       </div>
     </div>
+  );
+}
+
+function Kop({ children, rechts }: { children: React.ReactNode; rechts?: boolean }) {
+  return (
+    <th
+      className={`pb-2.5 text-[11px] font-bold uppercase tracking-[0.1em] text-ink-300 ${
+        rechts ? "pl-2 text-right" : "text-left"
+      }`}
+    >
+      {children}
+    </th>
   );
 }
 

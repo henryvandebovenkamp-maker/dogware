@@ -223,3 +223,144 @@ export function mayChargeSubscription(opts: {
   eerste.setUTCMonth(eerste.getUTCMonth() + Math.max(0, opts.freeMonths));
   return opts.now.getTime() >= eerste.getTime();
 }
+
+/* =========================================================================
+ * Factuurregels
+ *
+ * Een factuur is geen totaalbedrag met een label eromheen: hij bestaat uit
+ * regels, en de totalen zijn de som van die regels. Alles hieronder is puur en
+ * rekent uitsluitend in hele centen — geen enkele tussenstap in euro's, want
+ * daar ontstaan de afrondingsverschillen die een boekhouder later niet meer
+ * kan verklaren.
+ * ========================================================================= */
+
+/** Eén regel op de factuur, met alles al uitgerekend. */
+export type InvoiceLine = {
+  omschrijving: string;
+  /** Tweede regel eronder, bijv. "50% aanbetaling". Leeg = geen. */
+  toelichting: string | null;
+  aantal: number;
+  /** Stukprijs exclusief btw, in centen. */
+  prijsExVatCents: number;
+  vatPercent: number;
+  /** aantal × stukprijs */
+  regelExVatCents: number;
+  regelVatCents: number;
+  regelInclVatCents: number;
+};
+
+export type InvoiceTotals = {
+  exclCents: number;
+  btwCents: number;
+  inclCents: number;
+  /** Het percentage dat op de factuur staat. Null bij gemengde tarieven. */
+  btwPercent: number | null;
+};
+
+/**
+ * Bouwt één factuurregel. Het btw-bedrag wordt over de REGEL berekend, niet
+ * per stuk: bij 3 × € 0,15 met 21% is dat 9 cent en niet 3 × 3 cent.
+ */
+export function invoiceLine(input: {
+  omschrijving: string;
+  toelichting?: string | null;
+  aantal?: number;
+  prijsExVatCents: number;
+  vatPercent: number;
+}): InvoiceLine {
+  const aantal = Number.isFinite(input.aantal) ? Math.round(input.aantal as number) : 1;
+  const prijs = Math.round(input.prijsExVatCents);
+  const vatPercent = Math.max(0, Math.round(input.vatPercent));
+  const regelEx = aantal * prijs;
+  const regelVat = Math.round((regelEx * vatPercent) / 100);
+  return {
+    omschrijving: input.omschrijving,
+    toelichting: input.toelichting?.trim() || null,
+    aantal,
+    prijsExVatCents: prijs,
+    vatPercent,
+    regelExVatCents: regelEx,
+    regelVatCents: regelVat,
+    regelInclVatCents: regelEx + regelVat,
+  };
+}
+
+/**
+ * Regel exclusief btw uit een bedrag INCLUSIEF btw.
+ *
+ * Nodig omdat Mollie een bedrag inclusief btw bevestigt en dát het bedrag is
+ * dat werkelijk is ontvangen. De btw is dan het verschil, nooit een tweede
+ * afronding — anders telt de factuur een cent naast wat er op de rekening
+ * staat.
+ */
+export function invoiceLineFromGross(input: {
+  omschrijving: string;
+  toelichting?: string | null;
+  grossCents: number;
+  vatPercent: number;
+}): InvoiceLine {
+  const vatPercent = Math.max(0, Math.round(input.vatPercent));
+  const incl = Math.round(input.grossCents);
+  const ex = Math.round(incl / (1 + vatPercent / 100));
+  return {
+    omschrijving: input.omschrijving,
+    toelichting: input.toelichting?.trim() || null,
+    aantal: 1,
+    prijsExVatCents: ex,
+    vatPercent,
+    regelExVatCents: ex,
+    regelVatCents: incl - ex,
+    regelInclVatCents: incl,
+  };
+}
+
+/** Totalen als som van de regels. Nooit los ingevoerd of herberekend. */
+export function sumInvoiceLines(regels: readonly InvoiceLine[]): InvoiceTotals {
+  const exclCents = regels.reduce((s, r) => s + r.regelExVatCents, 0);
+  const btwCents = regels.reduce((s, r) => s + r.regelVatCents, 0);
+  const tarieven = new Set(regels.map((r) => r.vatPercent));
+  return {
+    exclCents,
+    btwCents,
+    inclCents: exclCents + btwCents,
+    btwPercent: tarieven.size === 1 ? [...tarieven][0] : null,
+  };
+}
+
+/** Alle bedragen van een regel omgedraaid — de basis onder een creditnota. */
+export function negateInvoiceLine(regel: InvoiceLine): InvoiceLine {
+  return {
+    ...regel,
+    prijsExVatCents: -regel.prijsExVatCents,
+    regelExVatCents: -regel.regelExVatCents,
+    regelVatCents: -regel.regelVatCents,
+    regelInclVatCents: -regel.regelInclVatCents,
+  };
+}
+
+/**
+ * Nette naam van een Mollie-betaalmethode.
+ *
+ * De factuur beweerde eerder altijd "via iDEAL", ook bij een creditcard- of
+ * incassobetaling. Onbekende methodes krijgen geen verzonnen label maar
+ * gewoon niets, zodat er nooit een onwaarheid op een factuur belandt.
+ */
+export function betaalmethodeLabel(method: string | null | undefined): string | null {
+  if (!method) return null;
+  const labels: Record<string, string> = {
+    ideal: "iDEAL",
+    creditcard: "Creditcard",
+    bancontact: "Bancontact",
+    banktransfer: "Bankoverboeking",
+    directdebit: "SEPA-incasso",
+    paypal: "PayPal",
+    applepay: "Apple Pay",
+    belfius: "Belfius",
+    kbc: "KBC",
+    sofort: "SOFORT",
+    eps: "EPS",
+    giropay: "giropay",
+    przelewy24: "Przelewy24",
+  };
+  return labels[method.toLowerCase()] ?? null;
+}

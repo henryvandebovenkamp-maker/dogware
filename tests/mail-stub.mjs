@@ -10,6 +10,16 @@
  */
 globalThis.__verzondenMails ??= [];
 
+/**
+ * De onderwerpregels. Geen mock-waarden maar dezelfde sleutels als in
+ * send.tsx: lib/commerce leest deze tabel om het e-maillogboek te vullen, dus
+ * zonder export hier kan geen enkele test iets importeren dat commerce raakt.
+ */
+export const COMMERCE_SUBJECTS = new Proxy(
+  {},
+  { get: (_t, sleutel) => `stub-onderwerp:${String(sleutel)}` },
+);
+
 export async function sendCommerceMail(type, to, naam, vars = {}, ctaUrl) {
   globalThis.__verzondenMails.push({ type, to, naam, vars, ctaUrl });
   return { ok: true, id: `stub_${globalThis.__verzondenMails.length}` };

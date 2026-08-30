@@ -73,15 +73,25 @@ export async function processPaymentByMollieId(molliePaymentId: string): Promise
   const db = getDb();
   if (!db) return;
 
-  const [payment] = await db
+  const [bestaand] = await db
     .select()
     .from(schema.payments)
     .where(eq(schema.payments.molliePaymentId, molliePaymentId))
     .limit(1);
-  if (!payment) return; // onbekende payment — negeren
 
   const mollie = await getMolliePayment(molliePaymentId);
   if (!mollie) return;
+
+  /*
+   * Een incasso die Mollie zélf aanmaakt uit het maandabonnement kennen wij
+   * nog niet: die betaling is nooit door onze code gestart, dus hij staat niet
+   * in `payments`. Zonder onderstaande stap negeerden we die webhook stil, en
+   * kreeg de klant nooit een maandfactuur. Dit is de plek waar zo'n incasso
+   * alsnog in de administratie landt.
+   */
+  const payment = bestaand ?? (await adoptSubscriptionPayment(molliePaymentId, mollie));
+  if (!payment) return; // onbekende payment die niet van ons is — negeren
+
   const nieuweStatus = mapMollieStatus(mollie.status);
 
   // Al volledig afgehandeld? Dan is er niets meer te doen.
@@ -92,6 +102,14 @@ export async function processPaymentByMollieId(molliePaymentId: string): Promise
     .set({
       status: nieuweStatus,
       paidAt: nieuweStatus === "PAID" ? (payment.paidAt ?? new Date()) : payment.paidAt,
+      /*
+       * De betaalmethode staat pas ná betaling vast — bij het aanmaken kiest
+       * de klant nog niets. Hem hier vastleggen is de enige manier waarop de
+       * factuur straks de waarheid kan vertellen in plaats van "iDEAL" aan te
+       * nemen.
+       */
+      method:
+        (mollie as unknown as { method?: string | null }).method ?? payment.method,
       mollieCustomerId:
         (mollie as unknown as { customerId?: string }).customerId ?? payment.mollieCustomerId,
       mollieMandateId:
@@ -129,6 +147,108 @@ export async function processPaymentByMollieId(molliePaymentId: string): Promise
     .where(eq(schema.payments.id, payment.id))
     .limit(1);
   await onPaymentPaid(vers ?? payment);
+}
+
+/**
+ * Neemt een door Mollie zelf aangemaakte abonnementsincasso op in de eigen
+ * administratie.
+ *
+ * De koppeling loopt via de Mollie-customer: die staat op de commerce-rij en
+ * is de enige betrouwbare band tussen een recurring payment en ons dossier.
+ * Een betaling zonder abonnement of zonder bekende customer laten we met rust
+ * — dan is het niet van ons, en dan verzinnen we er beslist geen dossier bij.
+ *
+ * De periode ("2026-09") komt uit de betaaldatum. De bestaande unieke index op
+ * (commerce, type, periode) zorgt dat één maand maar één keer geïncasseerd kan
+ * worden; een nieuwe poging in dezelfde maand neemt de bestaande, nog niet
+ * betaalde rij over in plaats van er een tweede naast te zetten.
+ */
+async function adoptSubscriptionPayment(
+  molliePaymentId: string,
+  mollie: NonNullable<Awaited<ReturnType<typeof getMolliePayment>>>,
+): Promise<Payment | null> {
+  const db = getDb();
+  if (!db) return null;
+
+  const ruw = mollie as unknown as {
+    subscriptionId?: string | null;
+    customerId?: string | null;
+    mandateId?: string | null;
+    method?: string | null;
+    amount?: { value?: string };
+    paidAt?: string | null;
+    createdAt?: string | null;
+  };
+  if (!ruw.subscriptionId || !ruw.customerId) return null;
+
+  const [commerce] = await db
+    .select()
+    .from(schema.commerce)
+    .where(eq(schema.commerce.mollieCustomerId, ruw.customerId))
+    .limit(1);
+  if (!commerce) return null;
+
+  // Bedrag uit Mollie in centen, zonder ooit via een float te gaan.
+  const waarde = ruw.amount?.value ?? "0";
+  const [heel, decimalen = ""] = waarde.split(".");
+  const amountCents =
+    Number(heel) * 100 + Number(`${decimalen}00`.slice(0, 2)) * (waarde.startsWith("-") ? -1 : 1);
+  if (!Number.isFinite(amountCents) || amountCents <= 0) return null;
+
+  const moment = new Date(ruw.paidAt ?? ruw.createdAt ?? Date.now());
+  const periode = `${moment.getUTCFullYear()}-${String(moment.getUTCMonth() + 1).padStart(2, "0")}`;
+
+  try {
+    const [nieuw] = await db
+      .insert(schema.payments)
+      .values({
+        commerceId: commerce.id,
+        type: "SUBSCRIPTION",
+        status: "CREATED",
+        amountCents,
+        molliePaymentId,
+        periode,
+        sequenceType: "recurring",
+        mollieCustomerId: ruw.customerId,
+        mollieMandateId: ruw.mandateId ?? null,
+        method: ruw.method ?? null,
+        referentie: `DW-ABONNEMENT-${periode}`,
+      })
+      .returning();
+    return nieuw ?? null;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "";
+    if (!/payments_sub_period_idx|payments_mollie_idx|duplicate key/i.test(msg)) throw err;
+  }
+
+  /*
+   * Er bestaat al een rij voor deze maand. Is die al betaald, dan zijn we
+   * klaar — dubbel incasseren registreren we niet. Staat hij nog open (een
+   * eerdere poging is mislukt), dan hoort déze betaling erbij en nemen we het
+   * nieuwe Mollie-id over.
+   */
+  const [vanDieMaand] = await db
+    .select()
+    .from(schema.payments)
+    .where(
+      and(
+        eq(schema.payments.commerceId, commerce.id),
+        eq(schema.payments.type, "SUBSCRIPTION"),
+        eq(schema.payments.periode, periode),
+      ),
+    )
+    .limit(1);
+  if (!vanDieMaand) return null;
+  if (vanDieMaand.status === "PAID" || vanDieMaand.molliePaymentId === molliePaymentId) {
+    return vanDieMaand.molliePaymentId === molliePaymentId ? vanDieMaand : null;
+  }
+
+  const [overgenomen] = await db
+    .update(schema.payments)
+    .set({ molliePaymentId, method: ruw.method ?? vanDieMaand.method })
+    .where(eq(schema.payments.id, vanDieMaand.id))
+    .returning();
+  return overgenomen ?? null;
 }
 
 /* ------------------------------------------------------------- betaald ---- */
@@ -417,17 +537,32 @@ const BUILD_TASKS = [
   "Oplevering klaarzetten",
 ];
 
-/** Verstuurt een mail en legt het resultaat vast op de tijdlijn. */
+/**
+ * Verstuurt een mail en legt het resultaat vast op de tijdlijn.
+ *
+ * `naar` maakt het mogelijk dezelfde mail naar een ANDER adres te sturen dan
+ * dat van de klant — bijvoorbeeld een factuurkopie naar de boekhouder. Dat is
+ * bewust één functie en geen tweede verzendpad: het e-maillogboek en de
+ * tijdlijn blijven zo de enige plek waar staat wat er de deur uit ging.
+ *
+ * Zo'n kopie is géén klantcommunicatie. Hij wordt daarom als intern
+ * gelogd en als kopie benoemd, zodat de tijdlijn nooit suggereert dat de klant
+ * iets heeft ontvangen dat hij niet gekregen heeft.
+ */
 export async function mailAndLog(
   lead: Lead,
   type: Parameters<typeof sendCommerceMail>[0],
   vars: { amount?: string; extra?: string } = {},
   ctaUrl?: string,
+  opts: { naar?: string } = {},
 ): Promise<boolean> {
-  const mail = await sendCommerceMail(type, lead.email, lead.naam, vars, ctaUrl);
+  const ontvanger = opts.naar?.trim() || lead.email;
+  const isKopie = ontvanger.toLowerCase() !== lead.email.toLowerCase();
+
+  const mail = await sendCommerceMail(type, ontvanger, lead.naam, vars, ctaUrl);
   await logEmail(lead.id, {
-    soort: type,
-    ontvanger: lead.email,
+    soort: isKopie ? `${type} (kopie)` : type,
+    ontvanger,
     onderwerp: COMMERCE_SUBJECTS[type],
     ok: mail.ok,
     providerId: mail.ok ? mail.id : undefined,
@@ -437,9 +572,9 @@ export async function mailAndLog(
     lead.id,
     mail.ok ? "email_sent" : "email_failed",
     mail.ok
-      ? `E-mail verstuurd naar ${lead.email} (${type})`
-      : `E-mail mislukt (${type}): ${mail.error.message}`,
-    { actor: "systeem", mailType: type, internal: !mail.ok },
+      ? `${isKopie ? "Kopie van e-mail" : "E-mail"} verstuurd naar ${ontvanger} (${type})`
+      : `E-mail mislukt (${type}) naar ${ontvanger}: ${mail.error.message}`,
+    { actor: isKopie ? "admin" : "systeem", mailType: type, internal: isKopie || !mail.ok },
   );
   return mail.ok;
 }

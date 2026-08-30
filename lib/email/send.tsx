@@ -479,6 +479,7 @@ export const COMMERCE_SUBJECTS: Record<CommerceMailType, string> = {
   "website-live": "Je website staat live 🎉",
   "welcome-customer": "Welkom als vaste DogWare-klant",
   "charge-failed": "Je maandbetaling is nog niet gelukt",
+  "invoice-sent": "Je factuur van DogWare",
 };
 
 export async function sendCommerceMail(

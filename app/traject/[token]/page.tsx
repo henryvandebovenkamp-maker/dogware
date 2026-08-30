@@ -4,6 +4,7 @@ import { getActiveProposal, isExpired, pricingLabels, readPricing } from "@/lib/
 import { getCurrentAgreement, isSigned } from "@/lib/agreements";
 import { paidTotal } from "@/lib/commerce";
 import { listDocuments } from "@/lib/documents";
+import { isInvoiceType } from "@/lib/db/schema";
 import { getTimeline } from "@/lib/journey";
 import { computeOutstanding, euroFromCents } from "@/lib/money";
 import { isMollieConfigured } from "@/lib/mollie";
@@ -74,7 +75,7 @@ export default async function TrajectPage({
         titel: d.titel,
         bedrag: d.totalInclVatCents > 0 ? euroFromCents(d.totalInclVatCents) : null,
         issuedAt: d.issuedAt.toISOString(),
-        isFactuur: d.type.startsWith("INVOICE"),
+        isFactuur: isInvoiceType(d.type),
       }))}
       tijdlijn={tijdlijn.map(naarRij)}
       voorstel={{

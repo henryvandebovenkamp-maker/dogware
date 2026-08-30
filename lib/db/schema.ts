@@ -9,6 +9,7 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 /* =========================================================================
  * Gebruikers & authenticatie
@@ -839,8 +840,57 @@ export const DOCUMENT_TYPES = [
   "INVOICE_DEPOSIT",
   "INVOICE_FINAL",
   "INVOICE_SUBSCRIPTION",
+  /**
+   * Creditnota. Een definitieve factuur wordt nooit verwijderd of aangepast;
+   * corrigeren gebeurt met een tegenboeking die zelf ook een nummer krijgt.
+   */
+  "CREDIT_NOTE",
 ] as const;
 export type DocumentType = (typeof DOCUMENT_TYPES)[number];
+
+/** Elk type dat administratief een factuur is (inclusief de creditnota). */
+export const INVOICE_DOCUMENT_TYPES = [
+  "INVOICE_DEPOSIT",
+  "INVOICE_FINAL",
+  "INVOICE_SUBSCRIPTION",
+  "CREDIT_NOTE",
+] as const;
+
+/**
+ * Is dit documenttype een factuur?
+ *
+ * Staat hier en niet in de servicelaag omdat ook de client-componenten
+ * (adminpaneel, klantomgeving) moeten weten of een document een factuurlink
+ * verdient. Eén definitie, zodat een creditnota nergens per ongeluk buiten de
+ * boot valt doordat er ergens nog `startsWith("INVOICE")` staat.
+ */
+export function isInvoiceType(type: string): boolean {
+  return (INVOICE_DOCUMENT_TYPES as readonly string[]).includes(type);
+}
+
+/**
+ * Betaalstatus van een factuur.
+ *
+ * `CONCEPT` bestaat voor volledigheid van de administratie: zolang een factuur
+ * concept is heeft hij nog geen definitief nummer verdiend. DogWare geeft op
+ * dit moment uitsluitend definitieve facturen uit (ze ontstaan uit een echte
+ * betaling of een echte termijn), dus in de praktijk begint een factuur op
+ * OPEN of BETAALD.
+ *
+ * VERLOPEN wordt niet als kolomwaarde weggeschreven maar afgeleid uit
+ * `dueAt`: een openstaande factuur die over de vervaldatum is, ís verlopen.
+ * Zo kan er geen achterstallige cronjob bestaan die de administratie laat
+ * liegen. Zie `effectieveStatus()` in lib/invoices.ts.
+ */
+export const INVOICE_STATUSES = [
+  "CONCEPT",
+  "OPEN",
+  "BETAALD",
+  "VERLOPEN",
+  "GECREDITEERD",
+  "GEANNULEERD",
+] as const;
+export type InvoiceStatus = (typeof INVOICE_STATUSES)[number];
 
 export const documents = pgTable(
   "documents",
@@ -872,11 +922,59 @@ export const documents = pgTable(
     /** Zichtbaar in de klantomgeving? Interne stukken staan hier op false. */
     visibleToCustomer: boolean("visible_to_customer").notNull().default(true),
     issuedAt: timestamp("issued_at", { withTimezone: true }).notNull().defaultNow(),
+
+    /* ------------------------------------------------- factuuradministratie -- */
+
+    /**
+     * Betaalstatus. Een echte kolom en niet iets dat elke keer uit de betaling
+     * wordt afgeleid: de factuuradministratie moet te filteren en te sommeren
+     * zijn zonder de hele betaalgeschiedenis mee te lezen. Niet-financiële
+     * documenten (voorstel, overeenkomst) staan op CONCEPT en tellen nergens
+     * in mee.
+     */
+    status: text("status").$type<InvoiceStatus>().notNull().default("CONCEPT"),
+    /** Vervaldatum. Leeg bij een factuur die bij uitgifte al voldaan was. */
+    dueAt: timestamp("due_at", { withTimezone: true }),
+    /**
+     * Wanneer er werkelijk betaald is. Stond eerder alleen in de snapshot;
+     * daarmee was "betaald deze maand" niet te berekenen zonder elke JSON-blob
+     * open te breken.
+     */
+    paidAt: timestamp("paid_at", { withTimezone: true }),
+    /** Mollie-methode zoals bevestigd door de webhook ("ideal", "creditcard"). */
+    paymentMethod: text("payment_method"),
+    /** Mollie-referentie, ook los opgeslagen zodat de admin erop kan zoeken. */
+    molliePaymentId: text("mollie_payment_id"),
+
+    /** Wanneer en waarheen de factuur per mail is verstuurd. */
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+    sentTo: text("sent_to"),
+
+    /**
+     * Creditnota-koppeling, beide kanten op. Op de oorspronkelijke factuur
+     * staat welke creditnota hem tegenboekt; op de creditnota staat welke
+     * factuur hij crediteert. Bewust zonder foreign key, net als `paymentId`
+     * hierboven: een administratieve verwijzing mag nooit een cascade-delete
+     * kunnen veroorzaken.
+     */
+    creditsDocumentId: uuid("credits_document_id"),
+    creditedByDocumentId: uuid("credited_by_document_id"),
+    /** Waarom er gecrediteerd is — verplicht bij het aanmaken van de nota. */
+    creditReason: text("credit_reason"),
   },
   (t) => [
     uniqueIndex("documents_nummer_idx").on(t.nummer),
     index("documents_lead_idx").on(t.leadId, t.issuedAt),
     index("documents_commerce_idx").on(t.commerceId, t.type),
+    /*
+     * Eén betaling, één factuur — afgedwongen door de database.
+     * `registerDocument` kijkt eerst zelf, maar twee gelijktijdige webhooks
+     * kunnen die controle allebei passeren. Deze index is de laatste grendel.
+     */
+    uniqueIndex("documents_payment_idx")
+      .on(t.paymentId)
+      .where(sql`${t.paymentId} is not null`),
+    index("documents_status_idx").on(t.status, t.issuedAt),
   ],
 );
 
@@ -916,6 +1014,13 @@ export const payments = pgTable(
     amountCents: integer("amount_cents").notNull(),
     /** Mollie payment-ID (tr_...) — uniek */
     molliePaymentId: text("mollie_payment_id"),
+    /**
+     * De betaalmethode zoals Mollie hem bevestigde ("ideal", "creditcard",
+     * "directdebit"). Wordt pas bekend ná betaling — bij het aanmaken kiest de
+     * klant nog niets. Stond nergens vast, waardoor de factuur "via iDEAL"
+     * beweerde ook wanneer er met een creditcard was betaald.
+     */
+    method: text("method"),
     /** Periode voor abonnementsbetalingen, bijv. "2026-08" — voorkomt dubbele incasso */
     periode: text("periode"),
     paidAt: timestamp("paid_at", { withTimezone: true }),

@@ -22,6 +22,7 @@ import {
   toggleTask,
   type CommerceState,
 } from "@/app/actions/commerce";
+import { isInvoiceType } from "@/lib/db/schema";
 import { cn } from "@/lib/cn";
 
 const IDLE: CommerceState = { status: "idle" };
@@ -279,12 +280,15 @@ export function CommerceSecties(props: {
       </Sectie>
 
       <Sectie
-        titel="Betalingen"
+        titel="Facturen & betalingen"
         icon={<Receipt className="h-4 w-4" />}
         badge={props.betalingen.length ? `${props.betalingen.length}` : "nog geen"}
       >
         {props.betalingen.length === 0 ? (
-          <Leeg>Er is nog geen betaling gestart.</Leeg>
+          <Leeg>
+            Er is nog geen betaling gestart. Een factuur ontstaat vanzelf zodra er een termijn
+            betaald is — hij wordt hier nooit met de hand aangemaakt.
+          </Leeg>
         ) : (
           <ul className="space-y-2">
             {props.betalingen.map((b) => (
@@ -309,7 +313,7 @@ export function CommerceSecties(props: {
                 )}
                 {b.factuurNummer && (
                   <Link
-                    href={`/admin/leads/${props.leadId}/factuur/${b.factuurNummer}`}
+                    href={`/admin/facturen/${encodeURIComponent(b.factuurNummer)}`}
                     className="mt-2 inline-flex items-center gap-1.5 text-[12px] font-bold text-brand hover:text-brand-600"
                   >
                     <Receipt className="h-3.5 w-3.5" />
@@ -376,11 +380,13 @@ export function CommerceSecties(props: {
         badge={props.documenten.length ? `${props.documenten.length}` : "nog geen"}
       >
         {props.documenten.length === 0 ? (
-          <Leeg>Documenten worden automatisch vastgelegd bij versturen, tekenen en betalen.</Leeg>
+          <Leeg>
+            Documenten worden automatisch vastgelegd bij versturen, tekenen en betalen.
+          </Leeg>
         ) : (
           <ul className="space-y-1.5">
             {props.documenten.map((d) => {
-              const isFactuur = d.type.startsWith("INVOICE");
+              const isFactuur = isInvoiceType(d.type);
               const regel = (
                 <>
                   <span className="min-w-0">
@@ -398,7 +404,7 @@ export function CommerceSecties(props: {
                 <li key={d.id} className="text-[13px]">
                   {isFactuur ? (
                     <Link
-                      href={`/admin/leads/${props.leadId}/factuur/${d.nummer}`}
+                      href={`/admin/facturen/${encodeURIComponent(d.nummer)}`}
                       className="-mx-2 flex flex-wrap items-baseline justify-between gap-2 rounded-lg px-2 py-1 transition hover:bg-cream-100/70"
                     >
                       {regel}

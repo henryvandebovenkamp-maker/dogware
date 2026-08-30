@@ -8,6 +8,8 @@ import { logout } from "@/app/actions/auth";
 import { BrandMark } from "@/components/brand";
 import { getCommerceForLead } from "@/lib/commerce";
 import { portalUrl } from "@/lib/portal-access";
+import { invoicesForUser } from "@/lib/invoices";
+import { KlantFacturen } from "@/components/commerce/klant-facturen";
 import { cn } from "@/lib/cn";
 
 export const metadata: Metadata = {
@@ -41,6 +43,14 @@ export default async function AccountPage() {
    * iets anders beweren. Vanaf hier verwijzen we er alleen naartoe.
    */
   const commerce = lead ? await getCommerceForLead(lead.id) : null;
+
+  /*
+   * De facturen van dit account. `invoicesForUser` doet de eigendomscontrole
+   * zelf en kijkt uitsluitend naar aanvragen die aan deze gebruiker gekoppeld
+   * zijn — niet naar het e-mailadres, want dat is te makkelijk gelijk te
+   * krijgen aan dat van iemand anders.
+   */
+  const facturen = await invoicesForUser(user.id);
   const trajectLink =
     commerce?.portalToken && commerce.status !== "DRAFT"
       ? portalUrl(commerce.portalToken)
@@ -158,7 +168,9 @@ export default async function AccountPage() {
           })}
         </ol>
 
-        <p className="mt-4 text-[13px] text-ink-400">
+        <KlantFacturen facturen={facturen} />
+
+        <p className="mt-8 text-[13px] text-ink-400">
           Vragen of feedback? Reageer gewoon op de mail die je van ons kreeg —
           je krijgt altijd een hondenmens aan de lijn.
         </p>

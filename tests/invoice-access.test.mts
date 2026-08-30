@@ -20,6 +20,19 @@ const adminPagina = readFileSync(
   "utf8",
 );
 const documenten = readFileSync(new URL("../lib/documents.ts", import.meta.url), "utf8");
+const accountPagina = readFileSync(
+  new URL("../app/account/facturen/[nummer]/page.tsx", import.meta.url),
+  "utf8",
+);
+const adminDetail = readFileSync(
+  new URL("../app/admin/(portal)/facturen/[nummer]/page.tsx", import.meta.url),
+  "utf8",
+);
+const adminActies = readFileSync(
+  new URL("../app/admin/(portal)/facturen/actions.ts", import.meta.url),
+  "utf8",
+);
+const facturenService = readFileSync(new URL("../lib/invoices.ts", import.meta.url), "utf8");
 
 describe("1. de klantroute", () => {
   it("controleert eerst de sleutel van de klantomgeving", () => {
@@ -58,9 +71,98 @@ describe("3. alleen facturen zijn opvraagbaar", () => {
   it("weigert documenten die geen factuur zijn", () => {
     assert.match(
       documenten,
-      /if \(!doc\.type\.startsWith\("INVOICE"\)\) return null/,
+      /if \(!isInvoiceType\(doc\.type\)\) return null/,
       "een voorstel of overeenkomst hoort niet via de factuurroute te lekken",
     );
+  });
+});
+
+describe("5. de klantroute in het account", () => {
+  it("eist een ingelogde klant", () => {
+    assert.match(accountPagina, /requireRole\("CUSTOMER"/);
+  });
+
+  it("laat de eigendomscontrole door de servicelaag doen", () => {
+    assert.match(
+      accountPagina,
+      /invoiceForUser\(user\.id, /,
+      "de pagina mag nooit op factuurnummer alleen zoeken — nummers lopen op en zijn te raden",
+    );
+    assert.match(accountPagina, /if \(!factuur\) notFound\(\)/);
+  });
+
+  it("wordt nooit gecachet", () => {
+    assert.match(accountPagina, /dynamic = "force-dynamic"/);
+  });
+
+  it("beperkt de zoekopdracht server-side tot de eigen aanvragen", () => {
+    // De query zelf moet op leadId filteren; een controle achteraf is te laat
+    // als iemand de query hergebruikt.
+    assert.match(facturenService, /export async function invoiceForUser/);
+    const body = facturenService.slice(
+      facturenService.indexOf("export async function invoiceForUser"),
+    );
+    assert.match(body, /eigenLeads\(userId\)/);
+    assert.match(body, /leads\.map\(\(l\) => l\.id\)/);
+    assert.match(
+      body,
+      /visibleToCustomer, true/,
+      "interne documenten horen niet in het klantportaal",
+    );
+  });
+
+  it("koppelt eigendom aan het account en niet aan het e-mailadres", () => {
+    assert.match(
+      facturenService,
+      /eq\(schema\.leads\.demoCustomerUserId, userId\)/,
+      "matchen op e-mailadres zou toegang tot facturen te makkelijk maken",
+    );
+  });
+});
+
+describe("6. de administratie in de admin", () => {
+  it("eist een beheerderssessie op de detailpagina", () => {
+    assert.match(adminDetail, /await requireAdmin\(\)/);
+  });
+
+  it("controleert de rol ook in de server actions", () => {
+    // Een server action is ook via een directe POST bereikbaar; de
+    // layout-guard is daar niet genoeg.
+    const acties = adminActies.match(/export async function \w+/g) ?? [];
+    assert.ok(acties.length >= 2, "er horen acties te zijn om te controleren");
+    assert.equal(
+      (adminActies.match(/await getAdminActor\(\)/g) ?? []).length,
+      acties.length,
+      "elke server action hoort zelf de beheerdersrol te controleren",
+    );
+  });
+});
+
+describe("7. geen gevaarlijke handmatige knoppen", () => {
+  it("kan een factuur niet met de hand op betaald zetten", () => {
+    for (const [naam, bron] of [
+      ["de server actions", adminActies],
+      ["de servicelaag", facturenService],
+    ] as const) {
+      assert.doesNotMatch(
+        bron,
+        /status:\s*"BETAALD"/,
+        `${naam} hoort geen betaalstatus te kunnen zetten — dat doet de Mollie-webhook`,
+      );
+    }
+  });
+
+  it("corrigeert met een creditnota in plaats van te verwijderen", () => {
+    assert.match(adminActies, /createCreditNote/);
+    assert.doesNotMatch(
+      adminActies,
+      /\.delete\(/,
+      "een definitieve factuur wordt nooit uit de administratie verwijderd",
+    );
+  });
+
+  it("eist een reden bij het crediteren", () => {
+    assert.match(adminActies, /reden\.length < 5/);
   });
 });
 

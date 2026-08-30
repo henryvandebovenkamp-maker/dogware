@@ -20,7 +20,8 @@ export type CommerceMailType =
   | "subscription-started"
   | "website-live"
   | "welcome-customer"
-  | "charge-failed";
+  | "charge-failed"
+  | "invoice-sent";
 
 const COPY: Record<
   CommerceMailType,
@@ -157,6 +158,19 @@ const COPY: Record<
     ],
     cta: "Naar je omgeving",
   },
+  /**
+   * De factuur zelf. Bewust kort en zonder bedrag-in-de-kop: de klant weet al
+   * waar het over gaat, en een factuurmail die begint met een bedrag leest als
+   * een aanmaning. Het bedrag en het nummer staan gewoon in de tekst.
+   */
+  "invoice-sent": {
+    heading: (n) => `Je factuur staat klaar, ${n}`,
+    body: (v) => [
+      `Hierbij de factuur voor ${v.extra ?? "onze samenwerking"}${v.amount ? ` — ${v.amount}` : ""}.`,
+      "Je kunt hem hieronder bekijken en als PDF bewaren voor je eigen administratie. Klopt er iets niet? Laat het me weten, dan pas ik het aan.",
+    ],
+    cta: "Bekijk je factuur",
+  },
   "charge-failed": {
     heading: (n) => `Even een seintje, ${n}`,
     body: () => [
@@ -238,6 +252,7 @@ const SIGN: Record<CommerceMailType, { groet: string; regel?: string }> = {
   "website-live": { groet: "Hartelijke groet,", regel: "Gefeliciteerd met je nieuwe website." },
   "welcome-customer": { groet: "Hartelijke groet,", regel: "Meer tijd voor wat telt." },
   "charge-failed": { groet: "Met vriendelijke groet," },
+  "invoice-sent": { groet: "Met vriendelijke groet," },
 };
 
 /**
@@ -257,4 +272,6 @@ const TOONT_ENTITEIT: CommerceMailType[] = [
   "final-received",
   "subscription-started",
   "charge-failed",
+  // Een factuurmail zonder de facturerende partij eronder is geen factuurmail.
+  "invoice-sent",
 ];
