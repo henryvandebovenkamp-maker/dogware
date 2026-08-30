@@ -29,19 +29,27 @@ export const legalEntity = {
   website: "https://onedaysite.nl",
 
   /**
-   * KvK- en btw-nummer staan bewust leeg.
+   * KvK- en btw-nummer van de facturerende partij.
    *
-   * Ze komen in geen van beide codebases voor — ook niet op de OneDaySite-
-   * factuur — en zijn niet iets om te reconstrueren of aan te nemen. Vul ze
-   * hier in met de echte waarden; alles wat ze nodig heeft (overeenkomst,
-   * factuur, voorwaarden) leest dit bestand en toont ze dan automatisch.
+   * Alles wat ze nodig heeft — factuur, overeenkomst, voorwaarden, de footer
+   * onder de commerciële mails — leest ze hier. Zet ze nergens anders nog een
+   * keer neer: twee plekken betekent vroeg of laat twee verschillende nummers
+   * op twee documenten.
    *
-   * Zolang ze leeg zijn blokkeert `entityReady()` het definitief versturen
-   * van een voorstel niet — een voorstel is nog geen factuur — maar toont de
-   * admin wel een duidelijke waarschuwing bij de overeenkomst en de facturen.
+   * Let op bij wijzigen: facturen die al zijn uitgegeven leggen deze gegevens
+   * bevroren vast in hun eigen momentopname (zie lib/documents.ts). Een
+   * wijziging hier werkt dus NIET met terugwerkende kracht door in bestaande
+   * facturen, en dat hoort ook zo.
    */
-  kvk: "",
-  btw: "",
+  kvk: "92105815",
+  btw: "NL004936558B58",
+
+  /**
+   * Nog leeg. Zodra dit is ingevuld, toont een openstaande factuur het
+   * rekeningnummer waarop overgemaakt kan worden. Betaalde facturen hebben het
+   * niet nodig — daar is al betaald — dus zolang alles via Mollie loopt, valt
+   * het ontbreken niet op.
+   */
   iban: "",
 } as const;
 

@@ -588,7 +588,19 @@ function leesSnapshot(doc: DogDocument): InvoiceSnapshot {
     molliePaymentId: (raw?.molliePaymentId as string) ?? doc.molliePaymentId,
     betaaldOp: (raw?.betaaldOp as string) ?? doc.paidAt?.toISOString() ?? null,
     betaalmethode: doc.paymentMethod ?? null,
-    entiteitOntbreekt: raw?.entiteitOntbreekt ?? [],
+    /*
+     * Bewust de HUIDIGE stand en niet wat er destijds is opgeslagen.
+     *
+     * Deze oude documenten hebben hun afzendergegevens nooit bevroren: KvK en
+     * btw hierboven komen live uit `legalEntity`. Zou de ontbreekt-lijst dan
+     * wél uit de opslag komen, dan spreekt de factuur zichzelf tegen — de
+     * nummers staan er gewoon op, terwijl de melding beweert dat ze ontbreken.
+     * Eén bron voor beide, dus.
+     *
+     * Voor facturen mét momentopname (versie ≥ 1) blijft alles bevroren; daar
+     * geldt deze tak niet.
+     */
+    entiteitOntbreekt: entityReady().missing,
   };
 }
 
