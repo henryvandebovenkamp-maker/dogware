@@ -1,11 +1,12 @@
 import { Text } from "@react-email/components";
 import { EmailLayout, Signature, paragraph, strong } from "./base";
+import { demoLevertijd } from "@/lib/branding";
 
 /** Persoonlijke bevestiging aan de aanvrager van een demo-intake. */
 export function IntakeConfirmationEmail({ naam }: { naam: string }) {
   return (
     <EmailLayout
-      preview="Ik ga aan de slag met jouw persoonlijke DogWare-voorbeeld"
+      preview="Ik ga persoonlijk aan de slag met jouw DogWare-voorbeeld"
       heading={`Bedankt, ${naam}! 🐾`}
     >
       <Text style={paragraph}>
@@ -19,8 +20,9 @@ export function IntakeConfirmationEmail({ naam }: { naam: string }) {
       </Text>
       <Text style={paragraph}>
         <span style={strong}>
-          Binnen 24 uur ontvang je geen offerte, maar een kosteloos voorbeeld
-          van hoe jouw eigen DogWare-omgeving eruit kan zien.
+          {demoLevertijd.termijnZin} ontvang je geen offerte, maar een
+          kosteloos voorbeeld van hoe jouw eigen DogWare-omgeving eruit kan
+          zien.
         </span>{" "}
         Je zit nergens aan vast.
       </Text>

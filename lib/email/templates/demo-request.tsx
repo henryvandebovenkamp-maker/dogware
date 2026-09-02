@@ -1,5 +1,6 @@
 import { Section, Text } from "@react-email/components";
 import { EmailLayout, emailColors, paragraph, strong } from "./base";
+import { demoLevertijd } from "@/lib/branding";
 
 export type DemoRequestData = {
   naam: string;
@@ -39,7 +40,8 @@ export function DemoRequestEmail({ naam, bedrijf, email, type }: DemoRequestData
         </Text>
       </Section>
       <Text style={{ ...paragraph, margin: "14px 0 0" }}>
-        Beloofd op de site: reactie binnen 1 werkdag.
+        Beloofd op de site: {demoLevertijd.termijn} een persoonlijke
+        voorbeeldwebsite.
       </Text>
     </EmailLayout>
   );

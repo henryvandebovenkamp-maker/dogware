@@ -69,6 +69,31 @@ export const branding = {
   },
 } as const;
 
+/**
+ * Wanneer iemand zijn persoonlijke voorbeeldwebsite kan verwachten.
+ *
+ * Eén bron voor de hele demo-journey: de metadata, de homepage-CTA, het
+ * aanvraagformulier, het scherm na de aanvraag, de branchepagina's en de
+ * bevestigingsmail lezen allemaal hieruit.
+ *
+ * Bewust zónder harde deadline. Elk voorbeeld wordt met de hand voorbereid, en
+ * die ruimte moet mee kunnen groeien met het aantal aanvragen. Verandert de
+ * belofte, dan verandert hij hier — en nergens anders.
+ *
+ * Dit staat los van `responseTime`: dat gaat over hoe snel je antwoord krijgt
+ * op een bericht, niet over de voorbeeldwebsite.
+ */
+export const demoLevertijd = {
+  /** Kleine letter, om midden in een lopende zin te plakken. */
+  termijn: "binnen enkele dagen",
+  /** Hoofdletter, voor het begin van een zin. */
+  termijnZin: "Binnen enkele dagen",
+  /** Uitgeschreven, voor de plekken waar ruimte is voor twee zinnen. */
+  lang:
+    "Na je aanvraag ga ik persoonlijk voor je aan de slag. Binnen enkele dagen " +
+    "ontvang je een persoonlijke voorbeeldwebsite, afgestemd op jouw bedrijf.",
+} as const;
+
 /** Absolute URL naar een public-asset (voor e-mails, JSON-LD, Open Graph). */
 export function absoluteUrl(path: string): string {
   return `${branding.siteUrl}${path}`;

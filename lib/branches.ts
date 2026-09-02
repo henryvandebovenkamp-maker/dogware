@@ -59,6 +59,7 @@ import {
   Wind,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { demoLevertijd } from "@/lib/branding";
 import type { ServiceKey } from "@/lib/demo-flow";
 
 export type BrancheSlug =
@@ -267,7 +268,7 @@ export const BRANCHES: Branche[] = [
     cta: {
       voorbeeld: "Bekijk een voorbeeld van een hondenschool",
       belofte:
-        "Binnen 24 uur zie je jouw eigen cursusaanbod, inschrijfformulier en klantportaal live staan.",
+        `${demoLevertijd.termijnZin} zie je jouw eigen cursusaanbod, inschrijfformulier en klantportaal live staan.`,
     },
     seo: {
       title: "Software voor je hondenschool — inschrijvingen, planning en facturen",
@@ -412,7 +413,7 @@ export const BRANCHES: Branche[] = [
     cta: {
       voorbeeld: "Bekijk een voorbeeld van een trimsalon",
       belofte:
-        "Binnen 24 uur zie je jouw eigen behandelingen, prijzen en online agenda live staan.",
+        `${demoLevertijd.termijnZin} zie je jouw eigen behandelingen, prijzen en online agenda live staan.`,
     },
     seo: {
       title: "Software voor je trimsalon — online afspraken en klantbeheer",
@@ -557,7 +558,7 @@ export const BRANCHES: Branche[] = [
     cta: {
       voorbeeld: "Bekijk een voorbeeld van een uitlaatservice",
       belofte:
-        "Binnen 24 uur zie je jouw eigen ritten, tarieven en aanmeldformulier live staan.",
+        `${demoLevertijd.termijnZin} zie je jouw eigen ritten, tarieven en aanmeldformulier live staan.`,
     },
     seo: {
       title: "Software voor je hondenuitlaatservice — routes, planning en facturatie",
@@ -702,7 +703,7 @@ export const BRANCHES: Branche[] = [
     cta: {
       voorbeeld: "Bekijk een voorbeeld van een dagopvang",
       belofte:
-        "Binnen 24 uur zie je jouw eigen dagplanning, tarieven en aanmeldformulier live staan.",
+        `${demoLevertijd.termijnZin} zie je jouw eigen dagplanning, tarieven en aanmeldformulier live staan.`,
     },
     seo: {
       title: "Software voor je hondendagopvang — dagplanning en administratie",
@@ -847,7 +848,7 @@ export const BRANCHES: Branche[] = [
     cta: {
       voorbeeld: "Bekijk een voorbeeld van een hondenpension",
       belofte:
-        "Binnen 24 uur zie je jouw eigen verblijven, tarieven en reserveringskalender live staan.",
+        `${demoLevertijd.termijnZin} zie je jouw eigen verblijven, tarieven en reserveringskalender live staan.`,
     },
     seo: {
       title: "Software voor je hondenpension — reserveringen en bezetting",
@@ -992,7 +993,7 @@ export const BRANCHES: Branche[] = [
     cta: {
       voorbeeld: "Bekijk een voorbeeld van een gedragspraktijk",
       belofte:
-        "Binnen 24 uur zie je jouw eigen intakeformulier, trajecten en klantportaal live staan.",
+        `${demoLevertijd.termijnZin} zie je jouw eigen intakeformulier, trajecten en klantportaal live staan.`,
     },
     seo: {
       title: "Software voor gedragstherapie bij honden — dossiers en trajecten",
@@ -1136,7 +1137,7 @@ export const BRANCHES: Branche[] = [
     cta: {
       voorbeeld: "Bekijk een voorbeeld van dierenverzorging aan huis",
       belofte:
-        "Binnen 24 uur zie je jouw eigen diensten, tarieven en aanvraagformulier live staan.",
+        `${demoLevertijd.termijnZin} zie je jouw eigen diensten, tarieven en aanvraagformulier live staan.`,
     },
     seo: {
       title: "Software voor dierenverzorging aan huis — bezoeken en routes",
@@ -1280,7 +1281,7 @@ export const BRANCHES: Branche[] = [
     cta: {
       voorbeeld: "Bekijk een voorbeeld van een chipservice",
       belofte:
-        "Binnen 24 uur zie je jouw eigen chipdiensten, tarieven en afspraakformulier live staan.",
+        `${demoLevertijd.termijnZin} zie je jouw eigen chipdiensten, tarieven en afspraakformulier live staan.`,
     },
     seo: {
       title: "Software voor je chipservice — chipafspraken en registraties",
@@ -1424,7 +1425,7 @@ export const BRANCHES: Branche[] = [
     cta: {
       voorbeeld: "Bekijk een voorbeeld van een webshop",
       belofte:
-        "Binnen 24 uur zie je jouw eigen producten, prijzen en afrekenpagina live staan.",
+        `${demoLevertijd.termijnZin} zie je jouw eigen producten, prijzen en afrekenpagina live staan.`,
     },
     seo: {
       title: "Webshop software voor je hondenbedrijf — verkopen naast je diensten",
@@ -1580,7 +1581,7 @@ export const ALGEMEEN: Omit<Branche, "slug" | "path" | "seo" | "faq" | "kaartTek
   cta: {
     voorbeeld: "Bekijk een voorbeeld voor mijn bedrijf",
     belofte:
-      "Binnen 24 uur zie je jouw eigen diensten, tarieven en klantportaal live staan.",
+      `${demoLevertijd.termijnZin} zie je jouw eigen diensten, tarieven en klantportaal live staan.`,
   },
 };
 

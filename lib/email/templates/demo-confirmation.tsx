@@ -13,9 +13,9 @@ export function DemoConfirmationEmail({ naam }: { naam: string }) {
         <span style={strong}>DogWare</span> goed ontvangen.
       </Text>
       <Text style={paragraph}>
-        We nemen <span style={strong}>binnen 1 werkdag</span> contact met je op
-        om een moment in te plannen. Vrijblijvend, en helemaal afgestemd op
-        jouw bedrijf.
+        Ik neem <span style={strong}>persoonlijk contact</span> met je op om een
+        moment in te plannen. Vrijblijvend, en helemaal afgestemd op jouw
+        bedrijf.
       </Text>
       <Text style={paragraph}>
         Tot snel. En doe tot die tijd waar je goed in bent: werken met honden.

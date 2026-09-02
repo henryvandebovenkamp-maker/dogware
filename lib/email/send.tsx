@@ -29,7 +29,7 @@ import {
   type DemoReadyContent,
 } from "./templates/demo-ready";
 import { CommerceEmail, type CommerceMailType } from "./templates/commerce";
-import { branding } from "@/lib/branding";
+import { branding, demoLevertijd } from "@/lib/branding";
 import { WelcomeEmail } from "./templates/welcome";
 
 /**
@@ -69,7 +69,7 @@ export async function sendDemoConfirmation(
     to,
     subject: "We hebben je demo-aanvraag ontvangen 🐾",
     react: <DemoConfirmationEmail naam={naam} />,
-    text: `Hoi ${naam},\n\nWe hebben je demo-aanvraag voor DogWare ontvangen en nemen binnen 1 werkdag contact met je op.\n\nHartelijke groet,\nHenry van de Bovenkamp\nDogWare`,
+    text: `Hoi ${naam},\n\nWe hebben je demo-aanvraag voor DogWare ontvangen. Ik neem persoonlijk contact met je op om een moment in te plannen.\n\nHartelijke groet,\nHenry van de Bovenkamp\nDogWare`,
   });
 }
 
@@ -109,7 +109,7 @@ export async function sendIntakeConfirmation(
     to,
     subject: "Jouw persoonlijke DogWare-voorbeeld is onderweg 🐾",
     react: <IntakeConfirmationEmail naam={naam} />,
-    text: `Hoi ${naam},\n\nBedankt voor je aanvraag! Binnen 24 uur ontvang je geen offerte, maar een kosteloos voorbeeld van hoe jouw eigen DogWare-omgeving eruit kan zien. Je zit nergens aan vast.\n\nHartelijke groet,\nHenry van de Bovenkamp\nDogWare`,
+    text: `Hoi ${naam},\n\nBedankt voor je aanvraag! Ik ga persoonlijk voor je aan de slag. ${demoLevertijd.termijnZin} ontvang je geen offerte, maar een kosteloos voorbeeld van hoe jouw eigen DogWare-omgeving eruit kan zien. Je zit nergens aan vast.\n\nHartelijke groet,\nHenry van de Bovenkamp\nDogWare`,
   });
 }
 

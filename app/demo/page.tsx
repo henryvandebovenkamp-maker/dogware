@@ -7,13 +7,13 @@ import { DemoExperience } from "@/components/demo/experience";
 import { SERVICES } from "@/lib/demo-flow";
 import { getValidAttribution, normalizeReferralCode } from "@/lib/referral";
 import { uploadsEnabled } from "@/lib/uploads";
-import { REFERRAL_BENEFITS } from "@/lib/branding";
+import { demoLevertijd, REFERRAL_BENEFITS } from "@/lib/branding";
 import { getDb, schema } from "@/lib/db";
 
 export const metadata: Metadata = {
   title: "Bouw jouw DogWare",
   description:
-    "Bouw in een paar minuten jouw eigen DogWare-omgeving en ontvang binnen 24 uur een kosteloos voorbeeld. Geen offerte — je zit nergens aan vast.",
+    `Bouw in een paar minuten jouw eigen DogWare-omgeving en ontvang ${demoLevertijd.termijn} een kosteloos voorbeeld, persoonlijk voor je gemaakt. Geen offerte — je zit nergens aan vast.`,
 };
 
 /**

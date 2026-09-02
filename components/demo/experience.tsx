@@ -19,6 +19,7 @@ import {
   type ServiceKey,
 } from "@/lib/demo-flow";
 import { EMPTY_INTAKE, isTelefoonGeldig } from "@/lib/intake";
+import { demoLevertijd } from "@/lib/branding";
 import {
   IlluBehavior,
   IlluDaycare,
@@ -322,8 +323,8 @@ export function DemoExperience({
             Dit is een eerste indruk, gebouwd op jouw keuzes. Ik werk hem nu
             persoonlijk voor je uit —{" "}
             <span className="font-semibold text-ink">
-              binnen 24 uur ontvang je geen offerte, maar een kosteloos
-              voorbeeld
+              {demoLevertijd.termijn} ontvang je geen offerte, maar een
+              kosteloos voorbeeld
             </span>{" "}
             van hoe jouw eigen omgeving eruit kan zien. Je zit nergens aan vast.
           </p>
@@ -626,7 +627,7 @@ export function DemoExperience({
                   <StepHeading
                     kicker="Bijna klaar"
                     titel="Waar mag ik jouw voorbeeld naartoe sturen?"
-                    intro="Binnen 24 uur. Geen offerte, maar een kosteloos voorbeeld. Je zit nergens aan vast."
+                    intro={`${demoLevertijd.lang} Geen offerte, maar een kosteloos voorbeeld — je zit nergens aan vast.`}
                   />
                   <div className="mt-10 grid max-w-md gap-8">
                     <GhostInput

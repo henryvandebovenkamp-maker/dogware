@@ -13,6 +13,7 @@ import { Button, Container } from "@/components/ui";
 import { BrandMark } from "@/components/brand";
 import { useBrancheContent } from "@/components/branche/branche-context";
 import { demoHref } from "@/lib/branches";
+import { demoLevertijd } from "@/lib/branding";
 
 const IMAGINE = [
   "Nog een hond helpen?",
@@ -38,7 +39,7 @@ export function FinalCta({ branche }: { branche?: string }) {
     },
     {
       icon: Clock,
-      text: "Binnen 24 uur een kosteloos voorbeeld van jouw eigen DogWare-omgeving",
+      text: `${demoLevertijd.termijnZin} een kosteloos voorbeeld van jouw eigen DogWare-omgeving`,
     },
   ];
 
