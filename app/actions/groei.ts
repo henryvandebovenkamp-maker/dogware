@@ -266,7 +266,6 @@ export async function verstuurBericht(
     voorstelUrl: link,
     afmeldUrl: afmeldLink(p.id),
     afmeldEenKlikUrl: afmeldEenKlikLink(p.id),
-    antwoordNaar: user.email,
   });
 
   if (!resultaat.ok) {

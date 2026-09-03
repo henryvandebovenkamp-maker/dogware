@@ -47,6 +47,20 @@ export const branding = {
    */
   contactEmail: "henry@dogware.nl",
 
+  /**
+   * Het antwoordadres van ALLE uitgaande DogWare-mail (de `Reply-To`-kopregel).
+   *
+   * Eén plek, bewust in code en niet in een environment variable: een `Reply-To`
+   * die per omgeving kan afwijken is precies hoe antwoorden van klanten in een
+   * postbus verdwijnen die niemand leest. De mailservice zet deze waarde op
+   * iedere mail; een losse verzendroute kan hem niet overschrijven, want
+   * `MailOptions` heeft geen `replyTo`-veld meer.
+   *
+   * Staat los van `contactEmail` (het adres dat we tónen op de site) en van
+   * EMAIL_FROM (de geverifieerde Resend-afzender, die blijft ongemoeid).
+   */
+  replyToEmail: "henry@dog-connect.nl",
+
   /** Wanneer je normaal gesproken antwoord krijgt — één plek, ook voor mails. */
   responseTime: "Meestal binnen een paar uur, uiterlijk de volgende werkdag",
 

@@ -35,7 +35,12 @@ export type MailOptions = {
   html?: string;
   /** Platte-tekstversie (aanrader voor deliverability) */
   text?: string;
-  replyTo?: string;
+  /**
+   * Er is met opzet GEEN `replyTo`. Elke DogWare-mail beantwoordt naar
+   * `branding.replyToEmail`; de mailservice zet dat vast. Een veld hier zou
+   * betekenen dat een willekeurige verzendroute die standaard stil kan
+   * omzeilen — en dan komen antwoorden van klanten ergens anders terecht.
+   */
   cc?: string | string[];
   bcc?: string | string[];
   attachments?: MailAttachment[];

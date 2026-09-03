@@ -55,7 +55,6 @@ export async function sendDemoRequestNotification(
     to: internal,
     subject: `Nieuwe demo-aanvraag: ${data.naam} (${data.bedrijf})`,
     react: <DemoRequestEmail {...data} />,
-    replyTo: data.email,
     text: `Nieuwe demo-aanvraag.\nNaam: ${data.naam}\nBedrijf: ${data.bedrijf}\nE-mail: ${data.email}\nVakgebied: ${data.type}`,
   });
 }
@@ -95,7 +94,6 @@ export async function sendIntakeNotification(
     react: (
       <IntakeNotificationEmail data={data} leadUrl={leadUrl} viaPartner={viaPartner} />
     ),
-    replyTo: data.email,
     text: `Persoonlijke demo-aanvraag van ${data.naam} (${data.bedrijfsnaam}, ${data.plaats}) — ${data.email}${viaPartner ? `\nVia partner: ${viaPartner}` : ""}`,
   });
 }
@@ -132,7 +130,6 @@ export async function sendContactNotification(
     subject: `Bericht via de website: ${data.naam}`,
     react: <ContactMessageEmail {...data} />,
     // Zo is antwoorden vanuit de mailbox meteen antwoorden aan de bezoeker.
-    replyTo: data.email,
     text: `Bericht via het contactformulier.\nNaam: ${data.naam}\nE-mail: ${data.email}${data.telefoon ? `\nTelefoon: ${data.telefoon}` : ""}${data.herkomst ? `\nPagina: ${data.herkomst}` : ""}\n\n${data.bericht}`,
   });
 }
@@ -533,14 +530,13 @@ export async function sendNotification(
 /**
  * Een persoonlijk bericht van Henry aan een collega-hondenbedrijf.
  *
- * Drie dingen die deze functie anders doet dan de rest:
+ * Twee dingen die deze functie anders doet dan de rest (het antwoordadres niet:
+ * dat is voor élke DogWare-mail hetzelfde, zie lib/email/service.ts):
  *
- * 1. `replyTo` gaat naar Henry's eigen adres. Antwoorden op deze mail hoort
- *    bij hem terecht te komen, niet bij een postbus die niemand leest.
- * 2. De afmeldlink zit óók in de kopregels, zodat Gmail en Outlook hun eigen
+ * 1. De afmeldlink zit óók in de kopregels, zodat Gmail en Outlook hun eigen
  *    afmeldknop kunnen tonen. Zonder die koppen leest een mailprovider dit
  *    als post die zich verstopt, en dat kost je bezorging.
- * 3. Er gaat een platte-tekstversie mee met dezelfde inhoud. Een mail die
+ * 2. Er gaat een platte-tekstversie mee met dezelfde inhoud. Een mail die
  *    alleen uit HTML bestaat is een spamsignaal.
  */
 export async function sendGroeiBericht(data: {
@@ -550,7 +546,6 @@ export async function sendGroeiBericht(data: {
   voorstelUrl: string | null;
   afmeldUrl: string;
   afmeldEenKlikUrl: string;
-  antwoordNaar?: string;
 }): Promise<MailResult> {
   const platteTekst = [
     data.voorstelUrl
@@ -565,7 +560,6 @@ export async function sendGroeiBericht(data: {
   return sendMail("groei-bericht", {
     to: data.to,
     subject: data.onderwerp,
-    replyTo: data.antwoordNaar,
     react: (
       <GroeiBerichtEmail
         tekst={data.tekst}

@@ -282,7 +282,7 @@ export default async function VoorstelPage({
                   Laat maar zien
                 </a>
                 <a
-                  href={`mailto:${process.env.EMAIL_REPLY_TO ?? ""}?subject=${encodeURIComponent(`Reactie van ${prospect.bedrijfsnaam}`)}`}
+                  href={`mailto:${branding.replyToEmail}?subject=${encodeURIComponent(`Reactie van ${prospect.bedrijfsnaam}`)}`}
                   className="inline-flex items-center justify-center rounded-xl px-5 py-3 text-[15px] font-semibold leading-[1.2] text-ink-500 ring-1 ring-ink/10 transition-all duration-150 ease-out hover:-translate-y-px hover:bg-cream hover:text-ink"
                 >
                   Liever eerst even mailen

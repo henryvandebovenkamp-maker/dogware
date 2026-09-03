@@ -30,6 +30,7 @@ const SERVER_ONLY_STUB = new URL("./server-only-stub.mjs", import.meta.url).href
 const NEXT_STUB = new URL("./next-stubs.mjs", import.meta.url).href;
 const MAIL_STUB = new URL("./mail-stub.mjs", import.meta.url).href;
 const MOLLIE_INTEROP = new URL("./mollie-interop.mjs", import.meta.url).href;
+const RESEND_STUB = new URL("./resend-stub.mjs", import.meta.url).href;
 const GESTUBD = new Set(["next/headers", "next/cache", "next/navigation"]);
 
 export async function resolve(specifier, context, nextResolve) {
@@ -52,6 +53,11 @@ export async function resolve(specifier, context, nextResolve) {
   // registreert welke mails verstuurd zouden zijn.
   if (specifier === "@/lib/email/send" || specifier.endsWith("/email/send")) {
     return { url: MAIL_STUB, shortCircuit: true };
+  }
+  // De echte Resend-SDK doet een netwerkaanroep. De stub legt vast welke
+  // payload de SDK zou krijgen — daar toetsen we de Reply-To op.
+  if (specifier === "resend") {
+    return { url: RESEND_STUB, shortCircuit: true };
   }
   if (specifier.startsWith("@/")) {
     return nextResolve(metExtensie(new URL(specifier.slice(2), ROOT)).href, context);

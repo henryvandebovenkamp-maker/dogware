@@ -4,14 +4,21 @@ import { render } from "@react-email/render";
 import { Resend } from "resend";
 import type { MailError, MailOptions, MailResult, MailType } from "./types";
 import { defaultEmailLogoUrl, getEmailLogoUrl } from "@/lib/site-settings";
+import { branding } from "@/lib/branding";
 
 /**
  * Centrale mailservice van DogWare.
  *
  * Alle e-mail verloopt via deze service — nergens anders mag de Resend SDK
  * rechtstreeks worden aangeroepen. Configuratie uitsluitend via environment
- * variables: RESEND_API_KEY, EMAIL_FROM, EMAIL_REPLY_TO (optioneel),
- * EMAIL_INTERNAL (ontvanger van interne notificaties).
+ * variables: RESEND_API_KEY, EMAIL_FROM, EMAIL_INTERNAL (ontvanger van interne
+ * notificaties).
+ *
+ * Het antwoordadres is bewust GEEN environment variable maar `branding.replyToEmail`:
+ * iedere uitgaande mail krijgt hier onvoorwaardelijk die `Reply-To` mee. Klikt
+ * een ontvanger op Beantwoorden — of dat nu een factuur, een journey-mail of
+ * een handmatige mail uit de admin is — dan komt het antwoord bij Henry.
+ * Aanroepers kunnen dit niet overrulen: `MailOptions` heeft geen `replyTo`.
  */
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -20,11 +27,7 @@ function getConfig() {
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.EMAIL_FROM;
   if (!apiKey || !from) return null;
-  return {
-    apiKey,
-    from,
-    replyTo: process.env.EMAIL_REPLY_TO || undefined,
-  };
+  return { apiKey, from, replyTo: branding.replyToEmail };
 }
 
 /**
@@ -172,7 +175,8 @@ export async function sendMail(
     react: reactToSend,
     html: htmlToSend,
     text: options.text,
-    replyTo: options.replyTo ?? config.replyTo,
+    // Vast, voor élke mail. Geen aanroeper, template of omgeving kan dit wijzigen.
+    replyTo: config.replyTo,
     // In sandbox geen cc/bcc naar echte ontvangers sturen
     cc: sandboxTo ? undefined : options.cc,
     bcc: sandboxTo ? undefined : options.bcc,
