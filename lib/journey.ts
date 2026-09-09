@@ -51,6 +51,47 @@ export async function logJourneyEvent(
   }
 }
 
+/** Machinecode van het koppelingsevent — één plek, ook voor de dubbelcontrole. */
+export const REFERRAL_EVENT_KIND = "attributed";
+
+/**
+ * Leg vast dat een aanvraag aan een partner gekoppeld is.
+ *
+ * Idempotent: dezelfde koppeling levert nooit een tweede regel op. De cookie
+ * wordt bij elke aanvraag opnieuw gelezen en een beheerder kan een toewijzing
+ * herhalen; zonder deze controle zou de tijdlijn volstromen met identieke
+ * meldingen. Een koppeling naar een ándere partner is wél nieuws en komt er
+ * dus gewoon bij.
+ */
+export async function logReferralGekoppeld(
+  leadId: string,
+  partnerId: string,
+  label: string,
+  meta?: Record<string, unknown>,
+): Promise<void> {
+  const db = getDb();
+  if (!db) return;
+  try {
+    const bestaand = await db
+      .select({ meta: schema.journeyEvents.meta })
+      .from(schema.journeyEvents)
+      .where(
+        and(
+          eq(schema.journeyEvents.leadId, leadId),
+          eq(schema.journeyEvents.kind, REFERRAL_EVENT_KIND),
+        ),
+      );
+    if (bestaand.some((e) => e.meta?.partnerId === partnerId)) return;
+  } catch {
+    // Kan de controle niet, dan liever een dubbele regel dan geen regel.
+  }
+  await logJourneyEvent(leadId, REFERRAL_EVENT_KIND, label, {
+    ...meta,
+    partnerId,
+    internal: true,
+  });
+}
+
 /**
  * Welke leadstatus hoort bij welke stage.
  *

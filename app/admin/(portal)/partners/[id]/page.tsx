@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { and, count, countDistinct, desc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { referralLinkFor } from "@/lib/referral";
-import { euro } from "@/lib/partner-data";
+import { euro, getPartnerCommission } from "@/lib/partner-data";
 import { decryptField } from "@/lib/crypto-field";
 import { LeadStatusBadge } from "../../leads/status-badge";
 import { PartnerAdminActions } from "./partner-actions";
@@ -40,7 +40,7 @@ export default async function PartnerDetailPage({
   if (!row) notFound();
   const { partner, user } = row;
 
-  const [[clickStats], leads, activity] = await Promise.all([
+  const [[clickStats], leads, activity, commissie] = await Promise.all([
     db
       .select({
         clicks: count(),
@@ -71,6 +71,12 @@ export default async function PartnerDetailPage({
       )
       .orderBy(desc(schema.activityLog.createdAt))
       .limit(15),
+    /*
+     * Dezelfde berekening als in het partnerportaal (lib/partner-data.ts), dus
+     * de partner ziet nooit een ander getal dan de beheerder. Hij telt op de
+     * vastgelegde koppeling bij de aanvraag — nooit op bezoeken of cookies.
+     */
+    getPartnerCommission(id, partner.commissionCents),
   ]);
 
   const referralLink = referralLinkFor(partner.referralCode);
@@ -105,7 +111,7 @@ export default async function PartnerDetailPage({
       </div>
 
       {/* Statistieken */}
-      <div className="mt-6 grid gap-3.5 sm:grid-cols-4">
+      <div className="mt-6 grid gap-3.5 grid-cols-2 sm:grid-cols-4">
         {[
           { label: "Clicks", value: clickStats.clicks },
           { label: "Unieke bezoekers", value: clickStats.uniek },
@@ -120,6 +126,31 @@ export default async function PartnerDetailPage({
           </div>
         ))}
       </div>
+
+      {/*
+        Commissie in de drie fases die DogWare kent. Bewust naast de
+        bezoekcijfers en niet ertussen: bezoeken zeggen iets over bereik,
+        deze regel gaat over geld.
+      */}
+      <div className="mt-3.5 grid grid-cols-2 gap-3.5 sm:grid-cols-4">
+        {[
+          { label: "In behandeling", value: String(commissie.inBehandeling) },
+          { label: "Gereserveerd", value: String(commissie.gereserveerd) },
+          { label: "Klant geworden", value: String(commissie.verkocht) },
+          { label: "Commissie verdiend", value: euro(commissie.verdiendCents) },
+        ].map((s) => (
+          <div key={s.label} className="rounded-2xl bg-white p-4 shadow-soft ring-1 ring-ink/5">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-300">
+              {s.label}
+            </p>
+            <p className="mt-1 text-2xl font-extrabold text-ink">{s.value}</p>
+          </div>
+        ))}
+      </div>
+      <p className="mt-2 text-[12px] text-ink-300">
+        Verdiend vanaf de bouwfase, gereserveerd vanaf akkoord. Uitbetaling
+        gebeurt buiten DogWare om; hier staat alleen wat verschuldigd is.
+      </p>
 
       {/* Referral-link */}
       <div className="mt-5 rounded-2xl bg-white p-5 shadow-soft ring-1 ring-ink/5">

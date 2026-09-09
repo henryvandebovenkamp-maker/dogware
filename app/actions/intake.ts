@@ -3,9 +3,9 @@
 import { and, eq, gt } from "drizzle-orm";
 import { branding } from "@/lib/branding";
 import { getDb, schema } from "@/lib/db";
-import { ATTRIBUTION_MODEL, getValidAttribution } from "@/lib/referral";
+import { getReferralHerkomst, getValidAttribution } from "@/lib/referral";
 import { logActivity } from "@/lib/audit";
-import { logJourneyEvent } from "@/lib/journey";
+import { logJourneyEvent, logReferralGekoppeld } from "@/lib/journey";
 import {
   sendIntakeConfirmation,
   sendIntakeNotification,
@@ -73,9 +73,14 @@ export async function submitIntake(raw: IntakeData): Promise<IntakeState> {
     return { status: "error", message: "Kies minimaal één dienst." };
   }
 
-  // Attributie: uitsluitend server-side bepaald via de ondertekende
-  // first-party cookie — nooit via invoer uit de browser.
+  /*
+   * Attributie: uitsluitend server-side bepaald via de ondertekende
+   * first-party cookie — nooit via invoer uit de browser. Vanaf hier wordt de
+   * lead-rij de bron van waarheid: wist de bezoeker straks zijn cookies, dan
+   * blijft de partner gewoon gekoppeld.
+   */
   const attribution = await getValidAttribution();
+  const herkomst = attribution ? await getReferralHerkomst(attribution) : null;
 
   // 1. Opslaan in de database (indien geconfigureerd — anders alleen mail).
   let leadUrl: string | undefined;
@@ -123,8 +128,16 @@ export async function submitIntake(raw: IntakeData): Promise<IntakeState> {
           affiliatePartnerId: attribution?.partnerId ?? null,
           referralCodeSnapshot: attribution?.referralCode ?? null,
           referralClickId: attribution?.clickId ?? null,
-          attributionModel: attribution ? ATTRIBUTION_MODEL : null,
+          attributionModel: attribution?.model ?? null,
           attributedAt: attribution ? new Date() : null,
+          // Beide aanrakingen apart, zodat achteraf te zien is wie binnenbracht
+          // en wie er later nog langskwam.
+          firstTouchPartnerId: attribution?.firstTouchPartnerId ?? null,
+          lastTouchPartnerId: attribution?.lastTouchPartnerId ?? null,
+          referralFirstSeenAt: herkomst?.firstSeenAt ?? null,
+          referralLandingPage: herkomst?.landingPage ?? null,
+          referralReferrer: herkomst?.referrer ?? null,
+          utm: herkomst?.utm ?? null,
           // Demo Journey start
           source: attribution ? "referral" : "website",
           stage: "aangevraagd",
@@ -136,11 +149,11 @@ export async function submitIntake(raw: IntakeData): Promise<IntakeState> {
         await logJourneyEvent(lead.id, "requested", "Demo aangevraagd via de website");
         await logJourneyEvent(lead.id, "journey_created", "Journey aangemaakt");
         if (attribution) {
-          await logJourneyEvent(
+          await logReferralGekoppeld(
             lead.id,
-            "attributed",
-            `Aangebracht via partner (${attribution.referralCode})`,
-            { partnerId: attribution.partnerId },
+            attribution.partnerId,
+            `Referral gekoppeld via partner (${attribution.referralCode})`,
+            { model: attribution.model },
           );
           await logActivity({
             action: "LEAD_ATTRIBUTED",
@@ -149,7 +162,9 @@ export async function submitIntake(raw: IntakeData): Promise<IntakeState> {
             newValue: {
               partnerId: attribution.partnerId,
               referralCode: attribution.referralCode,
-              model: ATTRIBUTION_MODEL,
+              model: attribution.model,
+              firstTouchAt: attribution.firstTouch.at.toISOString(),
+              lastTouchAt: attribution.lastTouch.at.toISOString(),
             },
           });
         }

@@ -1,7 +1,7 @@
 import Image from "next/image";
 import { requirePartner } from "@/lib/auth/session";
 import { branding } from "@/lib/branding";
-import { referralLinkFor } from "@/lib/referral";
+import { REFERRAL_WINDOW_DAYS, referralLinkFor } from "@/lib/referral";
 import { getPartnerForUser } from "@/lib/partner-data";
 import { ShareLink } from "@/components/partner/share-link";
 
@@ -56,8 +56,10 @@ export default async function MaterialenPage() {
         <h2 className="text-sm font-extrabold text-ink">Goed om te weten</h2>
         <ul className="mt-3 space-y-2 text-[13px] leading-relaxed text-ink-500">
           <li>
-            • Wie via jouw link een demo aanvraagt, wordt automatisch aan jou
-            gekoppeld — ook als de aanvraag pas later volgt (tot 30 dagen).
+            • Wie via jouw link binnenkomt, wordt aan jou gekoppeld — ook als de
+            aanvraag pas weken later volgt, en ook als die persoon in de
+            tussentijd rechtstreeks naar onze site gaat. Je houdt de koppeling
+            tot {REFERRAL_WINDOW_DAYS} dagen na dat eerste bezoek.
           </li>
           <li>
             • Deel je link gerust in je nieuwsbrief, op social media of

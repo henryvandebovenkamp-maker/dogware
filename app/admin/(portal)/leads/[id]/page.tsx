@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { asc, desc, eq } from "drizzle-orm";
 import { ArrowLeft, ExternalLink } from "lucide-react";
 import { getDb, schema } from "@/lib/db";
+import { commissieFase } from "@/lib/commissie";
 import { STAGE_META } from "@/lib/journey-stages";
 import { getTimeline } from "@/lib/journey";
 import { leidAf } from "@/lib/aanvragen";
@@ -29,6 +30,7 @@ import { JourneyBar } from "@/components/commerce/journey-bar";
 import { NextActionPanel } from "@/components/commerce/next-action";
 import { OpvolgenPanel } from "@/components/commerce/opvolgen-panel";
 import { CommerceSecties } from "@/components/commerce/admin-panel";
+import { Herkomst } from "@/components/admin/herkomst";
 import { LeadAdminForm } from "./lead-admin-form";
 import { ReassignForm } from "./reassign-form";
 import { StageControl, DemoPanel } from "./journey-controls";
@@ -107,13 +109,21 @@ export default async function LeadDetailPage({
           .limit(1)
           .then((r) => r[0] ?? null)
       : Promise.resolve(null),
+    /*
+     * Alle partners in één keer. Deze lijst voedt zowel het handmatig
+     * toewijzen als de herkomstsectie; de naam van een aanraking opzoeken is
+     * dan geen extra query per aanraking. De partnernaam komt uit de partner-
+     * of gebruikersrij, nooit uit de cookie van de bezoeker.
+     */
     db
       .select({
         id: schema.partners.id,
         bedrijfsnaam: schema.partners.bedrijfsnaam,
         referralCode: schema.partners.referralCode,
+        naam: schema.users.naam,
       })
-      .from(schema.partners),
+      .from(schema.partners)
+      .innerJoin(schema.users, eq(schema.partners.userId, schema.users.id)),
     getTimeline(id, "admin"),
     db
       .select()
@@ -138,6 +148,18 @@ export default async function LeadDetailPage({
       .where(eq(schema.payments.commerceId, commerce.id))
       .orderBy(desc(schema.payments.createdAt)),
   ]);
+
+  /**
+   * De weergavenaam van een partner. Bedrijfsnaam als die er is, anders de
+   * persoonsnaam — dezelfde volgorde als elders in het adminportaal. Een
+   * partner die inmiddels verwijderd is levert netjes de code op in plaats van
+   * een lege regel.
+   */
+  const partnerNamen = new Map(
+    allePartners.map((p) => [p.id, p.bedrijfsnaam?.trim() || p.naam || p.referralCode]),
+  );
+  const partnerNaam = (partnerId: string) =>
+    partnerNamen.get(partnerId) ?? "Onbekende partner";
 
   const snapshotPricing = actiefVoorstel
     ? readPricing(actiefVoorstel, commerce)
@@ -439,19 +461,6 @@ export default async function LeadDetailPage({
             <Regel label="Website" value={lead.website} />
           </div>
 
-          {attributedPartner && (
-            <p className="mt-2 text-[13px] text-ink-500">
-              Aangebracht via{" "}
-              <Link
-                href={`/admin/partners/${attributedPartner.id}`}
-                className="font-bold text-brand hover:underline"
-              >
-                {attributedPartner.bedrijfsnaam}
-              </Link>{" "}
-              <span className="font-mono text-[12px]">({lead.referralCodeSnapshot})</span>
-            </p>
-          )}
-
           <details className="mt-3 rounded-xl bg-cream-100/60 px-4 py-3">
             <summary className="cursor-pointer text-[13px] font-semibold text-ink-500">
               Volledige aanvraag bekijken
@@ -513,7 +522,7 @@ export default async function LeadDetailPage({
                   currentPartnerId={lead.affiliatePartnerId}
                   partners={allePartners.map((p) => ({
                     id: p.id,
-                    label: `${p.bedrijfsnaam} (${p.referralCode})`,
+                    label: `${partnerNaam(p.id)} (${p.referralCode})`,
                   }))}
                 />
               </div>
@@ -536,6 +545,32 @@ export default async function LeadDetailPage({
           </div>
         </div>
       </section>
+
+      <Herkomst
+        partner={
+          attributedPartner
+            ? { id: attributedPartner.id, naam: partnerNaam(attributedPartner.id) }
+            : null
+        }
+        referralCode={lead.referralCodeSnapshot}
+        eersteAanraking={
+          lead.firstTouchPartnerId
+            ? { id: lead.firstTouchPartnerId, naam: partnerNaam(lead.firstTouchPartnerId) }
+            : null
+        }
+        laatsteAanraking={
+          lead.lastTouchPartnerId
+            ? { id: lead.lastTouchPartnerId, naam: partnerNaam(lead.lastTouchPartnerId) }
+            : null
+        }
+        eersteBezoekAt={lead.referralFirstSeenAt ?? lead.attributedAt}
+        landingPage={lead.referralLandingPage}
+        verwijzer={lead.referralReferrer}
+        utm={lead.utm}
+        bron={lead.source}
+        handmatigToegewezen={lead.attributionModel === "MANUAL"}
+        commissie={commissieFase(lead.stage, lead.status)}
+      />
 
       {/* Handmatige correctie — helemaal onderaan, want zelden nodig */}
       <section className="mt-8">

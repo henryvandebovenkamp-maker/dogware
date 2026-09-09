@@ -1,4 +1,4 @@
-import { ATTRIBUTION_DAYS, ATTRIBUTION_MODEL } from "@/lib/referral";
+import { ATTRIBUTION_MODEL, REFERRAL_WINDOW_DAYS } from "@/lib/referral";
 import { getEmailLogoSetting } from "@/lib/site-settings";
 import { uploadsEnabled } from "@/lib/uploads";
 import { EmailLogoSettings } from "@/components/admin/email-logo-settings";
@@ -31,11 +31,16 @@ export default async function InstellingenPage() {
             <div className="flex justify-between gap-4">
               <dt className="text-ink-500">Attributieperiode</dt>
               <dd className="font-semibold text-ink">
-                {ATTRIBUTION_DAYS} dagen{" "}
-                <span className="font-normal text-ink-300">(ATTRIBUTION_DAYS)</span>
+                {REFERRAL_WINDOW_DAYS} dagen{" "}
+                <span className="font-normal text-ink-300">(REFERRAL_WINDOW_DAYS)</span>
               </dd>
             </div>
           </dl>
+          <p className="mt-3 text-[12px] leading-relaxed text-ink-300">
+            De partner die de bezoeker binnenbracht houdt de aanvraag, ook als
+            die pas weken later rechtstreeks terugkomt. De periode telt vanaf
+            dat eerste bezoek en verlengt niet bij elk volgend bezoek.
+          </p>
         </div>
         <div className="rounded-2xl bg-white p-5 shadow-soft ring-1 ring-ink/5">
           <h2 className="text-sm font-extrabold text-ink">Toekomstige instellingen</h2>

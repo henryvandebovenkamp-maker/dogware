@@ -57,6 +57,18 @@ export function proxy(request: NextRequest): NextResponse {
 
   const dest = new URL(`/p/${encodeURIComponent(ref)}`, request.url);
   dest.searchParams.set("next", next);
+  /*
+   * De pagina waarop de bezoeker écht binnenkwam. Die kan van `next`
+   * verschillen — vanaf de homepage sturen we door naar /demo — en juist het
+   * binnenkomstpunt is wat we later in de herkomst willen tonen ("kwam binnen
+   * op /hondenschool"). Zonder dit veld zou daar altijd /p/CODE staan.
+   */
+  dest.searchParams.set("from", pathname);
+  // Marketingparameters gaan mee, zodat ze bij de klik horen en niet verdwijnen
+  // door de tussenstop.
+  for (const [key, value] of searchParams) {
+    if (key.startsWith("utm_")) dest.searchParams.set(key, value);
+  }
   return NextResponse.redirect(dest);
 }
 

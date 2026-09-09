@@ -9,9 +9,10 @@ import { safeInternalPath } from "@/lib/roles";
  *
  * Bij een geldige partner gaat `?uitnodiging=CODE` mee in het terugkeerpad.
  * Dát is het signaal waarop /demo de persoonlijke uitnodiging toont — niet de
- * attributiecookie. Die cookie leeft 30 dagen en regelt de commissie; zonder
- * dit onderscheid zou iedereen die ooit op een partnerlink klikte een maand
- * lang de uitnodigingspagina zien, ook via de gewone 'Demo aanvragen'-knop.
+ * attributiecookie. Die cookie loopt het hele attributievenster door en regelt
+ * de commissie; zonder dit onderscheid zou iedereen die ooit op een
+ * partnerlink klikte maandenlang de uitnodigingspagina zien, ook via de
+ * gewone 'Demo aanvragen'-knop.
  */
 export async function GET(
   request: NextRequest,
@@ -21,6 +22,9 @@ export async function GET(
   // Terugkeerpad: alleen veilige interne paden, standaard de demo-aanvraag.
   const next = safeInternalPath(request.nextUrl.searchParams.get("next")) ?? "/demo";
   const demoUrl = new URL(next, request.url);
+  // De pagina waarop de bezoeker binnenkwam (door de proxy meegegeven). Valt
+  // terug op het terugkeerpad wanneer de link rechtstreeks wordt geopend.
+  const landingPage = safeInternalPath(request.nextUrl.searchParams.get("from")) ?? next;
 
   try {
     const partner = await findPartnerByCode(code);
@@ -28,8 +32,9 @@ export async function GET(
     // gepauzeerde/geblokkeerde/beëindigde partners doen bewust niets.
     if (partner && partnerCanRefer(partner.status)) {
       await recordReferralVisit(partner, {
-        landingPage: `/p/${partner.referralCode}`,
+        landingPage,
         userAgent: request.headers.get("user-agent"),
+        referrer: request.headers.get("referer"),
         searchParams: request.nextUrl.searchParams,
       });
       demoUrl.searchParams.set("uitnodiging", partner.referralCode);

@@ -88,8 +88,8 @@ export default async function DemoPage({
    * attributie. Twee bronnen die het eens moeten zijn, want:
    *  - alleen de parameter zou een uitnodiging tonen zonder dat de voordelen
    *    daadwerkelijk geregistreerd worden (cookies geweigerd, gedeelde link);
-   *  - alleen de cookie zou iedereen 30 dagen lang de uitnodiging tonen, ook
-   *    via de gewone 'Demo aanvragen'-knop op de homepage.
+   *  - alleen de cookie zou iedereen het hele attributievenster lang de
+   *    uitnodiging tonen, ook via de gewone 'Demo aanvragen'-knop.
    * In alle andere gevallen — geen, ongeldige of verlopen code — valt de
    * pagina automatisch terug op de neutrale onboarding.
    */

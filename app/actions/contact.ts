@@ -6,6 +6,7 @@ import {
   sendContactNotification,
 } from "@/lib/email/send";
 import { isTelefoonGeldig } from "@/lib/intake";
+import { getValidAttribution } from "@/lib/referral";
 
 /**
  * Het contactformulier van de publieke site.
@@ -16,6 +17,12 @@ import { isTelefoonGeldig } from "@/lib/intake";
  * mailservice — interne notificatie met `replyTo` naar de afzender, plus een
  * persoonlijke bevestiging — en wordt vastgelegd in het bestaande auditlog,
  * zodat het in /admin/activiteit terugkomt naast al het andere verkeer.
+ *
+ * Kwam de afzender via een partnerlink binnen, dan gaat die herkomst mee in het
+ * auditlog. Bewust alleen daar: een bericht is geen aanvraag, dus het krijgt
+ * geen partnerkoppeling die commissie kan opleveren. De cookie blijft gewoon
+ * staan, dus vraagt deze persoon later alsnog een demo aan, dan wordt de
+ * partner op dat moment wél netjes gekoppeld.
  */
 
 export type ContactState = {
@@ -78,10 +85,17 @@ export async function submitContact(
   // Bevestiging naar de afzender (nice-to-have, blokkeert nooit).
   await sendContactConfirmation(email, naam, bericht);
 
+  const attribution = await getValidAttribution();
   await logActivity({
     action: "CONTACT_MESSAGE",
     objectType: "contact",
-    newValue: { naam, email, telefoon: telefoon || null, herkomst: herkomst || null },
+    newValue: {
+      naam,
+      email,
+      telefoon: telefoon || null,
+      herkomst: herkomst || null,
+      referralCode: attribution?.referralCode ?? null,
+    },
   });
 
   return { status: "success" };

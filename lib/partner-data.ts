@@ -2,7 +2,7 @@ import "server-only";
 import { and, count, countDistinct, desc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import type { LeadStatus, Partner } from "@/lib/db/schema";
-import { stageIndex } from "@/lib/journey-stages";
+import { commissieFase } from "@/lib/commissie";
 
 /**
  * Datatoegang voor het partnerportaal.
@@ -92,18 +92,10 @@ export async function getPartnerLeads(partnerId: string) {
 /**
  * Commissie-overzicht — volledig server-side berekend.
  *
- * De drie bakken worden bepaald met de PLAATS van de stage in de journey, niet
- * met een opsomming van losse stages. Dat is bewust: bij een opsomming valt een
- * aanvraag stilzwijkend uit alle tellers zodra hij een stage bereikt die
- * niemand in het lijstje heeft gezet, en dan ziet de partner zijn aanbreng
- * verdwijnen precies op het moment dat die vooruitgaat.
- *
- * In behandeling — vanaf de demo-afspraak tot het voorstel verstuurd is.
- * Gereserveerd  — klant akkoord, overeenkomst en eerste termijn.
- * Verkocht      — vanaf de bouwfase; hier is de commissie verdiend.
- *
- * Handmatig op "afgevallen" gezet telt nergens meer mee, ongeacht hoe ver de
- * stage stond toen het afketste.
+ * De indeling in fases staat in lib/commissie.ts, zodat het partnerportaal en
+ * het adminscherm niet uit elkaar kunnen lopen. Er wordt geteld op de
+ * partner die de commissie toekomt (`affiliatePartnerId`), nooit op een
+ * aanraking: alleen de vastgelegde koppeling bepaalt geld.
  */
 export async function getPartnerCommission(
   partnerId: string,
@@ -118,19 +110,23 @@ export async function getPartnerCommission(
     .from(schema.leads)
     .where(eq(schema.leads.affiliatePartnerId, partnerId));
 
-  const VANAF_BEHANDELING = stageIndex("afspraak");
-  const VANAF_GERESERVEERD = stageIndex("akkoord");
-  const VANAF_VERKOCHT = stageIndex("gestart");
-
   let verkocht = 0;
   let gereserveerd = 0;
   let inBehandeling = 0;
   for (const r of rows) {
-    if (r.status === "afgevallen") continue;
-    const i = stageIndex(r.stage);
-    if (i >= VANAF_VERKOCHT) verkocht += 1;
-    else if (i >= VANAF_GERESERVEERD) gereserveerd += 1;
-    else if (i >= VANAF_BEHANDELING) inBehandeling += 1;
+    switch (commissieFase(r.stage, r.status)) {
+      case "verdiend":
+        verkocht += 1;
+        break;
+      case "gereserveerd":
+        gereserveerd += 1;
+        break;
+      case "in-behandeling":
+        inBehandeling += 1;
+        break;
+      default:
+        break;
+    }
   }
   return {
     verkocht,

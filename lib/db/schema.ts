@@ -10,6 +10,14 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
+import type { Utm } from "@/lib/referral-config";
+
+/**
+ * De vorm van de marketingparameters staat in lib/referral-config.ts, naast de
+ * lijst met toegestane sleutels. Hier alleen doorgegeven, zodat schema en
+ * opschoning het per definitie over dezelfde velden hebben.
+ */
+export type { Utm };
 
 /* =========================================================================
  * Gebruikers & authenticatie
@@ -224,7 +232,9 @@ export const referralClicks = pgTable(
     /** Anonieme bezoekers-id uit first-party cookie */
     visitorId: text("visitor_id").notNull(),
     landingPage: text("landing_page").notNull(),
-    utm: jsonb("utm").$type<Record<string, string>>(),
+    /** Verwijzende bron (Referer), alleen herkomst + pad — nooit de query */
+    referrer: text("referrer"),
+    utm: jsonb("utm").$type<Utm>(),
     /** Beperkte user agent (max 120 tekens) */
     userAgent: text("user_agent"),
     isBot: boolean("is_bot").notNull().default(false),
@@ -333,7 +343,20 @@ export const LEAD_STATUSES = [
 ] as const;
 export type LeadStatus = (typeof LEAD_STATUSES)[number];
 
-export const ATTRIBUTION_MODELS = ["LAST_VALID_REFERRAL", "MANUAL"] as const;
+/**
+ * Hoe een aanvraag aan een partner is toegekend.
+ *
+ * FIRST_TOUCH        — de partner die de bezoeker binnenbracht (standaard).
+ * LAST_VALID_REFERRAL — de eerste partner mocht niet meer attribueren, dus
+ *                       schoof de aanvraag door naar de laatste geldige link.
+ *                       Ook de waarde van aanvragen van vóór first touch.
+ * MANUAL             — een beheerder heeft de toewijzing zelf gezet.
+ */
+export const ATTRIBUTION_MODELS = [
+  "FIRST_TOUCH",
+  "LAST_VALID_REFERRAL",
+  "MANUAL",
+] as const;
 export type AttributionModel = (typeof ATTRIBUTION_MODELS)[number];
 
 /** Volledige intake van een persoonlijke-demo-aanvraag. */
@@ -377,7 +400,15 @@ export const leads = pgTable(
     functies: jsonb("functies").$type<string[]>().notNull().default([]),
     opmerkingen: text("opmerkingen"),
 
-    // Partnerattributie — leeg bij organische aanvraag
+    /*
+     * Partnerattributie — leeg bij organische aanvraag.
+     *
+     * `affiliatePartnerId` is en blijft de partner die de commissie toekomt:
+     * de rest van DogWare (partnerportaal, commissie, rapportage) rekent
+     * hierop. De twee aanrakingen ernaast zijn documentatie van de reis, geen
+     * tweede waarheid. Vanaf het moment dat deze rij bestaat, is zij de bron —
+     * de cookie in de browser doet er niet meer toe.
+     */
     affiliatePartnerId: uuid("affiliate_partner_id").references(
       () => partners.id,
       { onDelete: "set null" },
@@ -389,6 +420,28 @@ export const leads = pgTable(
     ),
     attributionModel: text("attribution_model").$type<AttributionModel>(),
     attributedAt: timestamp("attributed_at", { withTimezone: true }),
+    /** De partner via wie deze bezoeker DogWare voor het eerst vond */
+    firstTouchPartnerId: uuid("first_touch_partner_id").references(
+      () => partners.id,
+      { onDelete: "set null" },
+    ),
+    /** De laatst gebruikte partnerlink vóór de aanvraag (kan dezelfde zijn) */
+    lastTouchPartnerId: uuid("last_touch_partner_id").references(
+      () => partners.id,
+      { onDelete: "set null" },
+    ),
+    /** Wanneer die eerste aanraking plaatsvond */
+    referralFirstSeenAt: timestamp("referral_first_seen_at", { withTimezone: true }),
+    /** De pagina waarop de bezoeker toen binnenkwam */
+    referralLandingPage: text("referral_landing_page"),
+    /** Waar hij vandaan kwam (herkomst + pad, nooit de zoekopdracht) */
+    referralReferrer: text("referral_referrer"),
+    /**
+     * Marketingherkomst van datzelfde eerste bezoek. Bewust een eigen veld en
+     * niet vermengd met de partnervelden: een campagne zegt iets anders dan
+     * een aanbrenger, en alleen die laatste levert commissie op.
+     */
+    utm: jsonb("utm").$type<Utm>(),
 
     // Bron van de aanvraag
     source: text("source").$type<LeadSource>().notNull().default("website"),
@@ -421,6 +474,7 @@ export const leads = pgTable(
     index("leads_status_idx").on(t.status),
     index("leads_stage_idx").on(t.stage),
     index("leads_partner_idx").on(t.affiliatePartnerId),
+    index("leads_first_touch_idx").on(t.firstTouchPartnerId),
   ],
 );
 

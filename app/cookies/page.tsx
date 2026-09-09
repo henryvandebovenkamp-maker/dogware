@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { LegalPage, LegalSection } from "@/components/legal-page";
+import { REFERRAL_WINDOW_DAYS } from "@/lib/referral-config";
 
 export const metadata: Metadata = {
   title: "Cookies",
@@ -32,8 +33,16 @@ export default function CookiesPage() {
           <li>
             <strong>Referralkoppeling</strong> — onthoudt via welke partner je
             binnenkwam, zodat een latere demo-aanvraag aan de juiste partner
-            wordt toegewezen. Bevat een anonieme verwijzing, geldig gedurende de
-            attributieperiode (standaard 30 dagen).
+            wordt toegewezen. Hij wordt geplaatst op het moment dat je een
+            partnerlink opent, bevat uitsluitend een anonieme verwijzing naar
+            die partner (geen naam, e-mailadres of ander gegeven over jou) en is
+            alleen door onze server te lezen. Geldig tot {REFERRAL_WINDOW_DAYS}{" "}
+            dagen na dat eerste bezoek; herhaalde bezoeken verlengen dat niet.
+          </li>
+          <li>
+            <strong>Bezoekersaanduiding</strong> — een willekeurig nummer waarmee
+            we herhaalde klikken op dezelfde partnerlink als één bezoek tellen.
+            Niet herleidbaar tot jou als persoon.
           </li>
         </ul>
       </LegalSection>
@@ -43,6 +52,12 @@ export default function CookiesPage() {
           Je kunt cookies altijd verwijderen via de instellingen van je browser.
           Zonder de functionele cookies werkt inloggen of de partnerkoppeling
           mogelijk niet correct.
+        </p>
+        <p>
+          Heb je al een demo aangevraagd, dan is de partner waarlangs je
+          binnenkwam bij die aanvraag vastgelegd. Het verwijderen van je cookies
+          verandert daar niets meer aan; die gegevens vallen onder de bewaartermijn
+          in onze privacyverklaring.
         </p>
       </LegalSection>
     </LegalPage>

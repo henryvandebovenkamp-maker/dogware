@@ -9,7 +9,7 @@ import { getCurrentUser, revokeAllSessions } from "@/lib/auth/session";
 import { issueToken } from "@/lib/auth/tokens";
 import { normalizeReferralCode, referralLinkFor } from "@/lib/referral";
 import { logActivity } from "@/lib/audit";
-import { logJourneyEvent } from "@/lib/journey";
+import { logJourneyEvent, logReferralGekoppeld } from "@/lib/journey";
 import { sendPartnerInvite, sendPartnerAdded } from "@/lib/email/send";
 import {
   activatePartner,
@@ -452,6 +452,20 @@ export async function reassignLead(
       attributedAt: new Date(),
     })
     .where(eq(schema.leads.id, leadId));
+
+  /*
+   * De aanrakingen blijven staan zoals ze waren: die vertellen hoe de bezoeker
+   * binnenkwam, en dat verandert niet doordat een beheerder de commissie
+   * anders toewijst. Waaróm er handmatig is ingegrepen staat in de auditlog.
+   */
+  if (newPartner) {
+    await logReferralGekoppeld(
+      leadId,
+      newPartner.id,
+      `Referral handmatig gekoppeld via partner (${newPartner.referralCode})`,
+      { model: "MANUAL" },
+    );
+  }
 
   // Oorspronkelijke attributie blijft bewaard in de auditlog
   await logActivity({

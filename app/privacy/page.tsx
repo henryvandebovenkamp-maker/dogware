@@ -45,8 +45,15 @@ export default function PrivacyPage() {
           </li>
           <li>
             <strong>Referralbezoeken:</strong> een anonieme bezoekers-id, de
-            partnercode, tijdstip en beperkte technische gegevens, om een
-            aanmelding aan de juiste partner te koppelen.
+            partnercode, tijdstip, de pagina waarop je binnenkwam, de website
+            waarvandaan je kwam en beperkte technische gegevens, om een
+            aanmelding aan de juiste partner te koppelen. Van de verwijzende
+            website bewaren we alleen het adres, nooit de zoekopdracht.
+          </li>
+          <li>
+            <strong>Campagnegegevens:</strong> de herkenningscodes die in een
+            advertentie- of nieuwsbrieflink staan (utm-parameters), zodat we
+            weten welke campagne werkt. Deze zeggen niets over jou persoonlijk.
           </li>
         </ul>
       </LegalSection>
