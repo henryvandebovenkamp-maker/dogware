@@ -13,6 +13,7 @@ import {
 } from "@/lib/proposals";
 import { computeOneOff, euroFromCents } from "@/lib/money";
 import { ProposalEditor, type EditorData } from "@/components/commerce/proposal-editor";
+import { isDirectJourney } from "@/lib/journey-variant";
 
 export const metadata: Metadata = {
   title: "Voorstel",
@@ -58,6 +59,9 @@ export default async function VoorstelEditorPage({
 
   const data: EditorData = {
     leadId: id,
+    // Directe klant: dezelfde editor en hetzelfde versiemodel, maar het stuk
+    // heet opdrachtbevestiging en gaat meteen als overeenkomst de deur uit.
+    direct: isDirectJourney(lead.journeyVariant),
     version: draft.version,
     klant: {
       bedrijfsnaam: lead.bedrijfsnaam,

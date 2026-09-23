@@ -16,6 +16,7 @@ import {
 import { isEmailConfigured } from "@/lib/email/service";
 import { notifyPartner } from "@/lib/partner-notify";
 import { demoMailOpzet } from "@/lib/demo-mail";
+import { isDirectJourney } from "@/lib/journey-variant";
 
 export type JourneyActionState = {
   status: "idle" | "success" | "error";
@@ -95,6 +96,10 @@ export async function previewDemoMail(
   const leadId = String(formData.get("leadId") ?? "");
   const lead = await haalLead(leadId);
   if (!lead) return { status: "error", message: "Aanvraag niet gevonden." };
+  // Een directe klant krijgt nooit een voorbeeldwebsite — ook niet via een directe POST.
+  if (isDirectJourney(lead.journeyVariant)) {
+    return { status: "error", message: "Dit is een directe klant; er hoort geen demo bij." };
+  }
 
   const opzet = demoMailOpzet(lead, {
     website: String(formData.get("website") ?? ""),
@@ -150,6 +155,10 @@ export async function sendDemoTestMail(
 
   const lead = await haalLead(leadId);
   if (!lead) return { status: "error", message: "Aanvraag niet gevonden." };
+  // Een directe klant krijgt nooit een voorbeeldwebsite — ook niet via een directe POST.
+  if (isDirectJourney(lead.journeyVariant)) {
+    return { status: "error", message: "Dit is een directe klant; er hoort geen demo bij." };
+  }
 
   const opzet = demoMailOpzet(lead, {
     website: String(formData.get("website") ?? ""),
@@ -190,6 +199,10 @@ export async function sendDemo(
   const leadId = String(formData.get("leadId") ?? "");
   const lead = await haalLead(leadId);
   if (!lead) return { status: "error", message: "Aanvraag niet gevonden." };
+  // Een directe klant krijgt nooit een voorbeeldwebsite — ook niet via een directe POST.
+  if (isDirectJourney(lead.journeyVariant)) {
+    return { status: "error", message: "Dit is een directe klant; er hoort geen demo bij." };
+  }
 
   const opzet = demoMailOpzet(lead, {
     website: String(formData.get("website") ?? ""),

@@ -11,6 +11,7 @@ import { isMollieConfigured } from "@/lib/mollie";
 import { resolvePortal } from "@/lib/portal-access";
 import { trackProposalViewed } from "@/lib/proposals";
 import { TrajectShell } from "@/components/commerce/customer-view";
+import { isDirectJourney } from "@/lib/journey-variant";
 
 export const metadata: Metadata = {
   title: "Jouw nieuwe website met DogWare",
@@ -33,6 +34,7 @@ export default async function TrajectPage({
   const ctx = await resolvePortal(token);
   if (!ctx) notFound();
   const { lead, commerce } = ctx;
+  const direct = isDirectJourney(lead.journeyVariant);
 
   const proposal = await getActiveProposal(commerce.id);
   if (proposal?.sentAt) await trackProposalViewed(proposal.id);
@@ -56,7 +58,8 @@ export default async function TrajectPage({
         voornaam={lead.naam.split(" ")[0]}
         bedrijfsnaam={lead.bedrijfsnaam}
         stage={lead.stage}
-        kop="We zijn je voorstel aan het maken"
+        variant={lead.journeyVariant}
+        kop={direct ? "We zetten je opdrachtbevestiging klaar" : "We zijn je voorstel aan het maken"}
         tekst="Zodra het klaarstaat krijg je van ons bericht. Je hoeft nu even niets te doen."
         documenten={[]}
         tijdlijn={tijdlijn.map(naarRij)}
@@ -69,6 +72,7 @@ export default async function TrajectPage({
       voornaam={lead.naam.split(" ")[0]}
       bedrijfsnaam={lead.bedrijfsnaam}
       stage={lead.stage}
+      variant={lead.journeyVariant}
       documenten={documenten.map((d) => ({
         id: d.id,
         nummer: d.nummer,
@@ -80,6 +84,7 @@ export default async function TrajectPage({
       tijdlijn={tijdlijn.map(naarRij)}
       voorstel={{
         token,
+        direct,
         version: proposal.version,
         titel: proposal.titel,
         intro: proposal.intro,

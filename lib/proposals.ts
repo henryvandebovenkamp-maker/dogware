@@ -1,5 +1,5 @@
 import "server-only";
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, ne, sql } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import type { Commerce, Lead, Proposal } from "@/lib/db/schema";
 import {
@@ -291,6 +291,11 @@ export async function saveDraftContent(
  *
  * Een geaccepteerde versie wordt NOOIT superseded — die is de juridische
  * basis onder een eventuele overeenkomst en betaling.
+ *
+ * Eerst wordt het concept atomair geclaimd (`WHERE status = 'DRAFT'`): van
+ * twee gelijktijdige kliks krijgt er precies één een rij terug. De andere
+ * krijgt null en verstuurt dus geen tweede mail. Pas daarna worden de oudere
+ * versies opgevolgd — nooit de zojuist verstuurde zelf.
  */
 export async function markProposalSent(
   proposal: Proposal,
@@ -298,16 +303,6 @@ export async function markProposalSent(
 ): Promise<Proposal | null> {
   const db = getDb();
   if (!db) return null;
-
-  await db
-    .update(schema.proposals)
-    .set({ status: "SUPERSEDED" })
-    .where(
-      and(
-        eq(schema.proposals.commerceId, commerce.id),
-        inArray(schema.proposals.status, ["SENT", "VIEWED"]),
-      ),
-    );
 
   const [sent] = await db
     .update(schema.proposals)
@@ -317,9 +312,22 @@ export async function markProposalSent(
       pricing: freezePricing(commerce) as unknown as Record<string, unknown>,
       updatedAt: new Date(),
     })
-    .where(eq(schema.proposals.id, proposal.id))
+    .where(and(eq(schema.proposals.id, proposal.id), eq(schema.proposals.status, "DRAFT")))
     .returning();
-  return sent ?? null;
+  if (!sent) return null;
+
+  await db
+    .update(schema.proposals)
+    .set({ status: "SUPERSEDED" })
+    .where(
+      and(
+        eq(schema.proposals.commerceId, commerce.id),
+        ne(schema.proposals.id, sent.id),
+        inArray(schema.proposals.status, ["SENT", "VIEWED"]),
+      ),
+    );
+
+  return sent;
 }
 
 /** Registreert dat de klant het voorstel geopend heeft. Faalt nooit hard. */

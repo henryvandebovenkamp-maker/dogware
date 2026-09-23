@@ -1,6 +1,6 @@
 import { requirePartner } from "@/lib/auth/session";
 import { referralLinkFor } from "@/lib/referral";
-import { STAGE_KLANT_LABEL } from "@/lib/journey-stages";
+import { stageKlantLabel } from "@/lib/journey-stages";
 import {
   euro,
   getPartnerCommission,
@@ -117,7 +117,7 @@ export default async function PartnerDashboard() {
                   </span>
                 </span>
                 <span className="rounded-full bg-[#2f6bed]/10 px-3 py-1 text-[11px] font-bold text-[#2f6bed]">
-                  {STAGE_KLANT_LABEL[l.stage]}
+                  {stageKlantLabel(l.stage, l.journeyVariant)}
                 </span>
                 {l.demoUrl && (
                   <span className="flex w-full flex-wrap items-center justify-between gap-2 border-t border-ink/5 pt-2.5">

@@ -77,6 +77,7 @@ export async function getPartnerLeads(partnerId: string) {
       plaats: schema.leads.plaats,
       status: schema.leads.status,
       stage: schema.leads.stage,
+      journeyVariant: schema.leads.journeyVariant,
       referralCodeSnapshot: schema.leads.referralCodeSnapshot,
       // Alleen de PUBLIEKE voorbeeldwebsite + verzenddatum — nooit de
       // portaal-/loginlink of persoonsgegevens van de aanvrager.

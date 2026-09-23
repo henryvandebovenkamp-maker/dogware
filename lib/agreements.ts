@@ -1,5 +1,5 @@
 import "server-only";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import type { Agreement, Commerce, Lead, Proposal } from "@/lib/db/schema";
 import {
@@ -11,6 +11,7 @@ import {
   type Chapter,
 } from "@/lib/agreement";
 import { pricingLabels, readPricing, type PricingSnapshot } from "@/lib/proposals";
+import { isDirectJourney } from "@/lib/journey-variant";
 
 /**
  * Overeenkomsten: aanmaken, uitlezen en ondertekenen.
@@ -109,6 +110,7 @@ export function agreementPricing(a: Agreement): PricingSnapshot {
 export function renderAgreement(
   a: Agreement,
   proposal: Proposal,
+  variant?: string | null,
 ): { chapters: Chapter[]; ctx: AgreementContext; versionName: string } {
   const snap = agreementPricing(a);
   const L = pricingLabels(snap);
@@ -128,6 +130,7 @@ export function renderAgreement(
     freeMonths: L.freeMonths,
     subscriptionStartLabel: L.startLabel,
     bijzonderheden: proposal.bijzonderheden,
+    opdrachtDocument: isDirectJourney(variant) ? "opdrachtbevestiging" : "voorstel",
   };
   const versie = resolveContractVersion(a.voorwaardenVersie);
   return {
@@ -138,7 +141,7 @@ export function renderAgreement(
 }
 
 /** De akkoordverklaringen die de klant moet aanvinken, met de echte bedragen. */
-export function agreementConsents(a: Agreement) {
+export function agreementConsents(a: Agreement, variant?: string | null) {
   const L = pricingLabels(agreementPricing(a));
   return consentLabels({
     setupExclLabel: L.netExVat,
@@ -148,6 +151,7 @@ export function agreementConsents(a: Agreement) {
     finalPercent: L.finalPercent,
     monthlyExclLabel: L.monthlyExVat,
     versionLabel: resolveContractVersion(a.voorwaardenVersie).name,
+    opdrachtDocument: isDirectJourney(variant) ? "opdrachtbevestiging" : "voorstel",
   });
 }
 
@@ -164,4 +168,58 @@ export function isSigned(a: Agreement | null): a is Agreement {
       a.agreesVoorwaarden &&
       a.agreesBevoegd,
   );
+}
+
+/**
+ * Directe klant: legt het akkoord op de opdrachtbevestiging vast op basis van
+ * de ondertekende overeenkomst.
+ *
+ * Bij een directe klant is er geen los voorstelakkoord — de handtekening ís
+ * het akkoord. Het voorstel wordt daarom pas hier ACCEPTED, met exact het
+ * moment, de naam en de vingerafdruk van die handtekening. Nooit eerder: bij
+ * versturen heeft de klant nog nergens mee ingestemd.
+ *
+ * Idempotent: werkt alleen op een nog niet geaccepteerde, verstuurde versie
+ * die bij déze overeenkomst hoort. Wordt ook aangeroepen bij een herhaalde
+ * ondertekenpoging, zodat een onderbroken eerste poging zichzelf herstelt.
+ */
+export async function acceptProposalBySignature(
+  agreement: Agreement,
+  proposal: Proposal,
+): Promise<boolean> {
+  const db = getDb();
+  if (!db) return false;
+  if (agreement.status !== "SIGNED" || !agreement.signedAt) return false;
+  if (agreement.proposalId !== proposal.id) return false;
+
+  const moment = agreement.signedAt;
+  const [geaccepteerd] = await db
+    .update(schema.proposals)
+    .set({
+      status: "ACCEPTED",
+      acceptedAt: moment,
+      acceptedName: agreement.signerName,
+      acceptedIpHash: agreement.signedIpHash,
+      acceptedUserAgent: agreement.signedUserAgent,
+    })
+    .where(
+      and(
+        eq(schema.proposals.id, proposal.id),
+        isNull(schema.proposals.acceptedAt),
+        inArray(schema.proposals.status, ["SENT", "VIEWED"]),
+      ),
+    )
+    .returning({ id: schema.proposals.id });
+  if (!geaccepteerd) return false;
+
+  await db
+    .update(schema.commerce)
+    .set({
+      acceptedAt: moment,
+      acceptedIpHash: agreement.signedIpHash,
+      acceptedSnapshot: proposal.pricing,
+      updatedAt: new Date(),
+    })
+    .where(and(eq(schema.commerce.id, agreement.commerceId), isNull(schema.commerce.acceptedAt)));
+  return true;
 }

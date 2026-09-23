@@ -125,6 +125,7 @@ export async function laadAanvragen(nu: Date = new Date()): Promise<Aanvraag[] |
 
     const snapshot: JourneySnapshot = {
       stage: lead.stage,
+      variant: lead.journeyVariant,
       commerceStatus: commerce?.status ?? null,
       demoVerstuurd: Boolean(lead.demoSentAt),
       demoLinksKlaar: Boolean(

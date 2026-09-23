@@ -467,7 +467,7 @@ export const COMMERCE_SUBJECTS: Record<CommerceMailType, string> = {
   "proposal-sent": "Je persoonlijke voorstel van DogWare",
   "proposal-reminder": "Je voorstel staat nog voor je klaar",
   "proposal-accepted": "Je akkoord is binnen — nu de overeenkomst",
-  "agreement-ready": "De samenwerkingsovereenkomst staat klaar",
+  "agreement-ready": "Je opdrachtbevestiging staat klaar om te ondertekenen",
   "agreement-reminder": "De overeenkomst wacht nog op je handtekening",
   "agreement-signed": "Getekend — nu de eerste termijn",
   "deposit-ready": "We kunnen beginnen — de eerste termijn staat klaar",

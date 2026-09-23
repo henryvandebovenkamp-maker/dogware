@@ -31,6 +31,7 @@ type Klant = {
  */
 export function AgreementView({
   token,
+  direct = false,
   chapters,
   versionName,
   versionDate,
@@ -42,6 +43,8 @@ export function AgreementView({
   klant,
 }: {
   token: string;
+  /** Directe klant: deze overeenkomst ís de opdrachtbevestiging die hij tekent. */
+  direct?: boolean;
   chapters: Chapter[];
   versionName: string;
   versionDate: string;
@@ -107,11 +110,19 @@ export function AgreementView({
         </a>
 
         <h1 className="mt-4 text-balance text-[26px] font-extrabold leading-tight tracking-tight text-ink sm:text-[32px]">
-          Samenwerkingsovereenkomst
+          {direct ? "Opdrachtbevestiging en samenwerkingsovereenkomst" : "Samenwerkingsovereenkomst"}
         </h1>
         <p className="mt-1.5 text-[13.5px] text-ink-500">
-          {versionName} · ingangsdatum {versionDate} · hoort bij voorstel versie {voorstelVersie}
+          {versionName} · ingangsdatum {versionDate} · hoort bij{" "}
+          {direct ? "opdrachtbevestiging" : "voorstel"} versie {voorstelVersie}
         </p>
+        {direct && !getekend && (
+          <p className="mt-3 text-[14px] leading-relaxed text-ink-500">
+            Hierin staat precies wat we voor je bouwen, de investering, de betaling in twee
+            termijnen en het afgesproken maandbedrag. Met je digitale handtekening onderaan geef je
+            daar akkoord op.
+          </p>
+        )}
 
         {getekend && (
           <div className="mt-5 flex items-start gap-3 rounded-2xl bg-sage-100/70 p-4 ring-1 ring-sage/15">
@@ -279,8 +290,8 @@ export function AgreementView({
                 </p>
               )}
               <p className="mt-4 text-[11.5px] leading-relaxed text-ink-300">
-                Bij het ondertekenen leggen we je naam, de datum en tijd, de versie van dit voorstel
-                en deze voorwaarden vast, samen met een versleutelde weergave van je IP-adres. Zo is
+                Bij het ondertekenen leggen we je naam, de datum en tijd, de versie van{" "}
+                {direct ? "deze opdrachtbevestiging" : "dit voorstel"} en deze voorwaarden vast, samen met een versleutelde weergave van je IP-adres. Zo is
                 later te herleiden wat er precies is afgesproken.
               </p>
             </section>

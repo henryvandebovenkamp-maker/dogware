@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { AlertCircle, Inbox, Phone, Search } from "lucide-react";
+import { AlertCircle, Inbox, Phone, Plus, Search } from "lucide-react";
 import { laadAanvragen, type Aanvraag } from "@/lib/aanvragen-lijst";
 import {
   BAKJES,
@@ -9,7 +9,7 @@ import {
   urgentieSleutel,
   type Bakje,
 } from "@/lib/aanvragen";
-import { STAGE_META } from "@/lib/journey-stages";
+import { stageMeta } from "@/lib/journey-stages";
 import { cn } from "@/lib/cn";
 
 export const metadata: Metadata = {
@@ -88,16 +88,25 @@ export default async function AanvragenPage({
           </p>
         </div>
 
-        <form className="relative" action="/admin/leads">
-          {actief && <input type="hidden" name="bakje" value={actief} />}
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-300" />
-          <input
-            name="q"
-            defaultValue={q ?? ""}
-            placeholder="Bedrijf, persoon, e-mail of plaats"
-            className="w-full rounded-xl border border-cream-200 bg-white py-2 pl-9 pr-3 text-[13px] text-ink outline-none transition placeholder:text-ink-300 focus:border-brand focus:ring-2 focus:ring-brand/20 sm:w-72"
-          />
-        </form>
+        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+          <form className="relative min-w-0 flex-1 sm:flex-none" action="/admin/leads">
+            {actief && <input type="hidden" name="bakje" value={actief} />}
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-300" />
+            <input
+              name="q"
+              defaultValue={q ?? ""}
+              placeholder="Bedrijf, persoon, e-mail of plaats"
+              className="w-full rounded-xl border border-cream-200 bg-white py-2 pl-9 pr-3 text-[13px] text-ink outline-none transition placeholder:text-ink-300 focus:border-brand focus:ring-2 focus:ring-brand/20 sm:w-72"
+            />
+          </form>
+          {/* Voor wie al akkoord is: zonder demo meteen naar de opdracht. */}
+          <Link
+            href="/admin/leads/nieuw"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-brand px-3.5 py-2 text-[13px] font-bold text-white transition hover:bg-brand-600"
+          >
+            <Plus className="h-4 w-4" /> Nieuwe klant
+          </Link>
+        </div>
       </div>
 
       {/* Actie nodig — het enige blok dat er echt toe doet */}
@@ -246,13 +255,15 @@ function Rij({ a }: { a: Aanvraag }) {
           </span>
           <span className="block truncate text-[12px] text-ink-500">
             {lead.naam} · {lead.plaats}
-            {lead.diensten.length > 0 && ` · ${lead.diensten[0]}`}
+            {lead.journeyVariant === "direct"
+              ? " · directe klant"
+              : lead.diensten.length > 0 && ` · ${lead.diensten[0]}`}
           </span>
         </Link>
 
         <span className="min-w-0 basis-48 text-[12px]">
           <span className="block font-semibold text-ink-700">
-            {STAGE_META[lead.stage].korte}
+            {stageMeta(lead.stage, lead.journeyVariant).korte}
             {afleiding.dagenSindsDemo !== null && (
               <span className="font-normal text-ink-300">
                 {" · "}

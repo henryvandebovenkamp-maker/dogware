@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Phone, Users } from "lucide-react";
 import { alleenKlanten, laadAanvragen, type Aanvraag } from "@/lib/aanvragen-lijst";
-import { STAGE_META } from "@/lib/journey-stages";
+import { stageMeta } from "@/lib/journey-stages";
 import { euroFromCents } from "@/lib/money";
 
 export const metadata = { title: "Klanten" };
@@ -113,7 +113,7 @@ function KlantRij({ k }: { k: Aanvraag }) {
 
         <span className="basis-40 text-[12px]">
           <span className="block font-semibold text-ink-700">
-            {STAGE_META[lead.stage].label}
+            {stageMeta(lead.stage, lead.journeyVariant).label}
           </span>
           <span className="block text-ink-300">
             klant sinds{" "}

@@ -1,4 +1,4 @@
-import { JOURNEY_STAGES, type JourneyStage } from "@/lib/db/schema";
+import { JOURNEY_STAGES, type JourneyStage, type JourneyVariant } from "@/lib/db/schema";
 
 /**
  * Client-veilige journey-definities (labels, volgorde, fase-indeling).
@@ -79,11 +79,51 @@ export const JOURNEY_PHASES = [
   stages: readonly JourneyStage[];
 }[];
 
-export type JourneyPhaseKey = (typeof JOURNEY_PHASES)[number]["key"];
+/**
+ * Dezelfde balk voor een directe klant: die heeft nooit een demo gehad, dus
+ * er staat er ook geen — ook geen afgevinkte. Alles vóór de overeenkomst is
+ * één fase "Opdracht"; zo valt elke stage nog steeds in precies één fase, ook
+ * als iemand de stage handmatig terugzet.
+ */
+export const DIRECT_JOURNEY_PHASES = [
+  {
+    key: "opdracht",
+    label: "Opdracht",
+    stages: [
+      "aangevraagd",
+      "voorbereiden",
+      "demo-verstuurd",
+      "ingelogd",
+      "bekeken",
+      "feedback",
+      "afspraak",
+      "demo-akkoord",
+      "offerte",
+      "voorstel-verstuurd",
+      "akkoord",
+    ],
+  },
+  ...JOURNEY_PHASES.slice(2),
+] as const satisfies readonly {
+  key: string;
+  label: string;
+  stages: readonly JourneyStage[];
+}[];
+
+export type JourneyPhase = { key: string; label: string; stages: readonly JourneyStage[] };
+
+export type JourneyPhaseKey =
+  | (typeof JOURNEY_PHASES)[number]["key"]
+  | (typeof DIRECT_JOURNEY_PHASES)[number]["key"];
+
+/** De zichtbare fases voor deze route. Zonder route: de bestaande demo-balk. */
+export function journeyPhasesFor(variant: JourneyVariant = "demo"): readonly JourneyPhase[] {
+  return variant === "direct" ? DIRECT_JOURNEY_PHASES : JOURNEY_PHASES;
+}
 
 /** In welke zichtbare fase valt deze stage? */
-export function phaseIndexFor(stage: JourneyStage): number {
-  const i = JOURNEY_PHASES.findIndex((p) =>
+export function phaseIndexFor(stage: JourneyStage, variant: JourneyVariant = "demo"): number {
+  const i = journeyPhasesFor(variant).findIndex((p) =>
     (p.stages as readonly string[]).includes(stage),
   );
   return i < 0 ? 0 : i;
@@ -104,9 +144,47 @@ export function stepStateFor(
 }
 
 /** Fase-status voor de voortgangsbalk. */
-export function phaseStateFor(phaseIdx: number, current: JourneyStage): StepState {
-  const c = phaseIndexFor(current);
+export function phaseStateFor(
+  phaseIdx: number,
+  current: JourneyStage,
+  variant: JourneyVariant = "demo",
+): StepState {
+  const c = phaseIndexFor(current, variant);
   if (phaseIdx < c) return "done";
   if (phaseIdx === c) return "current";
   return "todo";
+}
+
+/*
+ * Labels voor een directe klant. Alleen de stages die hij werkelijk doorloopt
+ * krijgen een eigen woord; de rest valt terug op de gewone labels. Zo blijft
+ * er één stagelijst en is "Voorstel" voor hem gewoon "Opdracht".
+ */
+const DIRECT_META: Partial<Record<JourneyStage, { label: string; korte: string }>> = {
+  aangevraagd: { label: "Directe klant toegevoegd", korte: "Nieuw" },
+  offerte: { label: "Opdrachtbevestiging voorbereiden", korte: "Opdracht" },
+  "voorstel-verstuurd": { label: "Opdrachtbevestiging verstuurd", korte: "Opdracht" },
+  akkoord: { label: "Opdracht bevestigd", korte: "Akkoord" },
+  overeenkomst: { label: "Opdrachtbevestiging tekenen", korte: "Tekenen" },
+};
+
+const DIRECT_KLANT_LABEL: Partial<Record<JourneyStage, string>> = {
+  aangevraagd: "We zetten je opdracht klaar",
+  offerte: "We zetten je opdrachtbevestiging klaar",
+  "voorstel-verstuurd": "Je opdrachtbevestiging staat klaar",
+  akkoord: "Opdracht bevestigd",
+  overeenkomst: "Opdrachtbevestiging tekenen",
+};
+
+/** Adminlabel van een stage, passend bij de route. */
+export function stageMeta(
+  stage: JourneyStage,
+  variant: JourneyVariant = "demo",
+): { label: string; korte: string } {
+  return (variant === "direct" && DIRECT_META[stage]) || STAGE_META[stage];
+}
+
+/** Klantlabel van een stage, passend bij de route. */
+export function stageKlantLabel(stage: JourneyStage, variant: JourneyVariant = "demo"): string {
+  return (variant === "direct" && DIRECT_KLANT_LABEL[stage]) || STAGE_KLANT_LABEL[stage];
 }

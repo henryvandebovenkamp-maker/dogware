@@ -1,4 +1,4 @@
-import type { CommerceStatus, JourneyStage } from "@/lib/db/schema";
+import type { CommerceStatus, JourneyStage, JourneyVariant } from "@/lib/db/schema";
 
 /**
  * De volgende-stap-motor van de commerciële journey.
@@ -46,6 +46,12 @@ export type NextActionKey =
 
 export type JourneySnapshot = {
   stage: JourneyStage;
+  /**
+   * De route. "direct" betekent: geen voorbeeldwebsite, en het tekenen van de
+   * overeenkomst ís het akkoord op de opdracht. Leeg = "demo", zodat elke
+   * bestaande aanroep ongewijzigd blijft werken.
+   */
+  variant?: JourneyVariant;
   commerceStatus: CommerceStatus | null;
   /** Is het voorbeeld (demolink + inloglink) al naar de klant gemaild? */
   demoVerstuurd: boolean;
@@ -126,6 +132,41 @@ export function nextAction(s: JourneySnapshot, leadId: string): NextAction {
       volgende: "Wachten op de aanbetaling.",
       cta: { label: "Herinnering eerste termijn sturen", action: "aanbetaling-herinneren" },
       waitingOn: "klant",
+    };
+  }
+
+  /*
+   * Directe klant: er is geen demo en geen los voorstelakkoord. Alles vóór de
+   * handtekening draait om één stuk — de opdrachtbevestiging, die meteen als
+   * overeenkomst ter ondertekening klaarstaat. De stappen hierboven (tekenen,
+   * betalen, bouwen, opleveren) zijn voor beide routes gelijk.
+   */
+  if (s.variant === "direct") {
+    if (s.voorstelVerstuurd) {
+      return {
+        situatie: "De opdrachtbevestiging is verstuurd; de klant heeft nog niet getekend.",
+        volgende: "Wachten tot de klant de opdrachtbevestiging digitaal ondertekent.",
+        cta: { label: "Herinnering opdrachtbevestiging sturen", action: "overeenkomst-herinneren" },
+        waitingOn: "klant",
+      };
+    }
+    if (s.heeftConcept) {
+      return {
+        situatie: "Er ligt een concept-opdrachtbevestiging klaar.",
+        volgende: "Controleer de afspraken en verstuur de opdrachtbevestiging ter ondertekening.",
+        cta: {
+          label: "Opdrachtbevestiging afmaken en versturen",
+          action: "voorstel-bewerken",
+          href: `${base}/voorstel`,
+        },
+        waitingOn: "admin",
+      };
+    }
+    return {
+      situatie: "Directe klant — er is nog geen opdrachtbevestiging.",
+      volgende: "Leg vast wat we bouwen en wat het kost, en verstuur het ter ondertekening.",
+      cta: { label: "Opdrachtbevestiging maken", action: "voorstel-maken", href: `${base}/voorstel` },
+      waitingOn: "admin",
     };
   }
 

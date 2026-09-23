@@ -27,7 +27,14 @@ import {
   saveDraftContent,
   toConfig,
 } from "@/lib/proposals";
-import { agreementPricing, ensureAgreement, getCurrentAgreement, isSigned } from "@/lib/agreements";
+import {
+  acceptProposalBySignature,
+  agreementPricing,
+  ensureAgreement,
+  getCurrentAgreement,
+  isSigned,
+} from "@/lib/agreements";
+import { isDirectJourney, opdrachtWoord, overeenkomstPoort } from "@/lib/journey-variant";
 import { registerDocument } from "@/lib/documents";
 import { notifyPartner } from "@/lib/partner-notify";
 import { createMolliePayment, isMollieConfigured } from "@/lib/mollie";
@@ -91,6 +98,9 @@ export async function markDemoAccepted(
   const leadId = String(formData.get("leadId") ?? "");
   const ctx = await adminContext(leadId);
   if (!ctx) return FOUT("Geen toegang.");
+  if (isDirectJourney(ctx.lead.journeyVariant)) {
+    return FOUT("Dit is een directe klant — daar hoort geen demo-akkoord bij.");
+  }
 
   await setStage(leadId, "demo-akkoord", { force: true, actor: "admin", reden: "klant wil doorgaan" });
   await logJourneyEvent(leadId, "demo_accepted", "Klant wil doorgaan met DogWare", { actor: "admin" });
@@ -155,11 +165,12 @@ export async function createProposalDraft(
   const ctx = await adminContext(leadId);
   if (!ctx) return FOUT("Geen toegang.");
 
+  const w = opdrachtWoord(ctx.lead.journeyVariant);
   const draft = await createOrGetDraft(ctx.commerce, ctx.lead, ctx.actorId);
-  if (!draft) return FOUT("Kon geen voorstel aanmaken.");
+  if (!draft) return FOUT(`Kon geen ${w.naam} aanmaken.`);
   if (draft.version === 1) {
-    await setStage(leadId, "offerte", { actor: "admin", reden: "voorstel aangemaakt" });
-    await logJourneyEvent(leadId, "proposal_created", "Voorstel aangemaakt (versie 1)", {
+    await setStage(leadId, "offerte", { actor: "admin", reden: `${w.naam} aangemaakt` });
+    await logJourneyEvent(leadId, "proposal_created", `${w.Naam} concept aangemaakt (versie 1)`, {
       actor: "admin",
     });
   }
@@ -212,14 +223,22 @@ export async function saveProposalDraft(
       ok: false,
       message:
         res.reason === "NOT_DRAFT"
-          ? "Dit voorstel is al verstuurd en kan niet meer worden gewijzigd. Maak een nieuwe versie."
+          ? `${opdrachtWoord(ctx.lead.journeyVariant).Naam === "Voorstel" ? "Dit voorstel" : "Deze opdrachtbevestiging"} is al verstuurd en kan niet meer worden gewijzigd. Maak een nieuwe versie.`
           : "Opslaan lukte niet.",
     };
   }
   return { ok: true };
 }
 
-/** Verstuurt het concept definitief. Vanaf hier is de versie onveranderlijk. */
+/**
+ * Verstuurt het concept definitief. Vanaf hier is de versie onveranderlijk.
+ *
+ * Twee routes, één actie:
+ *  - demo:   het voorstel gaat naar de klant, die er apart akkoord op geeft;
+ *  - direct: de versie wordt als opdrachtbevestiging bevroren en de
+ *            overeenkomst staat meteen klaar om te tekenen. Er wordt géén
+ *            akkoord verondersteld — dat ontstaat pas bij de handtekening.
+ */
 export async function sendProposal(
   _prev: CommerceState,
   formData: FormData,
@@ -228,18 +247,30 @@ export async function sendProposal(
   const ctx = await adminContext(leadId);
   if (!ctx) return FOUT("Geen toegang.");
   const { lead, commerce } = ctx;
+  const direct = isDirectJourney(lead.journeyVariant);
+  const w = opdrachtWoord(lead.journeyVariant);
 
   const draft = await getDraftProposal(commerce.id);
-  if (!draft) return FOUT("Er is geen concept om te versturen. Maak eerst een voorstel.");
+  if (!draft) return FOUT(`Er is geen concept om te versturen. Maak eerst ${direct ? "een opdrachtbevestiging" : "een voorstel"}.`);
 
   const cfg = toConfig(commerce);
   if (cfg.projectCents + cfg.setupCents <= 0) {
-    return FOUT("Vul eerst de eenmalige investering in — een voorstel van € 0,00 versturen we niet.");
+    return FOUT(`Vul eerst de eenmalige investering in — ${direct ? "een opdrachtbevestiging" : "een voorstel"} van € 0,00 versturen we niet.`);
   }
-  if (!draft.titel.trim()) return FOUT("Geef het voorstel een titel.");
+  if (!draft.titel.trim()) return FOUT(`Geef ${w.deNaam} een titel.`);
+
+  /*
+   * Is er al getekend, dan ligt de opdracht juridisch vast. Een nieuwe versie
+   * zou naast een getekende overeenkomst komen te staan waar de klant nooit
+   * mee instemde — dat hoort via een nieuw gesprek, niet via deze knop.
+   */
+  if (direct && isSigned(await getCurrentAgreement(commerce.id))) {
+    return FOUT("De overeenkomst is al getekend. Een nieuwe versie versturen kan niet meer.");
+  }
 
   const sent = await markProposalSent(draft, commerce);
-  if (!sent) return FOUT("Versturen mislukte.");
+  // Geen rij terug: een gelijktijdige klik was ons voor. Niets dubbel versturen.
+  if (!sent) return FOUT(`Deze versie is al verstuurd. Ververs de pagina.`);
 
   await getDb()!
     .update(schema.commerce)
@@ -255,10 +286,49 @@ export async function sendProposal(
     leadId,
     commerceId: commerce.id,
     type: "PROPOSAL",
-    titel: `Voorstel versie ${sent.version} — ${sent.titel}`,
+    titel: `${w.Naam} versie ${sent.version} — ${sent.titel}`,
     proposalId: sent.id,
     snapshot: { versie: sent.version, pricing: sent.pricing },
   });
+
+  const link = commerce.portalToken ? portalUrl(commerce.portalToken) : undefined;
+
+  if (direct) {
+    // De overeenkomst hoort bij precies deze bevroren versie.
+    const agreement = await ensureAgreement(commerce, lead, sent);
+    if (!agreement || agreement.proposalId !== sent.id) {
+      return FOUT("De opdrachtbevestiging is vastgelegd, maar de overeenkomst kon niet worden klaargezet.");
+    }
+
+    await logJourneyEvent(leadId, "proposal_sent", `Opdrachtbevestiging versie ${sent.version} verstuurd`, {
+      actor: "admin",
+      version: sent.version,
+    });
+    await setStage(leadId, "overeenkomst", {
+      actor: "admin",
+      reden: `opdrachtbevestiging versie ${sent.version}`,
+    });
+    await logJourneyEvent(
+      leadId,
+      "agreement_ready",
+      `Overeenkomst klaargezet bij opdrachtbevestiging versie ${sent.version}`,
+      { actor: "admin", voorwaardenVersie: agreement.voorwaardenVersie, version: sent.version },
+    );
+
+    const gelukt = await mailAndLog(lead, "agreement-ready", {}, link ? `${link}/overeenkomst` : undefined);
+    await notifyPartner(leadId, "voorstel-verstuurd");
+    await logActivity({
+      actorUserId: ctx.actorId,
+      action: "ASSIGNMENT_SENT",
+      objectType: "lead",
+      objectId: leadId,
+      newValue: { version: sent.version, agreementId: agreement.id },
+    });
+    refresh(leadId);
+    return gelukt
+      ? OK(`Opdrachtbevestiging versie ${sent.version} klaargezet ter ondertekening en verstuurd naar ${lead.email}.`)
+      : OK("Opdrachtbevestiging en overeenkomst staan klaar, maar de mail kon niet worden verzonden. Probeer 'herinnering sturen'.");
+  }
 
   await setStage(leadId, "voorstel-verstuurd", { actor: "admin", reden: `versie ${sent.version}` });
   await logJourneyEvent(leadId, "proposal_sent", `Voorstel versie ${sent.version} verstuurd`, {
@@ -266,7 +336,6 @@ export async function sendProposal(
     version: sent.version,
   });
 
-  const link = commerce.portalToken ? portalUrl(commerce.portalToken) : undefined;
   const gelukt = await mailAndLog(lead, "proposal-sent", {}, link);
 
   // Aangebracht door een partner? Die hoort te weten dat zijn aanbreng vordert.
@@ -311,6 +380,10 @@ export async function sendReminder(
   };
   const keuze = map[soort];
   if (!keuze) return FOUT("Onbekende herinnering.");
+  // Een directe klant heeft geen demo en geen los voorstel om aan te herinneren.
+  if (isDirectJourney(lead.journeyVariant) && (soort === "demo" || soort === "voorstel")) {
+    return FOUT("Dit is een directe klant — stuur een herinnering voor de opdrachtbevestiging.");
+  }
 
   // Waar de knop in de mail heen wijst. Bij een demo-herinnering is dat het
   // voorbeeld zelf — daar gaat de vraag over. Zonder demolink valt hij terug
@@ -584,6 +657,15 @@ export async function acceptProposal(
   if (!db) return FOUT("Tijdelijk niet beschikbaar.");
   const { lead, commerce } = ctx;
 
+  /*
+   * Een directe klant geeft geen los akkoord: de handtekening onder de
+   * overeenkomst is het akkoord. Deze route blijft voor hem dicht, zodat er
+   * nooit een tweede, los vastgelegde instemming naast de handtekening ontstaat.
+   */
+  if (isDirectJourney(lead.journeyVariant)) {
+    return FOUT("Je geeft akkoord door de opdrachtbevestiging digitaal te ondertekenen.");
+  }
+
   const proposal = await getActiveProposal(commerce.id);
   if (!proposal) return FOUT("Er staat geen voorstel klaar.");
   if (proposal.acceptedAt) return OK(); // al akkoord — idempotent
@@ -670,12 +752,27 @@ export async function signAgreement(token: string, input: SignInput): Promise<Co
   if (!db) return FOUT("Tijdelijk niet beschikbaar.");
   const { lead, commerce } = ctx;
 
+  const direct = isDirectJourney(lead.journeyVariant);
   const proposal = await getActiveProposal(commerce.id);
-  if (!proposal?.acceptedAt) return FOUT("Ga eerst akkoord met het voorstel.");
+
+  /*
+   * Demo: alleen na een apart akkoord op het voorstel (ongewijzigd).
+   * Direct: de handtekening ís het akkoord; er moet een definitief verstuurde
+   * opdrachtbevestiging liggen. Zie overeenkomstPoort.
+   */
+  const poort = overeenkomstPoort(lead.journeyVariant, proposal);
+  if (!poort.ok || !proposal) return FOUT(poort.ok ? "Er staat geen overeenkomst klaar." : poort.reden);
 
   const agreement = await ensureAgreement(commerce, lead, proposal);
   if (!agreement) return FOUT("Er staat geen overeenkomst klaar.");
-  if (agreement.status === "SIGNED") return OK(); // idempotent
+  if (agreement.status === "SIGNED") {
+    // Idempotent. Bij een directe klant herstellen we zo ook een eerste poging
+    // die tussen handtekening en vastlegging van het akkoord werd onderbroken.
+    if (direct && agreement.proposalId === proposal.id) {
+      await acceptProposalBySignature(agreement, proposal);
+    }
+    return OK();
+  }
 
   /*
    * De overeenkomst moet horen bij het voorstel waar de klant akkoord op gaf.
@@ -683,7 +780,13 @@ export async function signAgreement(token: string, input: SignInput): Promise<Co
    * wat hij ziet — dat mag niet gebeuren.
    */
   if (agreement.proposalId !== proposal.id) {
-    return FOUT("Het voorstel is intussen gewijzigd. Ververs de pagina en lees de nieuwe versie.");
+    return FOUT(
+      `${direct ? "De opdrachtbevestiging" : "Het voorstel"} is intussen gewijzigd. Ververs de pagina en lees de nieuwe versie.`,
+    );
+  }
+  if (direct) {
+    const bijOvereenkomst = overeenkomstPoort(lead.journeyVariant, proposal, agreement);
+    if (!bijOvereenkomst.ok) return FOUT(bijOvereenkomst.reden);
   }
 
   const verplicht: [string, string][] = [
@@ -756,12 +859,36 @@ export async function signAgreement(token: string, input: SignInput): Promise<Co
     )
     .returning();
 
-  // Geen rij terug? Dan heeft een gelijktijdige tweede poging al getekend.
-  const definitief = signed ?? (await getCurrentAgreement(commerce.id));
-  if (!definitief || definitief.status !== "SIGNED") {
+  /*
+   * Geen rij terug? Dan heeft een gelijktijdige tweede poging al getekend. Die
+   * poging handelt de gevolgen (document, mail, stage) af — wij stoppen hier,
+   * anders krijgt de klant alles twee keer.
+   */
+  if (!signed) {
     const opnieuw = await getCurrentAgreement(commerce.id);
-    if (opnieuw?.status === "SIGNED") return OK();
+    if (opnieuw?.status === "SIGNED") {
+      if (direct && opnieuw.proposalId === proposal.id) {
+        await acceptProposalBySignature(opnieuw, proposal);
+      }
+      return OK();
+    }
     return FOUT("Ondertekenen lukte niet. Probeer het opnieuw.");
+  }
+  const definitief = signed;
+
+  /*
+   * Directe klant: pas nú — met de echte handtekening — wordt de
+   * opdrachtbevestiging als geaccepteerd vastgelegd. Zelfde moment, zelfde
+   * ondertekenaar, zelfde vingerafdruk. Vóór de stap naar de aanbetaling,
+   * want de betaling vraagt om een geaccepteerde versie.
+   */
+  if (direct && (await acceptProposalBySignature(definitief, proposal))) {
+    await logJourneyEvent(
+      lead.id,
+      "proposal_accepted",
+      `Opdrachtbevestiging versie ${proposal.version} geaccepteerd door ondertekening (${definitief.signerName})`,
+      { actor: "klant", version: proposal.version, agreementId: definitief.id, ipHash: fp.ipHash },
+    );
   }
 
   await setCommerceStatus(commerce.id, "DEPOSIT_PENDING");
@@ -782,7 +909,9 @@ export async function signAgreement(token: string, input: SignInput): Promise<Co
     leadId: lead.id,
     commerceId: commerce.id,
     type: "AGREEMENT",
-    titel: `Samenwerkingsovereenkomst ${definitief.voorwaardenVersie}`,
+    titel: direct
+      ? `Opdrachtbevestiging en samenwerkingsovereenkomst ${definitief.voorwaardenVersie}`
+      : `Samenwerkingsovereenkomst ${definitief.voorwaardenVersie}`,
     proposalId: definitief.proposalId,
     agreementId: definitief.id,
     snapshot: {

@@ -445,6 +445,15 @@ export const leads = pgTable(
 
     // Bron van de aanvraag
     source: text("source").$type<LeadSource>().notNull().default("website"),
+    /**
+     * Welke route deze klant door de journey loopt. Bewust los van `source`:
+     * die zegt waar iemand vandaan kwam (en voedt de attributie), dit zegt
+     * of er een voorbeeldwebsite bij hoort. Bestaande aanvragen zijn "demo".
+     */
+    journeyVariant: text("journey_variant")
+      .$type<JourneyVariant>()
+      .notNull()
+      .default("demo"),
 
     // Demo Journey — stage + handmatig geplaatste voorbeeldlinks
     stage: text("stage").$type<JourneyStage>().notNull().default("aangevraagd"),
@@ -492,6 +501,20 @@ export const LEAD_SOURCES = [
   "handmatig",
 ] as const;
 export type LeadSource = (typeof LEAD_SOURCES)[number];
+
+/**
+ * De twee instroomroutes van dezelfde journey.
+ *
+ * demo   — aanvraag via de site: eerst een gratis voorbeeldwebsite, dan een
+ *          voorstel dat de klant accepteert, dan de overeenkomst.
+ * direct — handmatig toegevoegde klant die al akkoord is: geen voorbeeld, de
+ *          opdrachtbevestiging gaat meteen als overeenkomst ter ondertekening.
+ *
+ * Beide routes gebruiken dezelfde commerce-, voorstel-, overeenkomst- en
+ * betaalmodellen; alleen de stappen vóór de overeenkomst verschillen.
+ */
+export const JOURNEY_VARIANTS = ["demo", "direct"] as const;
+export type JourneyVariant = (typeof JOURNEY_VARIANTS)[number];
 
 /**
  * De vaste stappen van de klantreis, in volgorde — één doorlopende journey van

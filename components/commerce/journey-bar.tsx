@@ -1,29 +1,33 @@
-import type { JourneyStage } from "@/lib/db/schema";
-import { JOURNEY_PHASES, phaseStateFor } from "@/lib/journey-stages";
+import type { JourneyStage, JourneyVariant } from "@/lib/db/schema";
+import { journeyPhasesFor, phaseStateFor } from "@/lib/journey-stages";
 import { cn } from "@/lib/cn";
 
 /**
  * De voortgangsbalk van de journey: zeven fases in plaats van twintig stappen.
  *
  * Dezelfde component in de admin én in de klantomgeving, zodat "waar staan we"
- * daar nooit iets anders kan zeggen dan hier. Mobiel-first: op smalle schermen
+ * daar nooit iets anders kan zeggen dan hier. Een directe klant krijgt de balk
+ * zonder demofase — die heeft hij nooit gehad. Mobiel-first: op smalle schermen
  * schuift hij horizontaal in plaats van dat de labels breken.
  */
 export function JourneyBar({
   current,
+  variant = "demo",
   toon = "admin",
   className,
 }: {
   current: JourneyStage;
+  variant?: JourneyVariant;
   toon?: "admin" | "klant";
   className?: string;
 }) {
+  const fases = journeyPhasesFor(variant);
   return (
     <div className={cn("-mx-1 overflow-x-auto pb-1", className)}>
       <ol className="flex min-w-max items-start gap-1 px-1">
-        {JOURNEY_PHASES.map((phase, i) => {
-          const state = phaseStateFor(i, current);
-          const laatste = i === JOURNEY_PHASES.length - 1;
+        {fases.map((phase, i) => {
+          const state = phaseStateFor(i, current, variant);
+          const laatste = i === fases.length - 1;
           return (
             <li key={phase.key} className="flex items-start">
               <div className="flex w-[74px] flex-col items-center gap-1.5 sm:w-[88px]">

@@ -49,6 +49,21 @@ export interface AgreementContext {
   subscriptionStartLabel: string;
   /** Afwijkende afspraken die de beheerder heeft vastgelegd (mag leeg zijn) */
   bijzonderheden?: string | null;
+  /**
+   * Hoe het onderliggende stuk heet. Een directe klant (zonder demo) tekent op
+   * basis van een opdrachtbevestiging, niet van een voorstel. Leeg = "voorstel",
+   * waardoor de tekst van bestaande overeenkomsten letterlijk gelijk blijft.
+   */
+  opdrachtDocument?: OpdrachtDocument;
+}
+
+export type OpdrachtDocument = "voorstel" | "opdrachtbevestiging";
+
+/** De woorden die de tekst per soort onderliggend stuk gebruikt. */
+function documentWoorden(d: OpdrachtDocument = "voorstel") {
+  return d === "opdrachtbevestiging"
+    ? { het: "de opdrachtbevestiging", versie: "versie van de opdrachtbevestiging", nieuweVersie: "nieuwe versie van de opdrachtbevestiging" }
+    : { het: "het voorstel", versie: "voorstelversie", nieuweVersie: "nieuwe voorstelversie" };
 }
 
 /** Vaste beheer- en contractvoorwaarden — één bron van waarheid. */
@@ -114,8 +129,9 @@ function maatwerkArtikelen(bijzonderheden: string, hoofdstuk: number): Article[]
  * ========================================================================= */
 
 function buildV1(ctx: AgreementContext): Chapter[] {
-  const modulesText = opsomming(ctx.modules, "de in het voorstel opgenomen onderdelen");
-  const werkText = opsomming(ctx.werkzaamheden, "de in het voorstel omschreven werkzaamheden");
+  const doc = documentWoorden(ctx.opdrachtDocument);
+  const modulesText = opsomming(ctx.modules, `de in ${doc.het} opgenomen onderdelen`);
+  const werkText = opsomming(ctx.werkzaamheden, `de in ${doc.het} omschreven werkzaamheden`);
 
   const chapters: Chapter[] = [
     {
@@ -135,8 +151,8 @@ function buildV1(ctx: AgreementContext): Chapter[] {
           n: "1.2",
           title: "Voorwerp van de overeenkomst",
           paragraphs: [
-            "Opdrachtnemer ontwikkelt, levert en onderhoudt voor Opdrachtgever een website en digitaal platform met de bijbehorende diensten, zoals omschreven in het voorstel waarvan deze overeenkomst onlosmakelijk onderdeel uitmaakt.",
-            "Bij tegenstrijdigheid tussen het voorstel en deze overeenkomst gaat de tekst van deze overeenkomst voor, met uitzondering van de bedragen en de omvang van de opdracht: die volgen altijd de voorstelversie waarnaar deze overeenkomst verwijst.",
+            `Opdrachtnemer ontwikkelt, levert en onderhoudt voor Opdrachtgever een website en digitaal platform met de bijbehorende diensten, zoals omschreven in ${doc.het} waarvan deze overeenkomst onlosmakelijk onderdeel uitmaakt.`,
+            `Bij tegenstrijdigheid tussen ${doc.het} en deze overeenkomst gaat de tekst van deze overeenkomst voor, met uitzondering van de bedragen en de omvang van de opdracht: die volgen altijd de ${doc.versie} waarnaar deze overeenkomst verwijst.`,
           ],
         },
       ],
@@ -149,7 +165,7 @@ function buildV1(ctx: AgreementContext): Chapter[] {
           n: "2.1",
           title: "Omvang",
           paragraphs: [
-            `De dienstverlening omvat de in het voorstel gekozen onderdelen: ${modulesText}.`,
+            `De dienstverlening omvat de in ${doc.het} gekozen onderdelen: ${modulesText}.`,
             `De overeengekomen werkzaamheden betreffen: ${werkText}.`,
             "Opdrachtnemer levert het platform op als een werkend geheel, inclusief de benodigde inrichting, koppelingen en oplevering.",
           ],
@@ -380,7 +396,7 @@ function buildV1(ctx: AgreementContext): Chapter[] {
           n: "10.1",
           title: "Wijzigingen",
           paragraphs: [
-            "Wijzigingen van deze overeenkomst zijn uitsluitend geldig indien schriftelijk overeengekomen. Een wijziging in de opdracht of de bedragen leidt tot een nieuwe voorstelversie en een nieuwe overeenkomst; de reeds ondertekende overeenkomst blijft ongewijzigd bewaard.",
+            `Wijzigingen van deze overeenkomst zijn uitsluitend geldig indien schriftelijk overeengekomen. Een wijziging in de opdracht of de bedragen leidt tot een ${doc.nieuweVersie} en een nieuwe overeenkomst; de reeds ondertekende overeenkomst blijft ongewijzigd bewaard.`,
           ],
         },
         {
@@ -485,9 +501,10 @@ export function consentLabels(ctx: {
   finalPercent: number;
   monthlyExclLabel: string;
   versionLabel: string;
+  opdrachtDocument?: OpdrachtDocument;
 }): Record<ConsentKey, string> {
   return {
-    agreesOpdracht: "Ik ga akkoord met de opdracht zoals omschreven in het voorstel.",
+    agreesOpdracht: `Ik ga akkoord met de opdracht zoals omschreven in ${documentWoorden(ctx.opdrachtDocument).het}.`,
     agreesInvestering: `Ik ga akkoord met de eenmalige investering van ${ctx.setupExclLabel} excl. btw.`,
     agreesTermijnen: `Ik ga akkoord met de betaling in twee termijnen: ${ctx.depositPercent}% (${ctx.depositLabel} incl. btw) nu en ${ctx.finalPercent}% (${ctx.finalLabel} incl. btw) bij oplevering.`,
     agreesMaandbedrag: `Ik ga akkoord met de maandelijkse DogWare-kosten van ${ctx.monthlyExclLabel} excl. btw en met automatische incasso daarvan.`,

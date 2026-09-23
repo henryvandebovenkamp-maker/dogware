@@ -3,6 +3,7 @@ import { count, desc, eq, isNotNull, sql } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { JOURNEY_STAGES, type JourneyStage } from "@/lib/db/schema";
 import { STAGE_META } from "@/lib/journey";
+import { stageMeta } from "@/lib/journey-stages";
 import { bakjeVanStage } from "@/lib/aanvragen";
 import { LeadStatusBadge } from "../leads/status-badge";
 
@@ -134,7 +135,7 @@ export default async function JourneysPage() {
                 </span>
                 <span className="flex items-center gap-2">
                   <span className="rounded-full bg-cream-100 px-2.5 py-1 text-[10px] font-bold text-ink-700">
-                    {STAGE_META[l.stage].korte}
+                    {stageMeta(l.stage, l.journeyVariant).korte}
                   </span>
                   <LeadStatusBadge status={l.status} />
                 </span>

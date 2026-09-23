@@ -159,6 +159,8 @@ const datumTijd = (iso: string) =>
  */
 export function CommerceSecties(props: {
   leadId: string;
+  /** Directe klant: het versievaste stuk heet "opdrachtbevestiging". */
+  direct?: boolean;
   klantLink: string | null;
   financieel: FinancieelData;
   voorstellen: VoorstelRij[];
@@ -172,6 +174,7 @@ export function CommerceSecties(props: {
   bouw: BouwData;
 }) {
   const f = props.financieel;
+  const stuk = props.direct ? "opdrachtbevestiging" : "voorstel";
   return (
     <div className="space-y-3">
       {/* Kerncijfers — altijd zichtbaar */}
@@ -212,17 +215,17 @@ export function CommerceSecties(props: {
           href={`/admin/leads/${props.leadId}/voorstel`}
           className="mt-4 inline-flex items-center gap-1.5 text-[12.5px] font-bold text-brand hover:text-brand-600"
         >
-          Bedragen aanpassen in de voorstel-editor →
+          Bedragen aanpassen in de {stuk}-editor →
         </Link>
       </Sectie>
 
       <Sectie
-        titel="Voorstel"
+        titel={props.direct ? "Opdrachtbevestiging" : "Voorstel"}
         icon={<FileText className="h-4 w-4" />}
         badge={props.voorstellen.length ? `${props.voorstellen.length} versie(s)` : "nog geen"}
       >
         {props.voorstellen.length === 0 ? (
-          <Leeg>Er is nog geen voorstel gemaakt.</Leeg>
+          <Leeg>Er is nog geen {stuk} gemaakt.</Leeg>
         ) : (
           <ul className="space-y-2">
             {props.voorstellen.map((p) => (
@@ -241,7 +244,8 @@ export function CommerceSecties(props: {
                 </p>
                 {p.acceptedAt && (
                   <p className="mt-1 text-[12px] font-semibold text-sage-600">
-                    Geaccepteerd op {datumTijd(p.acceptedAt)}
+                    {props.direct ? "Geaccepteerd door ondertekening op" : "Geaccepteerd op"}{" "}
+                    {datumTijd(p.acceptedAt)}
                     {p.acceptedName ? ` door ${p.acceptedName}` : ""}
                   </p>
                 )}
@@ -257,11 +261,18 @@ export function CommerceSecties(props: {
         badge={props.overeenkomst?.signedAt ? "getekend" : props.overeenkomst ? "wacht" : "nog geen"}
       >
         {!props.overeenkomst ? (
-          <Leeg>De overeenkomst wordt klaargezet zodra de klant het voorstel accepteert.</Leeg>
+          <Leeg>
+            {props.direct
+              ? "De overeenkomst wordt klaargezet zodra je de opdrachtbevestiging verstuurt."
+              : "De overeenkomst wordt klaargezet zodra de klant het voorstel accepteert."}
+          </Leeg>
         ) : (
           <dl className="space-y-1.5 text-[13.5px]">
             <Regel label="Voorwaardenversie" value={props.overeenkomst.voorwaardenVersie} />
-            <Regel label="Hoort bij voorstel" value={`versie ${props.overeenkomst.proposalVersion}`} />
+            <Regel
+              label={props.direct ? "Hoort bij opdrachtbevestiging" : "Hoort bij voorstel"}
+              value={`versie ${props.overeenkomst.proposalVersion}`}
+            />
             <Regel label="Status" value={props.overeenkomst.status} />
             {props.overeenkomst.signedAt && (
               <>

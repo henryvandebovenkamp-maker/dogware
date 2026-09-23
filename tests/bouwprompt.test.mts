@@ -57,6 +57,7 @@ const LEEG: Lead = {
   referralReferrer: null,
   utm: null,
   source: "website",
+  journeyVariant: "demo",
   stage: "aangevraagd",
   demoDomain: null,
   demoPortalUrl: null,

@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { Check, FileText, Loader2 } from "lucide-react";
 import { acceptProposal, startPayment } from "@/app/actions/commerce";
-import type { JourneyStage } from "@/lib/db/schema";
+import type { JourneyStage, JourneyVariant } from "@/lib/db/schema";
 import { JourneyBar } from "@/components/commerce/journey-bar";
 import { BrandMark } from "@/components/brand";
 import { legalFooterLine } from "@/lib/legal-entity";
@@ -30,6 +30,11 @@ export type Prijzen = {
 
 export type VoorstelData = {
   token: string;
+  /**
+   * Directe klant: geen los akkoord op een voorstel. De opdrachtbevestiging
+   * wordt ondertekend als overeenkomst — dat is het enige akkoord.
+   */
+  direct?: boolean;
   version: number;
   titel: string;
   intro: string | null;
@@ -85,6 +90,7 @@ export function TrajectShell({
   voornaam,
   bedrijfsnaam,
   stage,
+  variant = "demo",
   kop,
   tekst,
   voorstel,
@@ -95,6 +101,7 @@ export function TrajectShell({
   voornaam: string;
   bedrijfsnaam: string;
   stage: JourneyStage;
+  variant?: JourneyVariant;
   kop?: string;
   tekst?: string;
   voorstel?: VoorstelData;
@@ -120,7 +127,7 @@ export function TrajectShell({
         </p>
 
         <div className="mt-7 rounded-2xl bg-white p-4 shadow-soft ring-1 ring-ink/5 sm:p-5">
-          <JourneyBar current={stage} toon="klant" />
+          <JourneyBar current={stage} variant={variant} toon="klant" />
         </div>
 
         {kop && (
@@ -343,6 +350,42 @@ function VolgendeStap({ voorstel, status }: { voorstel: VoorstelData; status: St
     );
   }
 
+  /*
+   * Directe klant, nog niet getekend: één kaart, één knop — naar de
+   * opdrachtbevestiging die hij als overeenkomst tekent. Geen apart akkoord,
+   * geen naamveld: de handtekening is het akkoord.
+   */
+  if (voorstel.direct) {
+    if (voorstel.verlopen) {
+      return (
+        <Kaart>
+          <Kop>Deze opdrachtbevestiging is verlopen</Kop>
+          <Tekst>
+            De datum waarvóór we hem getekend terug wilden hebben
+            {voorstel.geldigTot ? ` (${datum(voorstel.geldigTot)})` : ""} is verstreken. Geen
+            probleem — laat het even weten, dan zetten we een verse versie voor je klaar.
+          </Tekst>
+        </Kaart>
+      );
+    }
+    return (
+      <Kaart tint="brand">
+        <Kop>Je opdrachtbevestiging staat klaar</Kop>
+        <Tekst>
+          Hieronder staat precies wat we voor je gaan bouwen, wat de investering is en welk
+          maandbedrag is afgesproken. Lees de afspraken rustig door en onderteken de overeenkomst
+          digitaal. Daarna kun je de eerste termijn voldoen en kunnen we starten.
+        </Tekst>
+        <a
+          href={`/traject/${voorstel.token}/overeenkomst`}
+          className="mt-5 inline-flex w-full items-center justify-center rounded-full bg-brand px-6 py-3.5 text-[15px] font-bold text-white shadow-glow transition hover:-translate-y-0.5 hover:bg-brand-600 sm:w-auto"
+        >
+          Bekijk en onderteken de opdrachtbevestiging
+        </a>
+      </Kaart>
+    );
+  }
+
   /* Geaccepteerd → overeenkomst tekenen */
   if (voorstel.geaccepteerd) {
     return (
@@ -419,11 +462,13 @@ function VoorstelDetails({ voorstel }: { voorstel: VoorstelData }) {
     <section className="mt-10">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-[13px] font-bold uppercase tracking-[0.12em] text-ink-300">
-          Het voorstel
+          {voorstel.direct ? "De opdrachtbevestiging" : "Het voorstel"}
         </h2>
         <span className="text-[11.5px] font-semibold text-ink-300">
           Versie {voorstel.version}
-          {voorstel.geldigTot && ` · geldig t/m ${datum(voorstel.geldigTot)}`}
+          {voorstel.geldigTot &&
+            !(voorstel.direct && voorstel.geaccepteerd) &&
+            ` · ${voorstel.direct ? "tekenen vóór" : "geldig t/m"} ${datum(voorstel.geldigTot)}`}
         </span>
       </div>
 
@@ -443,7 +488,10 @@ function VoorstelDetails({ voorstel }: { voorstel: VoorstelData }) {
         )}
 
         {voorstel.werkzaamheden.length > 0 && (
-          <Lijst titel="Wat we gaan doen" items={voorstel.werkzaamheden} />
+          <Lijst
+            titel={voorstel.direct ? "Wat we voor je bouwen" : "Wat we gaan doen"}
+            items={voorstel.werkzaamheden}
+          />
         )}
         {voorstel.modules.length > 0 && (
           <div className="mt-6">

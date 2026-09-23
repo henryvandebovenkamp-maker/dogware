@@ -59,13 +59,18 @@ const COPY: Record<
     ],
     cta: "Bekijk de overeenkomst",
   },
+  /**
+   * De eerste mail aan een directe klant (zonder demo): de opdrachtbevestiging
+   * staat meteen als overeenkomst klaar. Er is geen voorstel dat eerst nog
+   * geaccepteerd moet worden — de handtekening is het akkoord.
+   */
   "agreement-ready": {
-    heading: (n) => `De overeenkomst staat klaar, ${n}`,
+    heading: (n) => `Je opdrachtbevestiging staat klaar, ${n}`,
     body: () => [
-      "Ik heb de samenwerkingsovereenkomst voor je klaargezet. Lees hem rustig door — er staat niets in wat we niet al besproken hebben.",
-      "Onderaan zet je je gegevens en je akkoord. Daarna kun je de eerste termijn voldoen en beginnen we met bouwen.",
+      "Leuk dat we samen aan de slag gaan! Zoals besproken heb ik je opdrachtbevestiging klaargezet. Daarin staat precies wat we voor je bouwen, wat de investering is, dat je in twee termijnen betaalt (de helft bij de start, de rest bij oplevering) en welk maandbedrag we hebben afgesproken.",
+      "Lees het rustig door — er staat niets in wat we niet al besproken hebben. Onderaan vul je je gegevens in en onderteken je digitaal. Daarna kun je de eerste termijn voldoen en beginnen we met bouwen.",
     ],
-    cta: "Overeenkomst tekenen",
+    cta: "Bekijk en onderteken",
   },
   "agreement-reminder": {
     heading: (n) => `Nog even over de overeenkomst, ${n}`,
@@ -238,7 +243,7 @@ const SIGN: Record<CommerceMailType, { groet: string; regel?: string }> = {
   "demo-reminder": { groet: "Hartelijke groet," },
   "proposal-reminder": { groet: "Hartelijke groet," },
   "proposal-accepted": { groet: "Hartelijke groet,", regel: "Wat fijn dat we samen gaan bouwen." },
-  "agreement-ready": { groet: "Met vriendelijke groet," },
+  "agreement-ready": { groet: "Hartelijke groet,", regel: "Wat fijn dat we samen gaan bouwen." },
   "agreement-reminder": { groet: "Met vriendelijke groet," },
   "agreement-signed": { groet: "Hartelijke groet," },
   "deposit-ready": { groet: "Met vriendelijke groet," },

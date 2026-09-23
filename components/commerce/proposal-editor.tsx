@@ -16,6 +16,8 @@ const IDLE: CommerceState = { status: "idle" };
 
 export type EditorData = {
   leadId: string;
+  /** Directe klant (zonder demo): het stuk heet opdrachtbevestiging. */
+  direct?: boolean;
   version: number;
   klant: { bedrijfsnaam: string; naam: string; email: string; plaats: string; telefoon: string | null };
   content: {
@@ -143,6 +145,7 @@ export function ProposalEditor({ data }: { data: EditorData }) {
 
   const c = data.config;
   const m = data.computed;
+  const direct = Boolean(data.direct);
 
   return (
     <div className="mx-auto w-full max-w-3xl pb-24">
@@ -151,14 +154,14 @@ export function ProposalEditor({ data }: { data: EditorData }) {
           href={`/admin/leads/${data.leadId}`}
           className="inline-flex items-center gap-2 text-[13px] font-semibold text-ink-300 transition hover:text-ink-500"
         >
-          <ArrowLeft className="h-4 w-4" /> Terug naar de aanvraag
+          <ArrowLeft className="h-4 w-4" /> {direct ? "Terug naar de klant" : "Terug naar de aanvraag"}
         </Link>
         <SaveIndicator state={saveState} message={saveMsg} />
       </div>
 
       <header className="mt-4">
         <h1 className="text-2xl font-extrabold tracking-tight text-ink">
-          Voorstel voor {data.klant.bedrijfsnaam}
+          {direct ? "Opdrachtbevestiging" : "Voorstel"} voor {data.klant.bedrijfsnaam}
         </h1>
         <p className="mt-1 text-sm text-ink-500">
           Versie {data.version}
@@ -173,8 +176,12 @@ export function ProposalEditor({ data }: { data: EditorData }) {
       {/* ---------------------------------------------------------- inhoud -- */}
       <section className="mt-7 rounded-2xl bg-white p-5 shadow-soft ring-1 ring-ink/5 sm:p-6">
         <SectieKop
-          titel="Het voorstel"
-          uitleg="Dit is wat de klant leest. Alles wordt automatisch bewaard."
+          titel={direct ? "Wat gaan we bouwen?" : "Het voorstel"}
+          uitleg={
+            direct
+              ? "Dit is wat de klant leest en ondertekent. Alles wordt automatisch bewaard."
+              : "Dit is wat de klant leest. Alles wordt automatisch bewaard."
+          }
         />
         <div className="mt-4 space-y-4">
           <Veld label="Titel">
@@ -212,7 +219,7 @@ export function ProposalEditor({ data }: { data: EditorData }) {
               placeholder={"Ontwerp en opbouw van de website\nInrichten van de agenda\nOverzetten van bestaande content"}
             />
           </Veld>
-          <Veld label="Modules en diensten" hint="Eén per regel.">
+          <Veld label={direct ? "Modules en functionaliteiten" : "Modules en diensten"} hint="Eén per regel.">
             <textarea
               value={content.modules}
               onChange={(e) => set("modules")(e.target.value)}
@@ -222,7 +229,7 @@ export function ProposalEditor({ data }: { data: EditorData }) {
             />
           </Veld>
           <Veld
-            label="Bijzonderheden en afwijkende afspraken"
+            label={direct ? "Bijzonderheden / afspraken op maat" : "Bijzonderheden en afwijkende afspraken"}
             hint="Komt letterlijk in de overeenkomst als hoofdstuk 'Aanvullende afspraken'."
           >
             <textarea
@@ -232,7 +239,7 @@ export function ProposalEditor({ data }: { data: EditorData }) {
               className={inputKlas}
             />
           </Veld>
-          <Veld label="Voorstel geldig tot">
+          <Veld label={direct ? "Te ondertekenen vóór" : "Voorstel geldig tot"}>
             <input
               type="date"
               value={content.geldigTot}
@@ -284,12 +291,12 @@ export function ProposalEditor({ data }: { data: EditorData }) {
         </p>
 
         <p className="mb-2 mt-6 text-[11px] font-bold uppercase tracking-wide text-ink-300">
-          Maandabonnement
+          {direct ? "DogWare maandabonnement" : "Maandabonnement"}
         </p>
         <div className="grid gap-3 sm:grid-cols-3">
           <Geld name="monthly" label="Maandbedrag (excl. btw)" def={c.monthly} />
           <Getal name="freeMonths" label="Gratis maanden" def={c.freeMonths} />
-          <Veld label="Abonnement start">
+          <Veld label={direct ? "Startmoment abonnement" : "Abonnement start"}>
             <select
               name="startRule"
               value={startRule}
@@ -348,9 +355,24 @@ export function ProposalEditor({ data }: { data: EditorData }) {
           <Regel label="Totaal incl. btw" value={m.total} sterk />
         </dl>
         <div className="mt-4 grid gap-2.5 sm:grid-cols-3">
-          <Bedrag label={`Betaling bij start (${m.depositPercent}%)`} value={m.deposit} tint="brand" />
-          <Bedrag label={`Betaling bij oplevering (${m.finalPercent}%)`} value={m.final} tint="brand" />
-          <Bedrag label="DogWare abonnement" value={`${m.monthlyExVat} p/m`} sub="excl. btw" tint="sage" />
+          <Bedrag
+            label={direct ? `Eerste termijn: ${m.depositPercent}%` : `Betaling bij start (${m.depositPercent}%)`}
+            value={m.deposit}
+            sub={direct ? "incl. btw, na ondertekening" : undefined}
+            tint="brand"
+          />
+          <Bedrag
+            label={direct ? `Tweede termijn: ${m.finalPercent}%` : `Betaling bij oplevering (${m.finalPercent}%)`}
+            value={m.final}
+            sub={direct ? "incl. btw, bij oplevering" : undefined}
+            tint="brand"
+          />
+          <Bedrag
+            label={direct ? "DogWare maandabonnement" : "DogWare abonnement"}
+            value={`${m.monthlyExVat} p/m`}
+            sub="excl. btw"
+            tint="sage"
+          />
         </div>
       </section>
 
@@ -362,7 +384,11 @@ export function ProposalEditor({ data }: { data: EditorData }) {
         <input type="hidden" name="leadId" value={data.leadId} />
         <SectieKop
           titel="Definitief versturen"
-          uitleg="Na versturen staat deze versie vast. Wijzig je later iets, dan ontstaat er automatisch een nieuwe versie."
+          uitleg={
+            direct
+              ? "Na versturen staat deze versie vast en staat de overeenkomst voor de klant klaar om digitaal te ondertekenen. De klant geeft akkoord door te tekenen — niet eerder."
+              : "Na versturen staat deze versie vast. Wijzig je later iets, dan ontstaat er automatisch een nieuwe versie."
+          }
         />
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <button
@@ -370,7 +396,11 @@ export function ProposalEditor({ data }: { data: EditorData }) {
             disabled={sendPending}
             className="rounded-full bg-brand px-5 py-2.5 text-[13px] font-bold text-white transition hover:-translate-y-px hover:bg-brand-600 disabled:opacity-60"
           >
-            {sendPending ? "Versturen…" : `Voorstel versturen naar ${data.klant.email}`}
+            {sendPending
+              ? "Versturen…"
+              : direct
+                ? "Opdrachtbevestiging en overeenkomst versturen"
+                : `Voorstel versturen naar ${data.klant.email}`}
           </button>
           {sendState.message && (
             <span

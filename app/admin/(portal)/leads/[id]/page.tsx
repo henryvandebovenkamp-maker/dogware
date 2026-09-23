@@ -5,7 +5,8 @@ import { asc, desc, eq } from "drizzle-orm";
 import { ArrowLeft, ExternalLink } from "lucide-react";
 import { getDb, schema } from "@/lib/db";
 import { commissieFase } from "@/lib/commissie";
-import { STAGE_META } from "@/lib/journey-stages";
+import { stageMeta } from "@/lib/journey-stages";
+import { isDirectJourney } from "@/lib/journey-variant";
 import { getTimeline } from "@/lib/journey";
 import { leidAf } from "@/lib/aanvragen";
 import { nextAction, type JourneySnapshot } from "@/lib/journey-next";
@@ -173,11 +174,13 @@ export default async function LeadDetailPage({
     (p) => p.type === "FINAL_PAYMENT" && p.status === "PAID",
   );
 
+  const direct = isDirectJourney(lead.journeyVariant);
   const demoVerstuurd = Boolean(lead.demoSentAt);
   const demoLinksKlaar = Boolean(lead.demoDomain?.trim() && lead.demoPortalUrl?.trim());
 
   const snapshot: JourneySnapshot = {
     stage: lead.stage,
+    variant: lead.journeyVariant,
     commerceStatus: commerce.status,
     demoVerstuurd,
     demoLinksKlaar,
@@ -238,13 +241,13 @@ export default async function LeadDetailPage({
           </p>
         </div>
         <span className="rounded-full bg-[#2f6bed]/10 px-3 py-1 text-[12px] font-bold text-[#2f6bed]">
-          {STAGE_META[lead.stage].label}
+          {stageMeta(lead.stage, lead.journeyVariant).label}
         </span>
       </div>
 
       {/* De journey in één oogopslag */}
       <div className="mt-6 rounded-2xl bg-white p-5 shadow-soft ring-1 ring-ink/5">
-        <JourneyBar current={lead.stage} />
+        <JourneyBar current={lead.stage} variant={lead.journeyVariant} />
       </div>
 
       {/* Ligt deze aanvraag stil? Dan gaat dat vóór de gewone volgende stap. */}
@@ -265,56 +268,81 @@ export default async function LeadDetailPage({
         <NextActionPanel leadId={id} next={volgende} />
       </div>
 
-      {/* De demo: demolink + inloglink. Staat bewust hoog — dit is de eerste
-          stap van elke aanvraag en blijft daarna bereikbaar om de mail te
-          bekijken, te testen en opnieuw te versturen. */}
-      <section id="voorbeeld" className="mt-4 scroll-mt-6">
-        <div className="rounded-2xl bg-white p-5 shadow-soft ring-1 ring-ink/5">
-          <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
+      {direct ? (
+        /* Directe klant: er is geen demo, dus ook geen demosectie. */
+        <section id="project" className="mt-4 scroll-mt-6">
+          <div className="rounded-2xl bg-white p-5 shadow-soft ring-1 ring-ink/5">
             <h2 className="text-[13px] font-bold uppercase tracking-wide text-ink-300">
-              Demo versturen
+              Directe klant
             </h2>
-            <p
-              className={`text-[12px] font-semibold ${
-                lead.demoSentAt
-                  ? "text-ink-300"
-                  : demoLinksKlaar
-                    ? "text-sage-600"
-                    : "text-ink-300"
-              }`}
-            >
-              {lead.demoSentAt
-                ? `Verstuurd op ${lead.demoSentAt.toLocaleDateString("nl-NL", {
-                    day: "numeric",
-                    month: "long",
-                    year: "numeric",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })} aan ${lead.demoLoginEmail ?? lead.email}`
-                : demoLinksKlaar
-                  ? "Demo klaar om te versturen"
-                  : "Nog niet verstuurd"}
+            <p className="mt-2 text-[13.5px] leading-relaxed text-ink-500">
+              Deze klant is zonder voorbeeldwebsite ingestroomd en gaat direct via de
+              opdrachtbevestiging naar de bouwfase.
             </p>
-          </div>
-          <DemoPanel
-            leadId={lead.id}
-            website={lead.demoDomain ?? ""}
-            portaal={lead.demoPortalUrl ?? ""}
-            loginEmail={lead.demoLoginEmail ?? ""}
-            klantEmail={lead.email}
-            alSent={demoVerstuurd}
-          />
 
-          {/* De opdracht voor het klantproject. Levert alleen tekst op — het
-              bouwen zelf gebeurt in dat aparte project, niet hier. */}
-          <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-cream-100 pt-4">
-            <BouwpromptKnop leadId={lead.id} bedrijfsnaam={lead.bedrijfsnaam} />
-            <p className="text-[12px] text-ink-300">
-              De opdracht voor Claude in het nieuwe klantproject, gevuld met deze aanvraag.
-            </p>
+            {/* De opdracht voor het klantproject hoort bij de bouw, niet bij een demo. */}
+            <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-cream-100 pt-4">
+              <BouwpromptKnop leadId={lead.id} bedrijfsnaam={lead.bedrijfsnaam} />
+              <p className="text-[12px] text-ink-300">
+                De opdracht voor Claude in het klantproject, gevuld met dit dossier.
+              </p>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      ) : (
+        <>
+        {/* De demo: demolink + inloglink. Staat bewust hoog — dit is de eerste
+            stap van elke aanvraag en blijft daarna bereikbaar om de mail te
+            bekijken, te testen en opnieuw te versturen. */}
+        <section id="voorbeeld" className="mt-4 scroll-mt-6">
+          <div className="rounded-2xl bg-white p-5 shadow-soft ring-1 ring-ink/5">
+            <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
+              <h2 className="text-[13px] font-bold uppercase tracking-wide text-ink-300">
+                Demo versturen
+              </h2>
+              <p
+                className={`text-[12px] font-semibold ${
+                  lead.demoSentAt
+                    ? "text-ink-300"
+                    : demoLinksKlaar
+                      ? "text-sage-600"
+                      : "text-ink-300"
+                }`}
+              >
+                {lead.demoSentAt
+                  ? `Verstuurd op ${lead.demoSentAt.toLocaleDateString("nl-NL", {
+                      day: "numeric",
+                      month: "long",
+                      year: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })} aan ${lead.demoLoginEmail ?? lead.email}`
+                  : demoLinksKlaar
+                    ? "Demo klaar om te versturen"
+                    : "Nog niet verstuurd"}
+              </p>
+            </div>
+            <DemoPanel
+              leadId={lead.id}
+              website={lead.demoDomain ?? ""}
+              portaal={lead.demoPortalUrl ?? ""}
+              loginEmail={lead.demoLoginEmail ?? ""}
+              klantEmail={lead.email}
+              alSent={demoVerstuurd}
+            />
+
+            {/* De opdracht voor het klantproject. Levert alleen tekst op — het
+                bouwen zelf gebeurt in dat aparte project, niet hier. */}
+            <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-cream-100 pt-4">
+              <BouwpromptKnop leadId={lead.id} bedrijfsnaam={lead.bedrijfsnaam} />
+              <p className="text-[12px] text-ink-300">
+                De opdracht voor Claude in het nieuwe klantproject, gevuld met deze aanvraag.
+              </p>
+            </div>
+          </div>
+        </section>
+        </>
+      )}
 
       {!isMollieConfigured() && (
         <p className="mt-3 rounded-xl bg-brand-50 px-4 py-2.5 text-[12.5px] font-semibold text-brand-600 ring-1 ring-brand/10">
@@ -334,6 +362,7 @@ export default async function LeadDetailPage({
       <div className="mt-8">
         <CommerceSecties
           leadId={id}
+          direct={direct}
           klantLink={klantLink}
           financieel={{
             subtotal: L.subtotal,
@@ -463,9 +492,11 @@ export default async function LeadDetailPage({
 
           <details className="mt-3 rounded-xl bg-cream-100/60 px-4 py-3">
             <summary className="cursor-pointer text-[13px] font-semibold text-ink-500">
-              Volledige aanvraag bekijken
+              {direct ? "Partnerkoppeling" : "Volledige aanvraag bekijken"}
             </summary>
             <div className="mt-3 space-y-3 border-t border-cream-200 pt-3">
+              {!direct && (
+              <>
               <div>
                 <p className="text-[12px] font-bold text-ink">Diensten</p>
                 <Chips items={lead.diensten} />
@@ -516,7 +547,9 @@ export default async function LeadDetailPage({
                   ))}
                 </ul>
               )}
-              <div className="border-t border-cream-200 pt-2">
+              </>
+              )}
+              <div className={direct ? "" : "border-t border-cream-200 pt-2"}>
                 <ReassignForm
                   leadId={lead.id}
                   currentPartnerId={lead.affiliatePartnerId}
