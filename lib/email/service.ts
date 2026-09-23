@@ -4,21 +4,29 @@ import { render } from "@react-email/render";
 import { Resend } from "resend";
 import type { MailError, MailOptions, MailResult, MailType } from "./types";
 import { defaultEmailLogoUrl, getEmailLogoUrl } from "@/lib/site-settings";
-import { branding } from "@/lib/branding";
+import {
+  VISITOR_REPLY_TYPES,
+  defaultReplyTo,
+  isSandboxSender,
+  resolveFrom,
+  senderKindFor,
+} from "./config";
 
 /**
  * Centrale mailservice van DogWare.
  *
  * Alle e-mail verloopt via deze service — nergens anders mag de Resend SDK
- * rechtstreeks worden aangeroepen. Configuratie uitsluitend via environment
- * variables: RESEND_API_KEY, EMAIL_FROM, EMAIL_INTERNAL (ontvanger van interne
- * notificaties).
+ * rechtstreeks worden aangeroepen. Resend is uitsluitend voor mail die de
+ * applicatie zelf verstuurt; Henry's persoonlijke mail loopt via TransIP.
  *
- * Het antwoordadres is bewust GEEN environment variable maar `branding.replyToEmail`:
- * iedere uitgaande mail krijgt hier onvoorwaardelijk die `Reply-To` mee. Klikt
- * een ontvanger op Beantwoorden — of dat nu een factuur, een journey-mail of
- * een handmatige mail uit de admin is — dan komt het antwoord bij Henry.
- * Aanroepers kunnen dit niet overrulen: `MailOptions` heeft geen `replyTo`.
+ * Afzenders en antwoordadres komen uit ./config. Configuratie via environment
+ * variables: RESEND_API_KEY, EMAIL_FROM, EMAIL_FROM_NOREPLY (optioneel) en
+ * EMAIL_INTERNAL (ontvanger van interne notificaties).
+ *
+ * Het antwoordadres is `branding.replyToEmail` voor iedere mail. Eén bewuste
+ * uitzondering: de interne melding van een websiteformulier krijgt de bezoeker
+ * als Reply-To (`replyToVisitor`), zodat Beantwoorden de bezoeker antwoordt.
+ * De bezoeker staat nooit in From — dat zou SPF/DMARC breken.
  */
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -27,7 +35,25 @@ function getConfig() {
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.EMAIL_FROM;
   if (!apiKey || !from) return null;
-  return { apiKey, from, replyTo: branding.replyToEmail };
+  return { apiKey, from };
+}
+
+/**
+ * Reply-To voor deze mail. Alleen formuliermeldingen mogen de bezoeker
+ * gebruiken, en alleen met een geldig adres; anders het vaste antwoordadres.
+ */
+function resolveReplyTo(type: MailType, options: MailOptions): string {
+  const visitor = options.replyToVisitor?.trim();
+  if (!visitor) return defaultReplyTo();
+  if (!VISITOR_REPLY_TYPES.has(type)) {
+    logMail("warn", "email.reply_to_ignored", { type, reason: "type_not_allowed" });
+    return defaultReplyTo();
+  }
+  if (!EMAIL_REGEX.test(visitor)) {
+    logMail("warn", "email.reply_to_ignored", { type, reason: "invalid_address" });
+    return defaultReplyTo();
+  }
+  return visitor;
 }
 
 /**
@@ -39,7 +65,7 @@ function getConfig() {
  * (geverifieerd) domein gebruikt, stopt dit automatisch.
  */
 function getSandboxRedirect(from: string): string | null {
-  const usesSandboxSender = /@resend\.dev>?\s*$/i.test(from.trim());
+  const usesSandboxSender = isSandboxSender(from);
   const to = process.env.EMAIL_SANDBOX_TO?.trim();
   if (usesSandboxSender && to) return to;
   return null;
@@ -163,11 +189,13 @@ export async function sendMail(
 
   // Sandbox: alle mail omleiden naar het testadres zodat er niets faalt.
   const sandboxTo = getSandboxRedirect(config.from);
+  const from = resolveFrom(type) ?? config.from;
+  const replyTo = resolveReplyTo(type, options);
   const origineleOntvanger = Array.isArray(options.to)
     ? options.to.join(", ")
     : options.to;
   const payload = {
-    from: config.from,
+    from,
     to: sandboxTo ?? options.to,
     subject: sandboxTo
       ? `[TEST → ${origineleOntvanger}] ${options.subject}`
@@ -175,8 +203,7 @@ export async function sendMail(
     react: reactToSend,
     html: htmlToSend,
     text: options.text,
-    // Vast, voor élke mail. Geen aanroeper, template of omgeving kan dit wijzigen.
-    replyTo: config.replyTo,
+    replyTo,
     // In sandbox geen cc/bcc naar echte ontvangers sturen
     cc: sandboxTo ? undefined : options.cc,
     bcc: sandboxTo ? undefined : options.bcc,
@@ -201,8 +228,12 @@ export async function sendMail(
         // API-fout (bijv. ongeldig domein) — opnieuw proberen heeft geen zin.
         logMail("error", "email.provider_error", {
           type,
+          provider: "resend",
+          ok: false,
+          sender: senderKindFor(type),
           to: options.to,
           subject: options.subject,
+          error_code: error.name,
           provider_error: error.message,
         });
         return {
@@ -216,6 +247,9 @@ export async function sendMail(
 
       logMail("info", "email.sent", {
         type,
+        provider: "resend",
+        ok: true,
+        sender: senderKindFor(type),
         to: options.to,
         subject: options.subject,
         id: data?.id,
@@ -227,7 +261,10 @@ export async function sendMail(
       const message = err instanceof Error ? err.message : "Onbekende fout";
       logMail("error", "email.network_error", {
         type,
+        provider: "resend",
+        ok: false,
         to: options.to,
+        subject: options.subject,
         attempt,
         error: message,
       });

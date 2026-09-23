@@ -86,7 +86,7 @@ describe("2. de link in een kopie lekt het traject niet", () => {
 
 describe("3. het adres wordt gecontroleerd", () => {
   it("accepteert normale adressen", () => {
-    for (const adres of ["henry@dog-connect.nl", "a.b+c@voorbeeld.co.uk", "info@x.nl"]) {
+    for (const adres of ["henry@dogware.nl", "a.b+c@voorbeeld.co.uk", "info@x.nl"]) {
       assert.equal(isGeldigEmail(adres), true, `${adres} hoort geldig te zijn`);
     }
   });

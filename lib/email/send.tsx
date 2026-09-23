@@ -54,6 +54,8 @@ export async function sendDemoRequestNotification(
   return sendMail("demo-request", {
     to: internal,
     subject: `Nieuwe demo-aanvraag: ${data.naam} (${data.bedrijf})`,
+    // Beantwoorden in de mailbox = de bezoeker antwoorden.
+    replyToVisitor: data.email,
     react: <DemoRequestEmail {...data} />,
     text: `Nieuwe demo-aanvraag.\nNaam: ${data.naam}\nBedrijf: ${data.bedrijf}\nE-mail: ${data.email}\nVakgebied: ${data.type}`,
   });
@@ -91,6 +93,8 @@ export async function sendIntakeNotification(
   return sendMail("intake-request", {
     to: internal,
     subject: `Persoonlijke demo-aanvraag: ${data.naam} (${data.bedrijfsnaam})`,
+    // Beantwoorden in de mailbox = de bezoeker antwoorden.
+    replyToVisitor: data.email,
     react: (
       <IntakeNotificationEmail data={data} leadUrl={leadUrl} viaPartner={viaPartner} />
     ),
@@ -128,8 +132,9 @@ export async function sendContactNotification(
   return sendMail("contact-message", {
     to: internal,
     subject: `Bericht via de website: ${data.naam}`,
+    // Beantwoorden in de mailbox = de bezoeker antwoorden.
+    replyToVisitor: data.email,
     react: <ContactMessageEmail {...data} />,
-    // Zo is antwoorden vanuit de mailbox meteen antwoorden aan de bezoeker.
     text: `Bericht via het contactformulier.\nNaam: ${data.naam}\nE-mail: ${data.email}${data.telefoon ? `\nTelefoon: ${data.telefoon}` : ""}${data.herkomst ? `\nPagina: ${data.herkomst}` : ""}\n\n${data.bericht}`,
   });
 }

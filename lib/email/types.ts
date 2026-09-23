@@ -36,11 +36,14 @@ export type MailOptions = {
   /** Platte-tekstversie (aanrader voor deliverability) */
   text?: string;
   /**
-   * Er is met opzet GEEN `replyTo`. Elke DogWare-mail beantwoordt naar
-   * `branding.replyToEmail`; de mailservice zet dat vast. Een veld hier zou
-   * betekenen dat een willekeurige verzendroute die standaard stil kan
-   * omzeilen — en dan komen antwoorden van klanten ergens anders terecht.
+   * Er is met opzet geen vrij `replyTo`. Elke DogWare-mail beantwoordt naar
+   * `branding.replyToEmail`; de mailservice zet dat vast.
+   *
+   * Enige uitzondering: het adres van de bezoeker bij de interne melding van
+   * een websiteformulier (demo-request, intake-request, contact-message).
+   * Op elk ander mailtype negeert de service dit veld.
    */
+  replyToVisitor?: string;
   cc?: string | string[];
   bcc?: string | string[];
   attachments?: MailAttachment[];

@@ -56,10 +56,12 @@ export const branding = {
    * iedere mail; een losse verzendroute kan hem niet overschrijven, want
    * `MailOptions` heeft geen `replyTo`-veld meer.
    *
-   * Staat los van `contactEmail` (het adres dat we tónen op de site) en van
-   * EMAIL_FROM (de geverifieerde Resend-afzender, die blijft ongemoeid).
+   * Dit is de echte TransIP-mailbox van Henry, niet een Resend-adres: antwoorden
+   * komen rechtstreeks in Apple Mail binnen, zonder DogWare ertussen.
+   * Uitzondering: interne formuliermeldingen antwoorden naar de bezoeker (zie
+   * lib/email/config.ts). Staat los van EMAIL_FROM (de Resend-systeemafzender).
    */
-  replyToEmail: "henry@dog-connect.nl",
+  replyToEmail: "henry@dogware.nl",
 
   /** Wanneer je normaal gesproken antwoord krijgt — één plek, ook voor mails. */
   responseTime: "Meestal binnen een paar uur, uiterlijk de volgende werkdag",

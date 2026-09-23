@@ -13,6 +13,12 @@ export class Resend {
     this.emails = {
       send: async (payload) => {
         globalThis.__resendPayloads.push(payload);
+        // Een test kan één API-fout klaarzetten (bijv. ongeverifieerd domein).
+        const fout = globalThis.__resendNextError;
+        if (fout) {
+          globalThis.__resendNextError = undefined;
+          return { data: null, error: fout };
+        }
         return { data: { id: `stub_${globalThis.__resendPayloads.length}` }, error: null };
       },
     };
