@@ -42,6 +42,8 @@ export type NextActionKey =
   | "oplevering-klaarzetten"
   | "restbetaling-herinneren"
   | "livegang"
+  | "termijn-herinneren"
+  | "mandaat-opnieuw"
   | "klaar";
 
 export type JourneySnapshot = {
@@ -71,6 +73,22 @@ export type JourneySnapshot = {
   live: boolean;
   /** Is het maandbedrag > 0? Zonder abonnement is er geen mandaat nodig. */
   heeftAbonnement: boolean;
+  /**
+   * De stand van het betaalschema, als de getekende overeenkomst er een
+   * heeft. Leeg of "50-50" = de bestaande logica hieronder, ongewijzigd.
+   */
+  regeling?: RegelingStand | null;
+};
+
+/** Het deel van het betaalschema dat de volgende-stap-motor nodig heeft. */
+export type RegelingStand = {
+  soort: "50-50" | "volledig" | "termijnen";
+  aantal: number;
+  betaaldAantal: number;
+  teLaatAantal: number;
+  allesBetaald: boolean;
+  /** De eerstvolgende onbetaalde termijn. */
+  volgende: { volgnummer: number; teLaat: boolean } | null;
 };
 
 /**
@@ -80,6 +98,12 @@ export type JourneySnapshot = {
  */
 export function nextAction(s: JourneySnapshot, leadId: string): NextAction {
   const base = `/admin/leads/${leadId}`;
+
+  const regeling = s.regeling && s.regeling.soort !== "50-50" ? s.regeling : null;
+  if (regeling) {
+    const eigen = regelingAction(s, regeling);
+    if (eigen) return eigen;
+  }
 
   if (s.live && (!s.heeftAbonnement || s.mandaatActief)) {
     return {
@@ -239,5 +263,81 @@ export function nextAction(s: JourneySnapshot, leadId: string): NextAction {
     volgende: "Zodra de klant aangeeft door te willen, maak je het voorstel.",
     cta: { label: "Klant wil doorgaan", action: "demo-akkoord" },
     waitingOn: "klant",
+  };
+}
+
+/**
+ * "In één keer" en "in termijnen": na de eerste betaling is er geen
+ * slotbetaling bij oplevering. De website kan live terwijl er nog termijnen
+ * lopen, en het mandaat ontstaat bij een termijnbetaling in plaats van bij de
+ * tweede termijn. Geeft null wanneer de gewone logica het over kan nemen
+ * (alles vóór de eerste betaling is voor elke regeling gelijk).
+ */
+function regelingAction(s: JourneySnapshot, r: RegelingStand): NextAction | null {
+  if (!s.aanbetalingBetaald) return null;
+
+  const stand =
+    r.soort === "termijnen" ? ` (${r.betaaldAantal} van ${r.aantal} termijnen betaald)` : "";
+
+  if (r.volgende?.teLaat) {
+    return {
+      situatie: `Termijn ${r.volgende.volgnummer} van ${r.aantal} is te laat${stand}.`,
+      volgende: "Stuur de klant een vriendelijke herinnering, of bel even.",
+      cta: { label: "Herinnering termijn sturen", action: "termijn-herinneren" },
+      waitingOn: "klant",
+    };
+  }
+
+  const mandaatOntbreekt = s.heeftAbonnement && !s.mandaatActief;
+
+  if (s.live) {
+    if (mandaatOntbreekt) {
+      return {
+        situatie: "De website is live, maar er is nog geen actief incassomandaat voor het abonnement.",
+        volgende: "Probeer het mandaat opnieuw bij Mollie, of vraag de klant de eerstvolgende termijn te betalen.",
+        cta: { label: "Mandaat opnieuw proberen", action: "mandaat-opnieuw" },
+        waitingOn: "admin",
+      };
+    }
+    if (!r.allesBetaald) {
+      return {
+        situatie: `De website is live en de klant is actief; de termijnen lopen nog${stand}.`,
+        volgende: "Niets — de klant krijgt automatisch bericht als de volgende termijn klaarstaat.",
+        cta: null,
+        waitingOn: "niemand",
+      };
+    }
+    return null; // alles rond: de gewone "afgerond"-melding
+  }
+
+  if (s.opleveringKlaar) {
+    if (mandaatOntbreekt) {
+      return {
+        situatie: "Opgeleverd, maar er is nog geen actief incassomandaat voor het abonnement.",
+        volgende: r.allesBetaald
+          ? "Controleer het mandaat bij Mollie en probeer het opnieuw."
+          : "Het mandaat ontstaat bij de eerstvolgende termijnbetaling. Staat het al bij Mollie? Probeer het dan opnieuw.",
+        cta: { label: "Mandaat opnieuw proberen", action: "mandaat-opnieuw" },
+        waitingOn: r.allesBetaald ? "admin" : "klant",
+      };
+    }
+    return {
+      situatie: r.allesBetaald
+        ? "Opgeleverd en de eenmalige investering is volledig betaald."
+        : `Opgeleverd; de verschuldigde termijnen zijn betaald${stand}.`,
+      volgende: "Zet de website live en maak de klant actief.",
+      cta: { label: "Website live zetten", action: "livegang" },
+      waitingOn: "admin",
+    };
+  }
+
+  return {
+    situatie:
+      r.soort === "volledig"
+        ? "De eenmalige investering is betaald — we zijn aan het bouwen."
+        : `De eerste termijn is binnen — we zijn aan het bouwen${stand}.`,
+    volgende: "Rond de bouw af en zet de oplevering klaar.",
+    cta: { label: "Oplevering klaarzetten", action: "oplevering-klaarzetten" },
+    waitingOn: "admin",
   };
 }

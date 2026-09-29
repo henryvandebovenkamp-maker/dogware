@@ -78,7 +78,8 @@ describe("3. één factuur per betaling", () => {
   it("geeft bij een botsing de bestaande factuur terug in plaats van een nieuwe", () => {
     assert.match(
       documenten,
-      /documents_payment_idx\/i\.test\(msg\) && input\.paymentId/,
+      // Via isUniekeSchending: Drizzle zet de indexnaam in `cause`, niet in de melding.
+      /isUniekeSchending\(err, "documents_payment_idx"\) && input\.paymentId/,
       "opnieuw proberen na deze botsing zou alsnog een duplicaat maken",
     );
   });

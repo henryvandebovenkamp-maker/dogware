@@ -11,6 +11,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import type { Utm } from "@/lib/referral-config";
+import type { InstallmentStatus, PaymentPlanKind, PlanStart } from "@/lib/payment-plan";
 
 /**
  * De vorm van de marketingparameters staat in lib/referral-config.ts, naast de
@@ -719,6 +720,19 @@ export const commerce = pgTable(
     subscriptionStartAt: timestamp("subscription_start_at", { withTimezone: true }),
     opmerkingen: text("opmerkingen"),
 
+    /*
+     * Betaalregeling van de eenmalige investering (zie lib/payment-plan.ts).
+     * Staat los van het abonnement hierboven: dat blijft een eigen
+     * verplichting met een eigen incasso. Bestaande rijen krijgen via de
+     * DEFAULT "50-50" — exact de afspraak die ze al hadden.
+     */
+    paymentPlan: text("payment_plan").$type<PaymentPlanKind>().notNull().default("50-50"),
+    /** Aantal termijnen bij "termijnen"; genegeerd bij de andere regelingen. */
+    installmentCount: integer("installment_count").notNull().default(6),
+    installmentStart: text("installment_start").$type<PlanStart>().notNull().default("bij-akkoord"),
+    /** Kalenderdatum "YYYY-MM-DD" bij een vaste startdatum. Tekst, geen tijdstip. */
+    installmentStartDate: text("installment_start_date"),
+
     // Voorstel — geaccepteerde versie wordt onveranderlijk vastgelegd
     proposalVersion: integer("proposal_version").notNull().default(0),
     proposalSentAt: timestamp("proposal_sent_at", { withTimezone: true }),
@@ -917,6 +931,8 @@ export const DOCUMENT_TYPES = [
   "INVOICE_DEPOSIT",
   "INVOICE_FINAL",
   "INVOICE_SUBSCRIPTION",
+  /** Factuur bij een termijn uit een termijnregeling (termijn 2 t/m n). */
+  "INVOICE_INSTALLMENT",
   /**
    * Creditnota. Een definitieve factuur wordt nooit verwijderd of aangepast;
    * corrigeren gebeurt met een tegenboeking die zelf ook een nummer krijgt.
@@ -930,6 +946,7 @@ export const INVOICE_DOCUMENT_TYPES = [
   "INVOICE_DEPOSIT",
   "INVOICE_FINAL",
   "INVOICE_SUBSCRIPTION",
+  "INVOICE_INSTALLMENT",
   "CREDIT_NOTE",
 ] as const;
 
@@ -1060,6 +1077,8 @@ export type DogDocument = typeof documents.$inferSelect;
 export const PAYMENT_TYPES = [
   "DEPOSIT",
   "FINAL_PAYMENT",
+  /** Termijn 2 t/m n van een termijnregeling. Termijn 1 blijft DEPOSIT. */
+  "INSTALLMENT",
   "SUBSCRIPTION",
   "MANUAL_CORRECTION",
   "REFUND",
@@ -1118,6 +1137,11 @@ export const payments = pgTable(
     mollieCustomerId: text("mollie_customer_id"),
     mollieMandateId: text("mollie_mandate_id"),
     failureReason: text("failure_reason"),
+    /**
+     * De termijn uit het betaalschema waar deze betaling voor is. Leeg bij
+     * betalingen van vóór het betaalschema en bij abonnementsincasso's.
+     */
+    installmentId: uuid("installment_id"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
@@ -1125,8 +1149,85 @@ export const payments = pgTable(
     // Blokkeert dubbele incasso voor dezelfde abonnementsperiode
     uniqueIndex("payments_sub_period_idx").on(t.commerceId, t.type, t.periode),
     index("payments_commerce_idx").on(t.commerceId, t.createdAt),
+    index("payments_installment_idx").on(t.installmentId),
+    /*
+     * Hooguit één lopende betaling per termijn — afgedwongen door de database.
+     * De betaalactie hergebruikt eerst zelf een openstaande checkout, maar een
+     * dubbelklik kan die controle twee keer passeren. Dit is de laatste grendel.
+     */
+    uniqueIndex("payments_installment_active_idx")
+      .on(t.installmentId)
+      .where(sql`${t.installmentId} is not null and ${t.status} in ('CREATED', 'OPEN', 'PENDING')`),
   ],
 );
+
+/* =========================================================================
+ * Betaalschema — de termijnen van de eenmalige investering
+ *
+ * Ontstaat één keer, op het moment van ondertekenen, uit de BEVROREN
+ * betaalregeling van de overeenkomst. Wordt daarna nooit herberekend: de
+ * bedragen zijn wat de klant heeft getekend. Betalingen, facturen en de
+ * tijdlijn hangen aan deze rijen; er is geen tweede administratie.
+ *
+ * Overeenkomsten van vóór het betaalschema hebben geen rijen en lopen
+ * ongewijzigd via de bestaande aanbetaling/restbetaling.
+ * ========================================================================= */
+
+export const paymentInstallments = pgTable(
+  "payment_installments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    commerceId: uuid("commerce_id")
+      .notNull()
+      .references(() => commerce.id, { onDelete: "cascade" }),
+    leadId: uuid("lead_id")
+      .notNull()
+      .references(() => leads.id, { onDelete: "cascade" }),
+    /** De getekende overeenkomst waar dit schema uit voortkomt. */
+    agreementId: uuid("agreement_id")
+      .notNull()
+      .references(() => agreements.id, { onDelete: "restrict" }),
+    proposalId: uuid("proposal_id").references(() => proposals.id, { onDelete: "set null" }),
+
+    plan: text("plan").$type<PaymentPlanKind>().notNull(),
+    volgnummer: integer("volgnummer").notNull(),
+    aantal: integer("aantal").notNull(),
+    /** "akkoord" | "maandelijks" | "oplevering" — wat de termijn verschuldigd maakt. */
+    moment: text("moment").notNull(),
+    /** Vervaldatum (12:00 UTC van de kalenderdag). Leeg zolang de oplevering er niet is. */
+    dueAt: timestamp("due_at", { withTimezone: true }),
+
+    amountExVatCents: integer("amount_ex_vat_cents").notNull(),
+    vatCents: integer("vat_cents").notNull(),
+    amountInclVatCents: integer("amount_incl_vat_cents").notNull(),
+    vatPercent: integer("vat_percent").notNull(),
+
+    /** GEPLAND | BETAALD | GEANNULEERD. "Te betalen"/"te laat" worden afgeleid. */
+    status: text("status").$type<InstallmentStatus>().notNull().default("GEPLAND"),
+    /** De betaling die deze termijn voldeed (of de laatste poging). Geen FK, net als documents.paymentId. */
+    paymentId: uuid("payment_id"),
+    molliePaymentId: text("mollie_payment_id"),
+    /** De factuur van deze termijn. */
+    documentId: uuid("document_id"),
+    paidAt: timestamp("paid_at", { withTimezone: true }),
+
+    /** Wanneer de klant gemaild is dat de termijn klaarstaat — éénmalig. */
+    notifiedAt: timestamp("notified_at", { withTimezone: true }),
+    /** Wanneer de automatische herinnering (te laat) is verstuurd — éénmalig. */
+    remindedAt: timestamp("reminded_at", { withTimezone: true }),
+
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    // Eén schema per overeenkomst: een tweede aanroep kan geen dubbele termijnen maken.
+    uniqueIndex("payment_installments_agreement_seq_idx").on(t.agreementId, t.volgnummer),
+    index("payment_installments_commerce_idx").on(t.commerceId, t.volgnummer),
+    index("payment_installments_due_idx").on(t.status, t.dueAt),
+  ],
+);
+
+export type PaymentInstallment = typeof paymentInstallments.$inferSelect;
 
 /* =========================================================================
  * Site-instellingen (singleton) — door de Super Admin beheerd

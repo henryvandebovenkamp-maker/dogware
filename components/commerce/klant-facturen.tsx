@@ -37,7 +37,9 @@ export function KlantFacturen({ facturen }: { facturen: KlantFactuur[] }) {
               <p className="mt-1 text-[14.5px] font-semibold leading-snug text-ink-700">
                 {f.omschrijving}
               </p>
-              <p className="text-[13px] text-ink-500">{lang(f.issuedAt)}</p>
+              <p className="text-[13px] text-ink-500">
+                {lang(f.issuedAt)} · waarvan {euroFromCents(f.vatCents)} btw
+              </p>
 
               {f.status === "BETAALD" ? (
                 <p className="mt-2 inline-flex items-center gap-1.5 text-[13px] font-bold text-sage-600">

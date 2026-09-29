@@ -11,6 +11,8 @@ import {
   type CommerceState,
 } from "@/app/actions/commerce";
 import { cn } from "@/lib/cn";
+import type { RegelingLabels } from "@/lib/proposals";
+import { INSTALLMENT_PRESETS, MAX_INSTALLMENTS, MIN_INSTALLMENTS } from "@/lib/payment-plan";
 
 const IDLE: CommerceState = { status: "idle" };
 
@@ -43,6 +45,10 @@ export type EditorData = {
     startRule: string;
     startAt: string;
     opmerkingen: string;
+    paymentPlan: string;
+    installmentCount: string;
+    installmentStart: string;
+    installmentStartDate: string;
   };
   computed: {
     subtotal: string;
@@ -56,6 +62,10 @@ export type EditorData = {
     finalPercent: number;
     monthlyExVat: string;
     monthlyInclVat: string;
+    /** Het termijnschema zoals de server het berekent uit de opgeslagen afspraak. */
+    regeling: RegelingLabels;
+    /** Waarom de regeling zo niet verstuurd kan worden, of null. */
+    regelingFout: string | null;
   };
   eerderVerstuurd: number;
 };
@@ -80,6 +90,9 @@ export function ProposalEditor({ data }: { data: EditorData }) {
   const [sendState, sendAction, sendPending] = useActionState(sendProposal, IDLE);
   const [discountType, setDiscountType] = useState(data.config.discountType);
   const [startRule, setStartRule] = useState(data.config.startRule);
+  const [plan, setPlan] = useState(data.config.paymentPlan);
+  const [aantal, setAantal] = useState(data.config.installmentCount);
+  const [planStart, setPlanStart] = useState(data.config.installmentStart);
 
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const laatsteOpslag = useRef(JSON.stringify(data.content));
@@ -284,11 +297,138 @@ export function ProposalEditor({ data }: { data: EditorData }) {
           ) : (
             <Geld name="discountValue" label="Kortingsbedrag" def={c.discountValue} />
           )}
-          <Getal name="depositPercent" label="Eerste termijn %" def={c.depositPercent} />
         </div>
-        <p className="mt-2 text-[12px] text-ink-300">
-          De tweede termijn is altijd het restant — die hoef je niet apart in te vullen.
+
+        {/* ------------------------------------------------ betaalregeling */}
+        <p className="mb-2 mt-6 text-[11px] font-bold uppercase tracking-wide text-ink-300">
+          Betaalregeling eenmalige investering
         </p>
+        <fieldset>
+          <legend className="sr-only">Betaalregeling</legend>
+          <div className="grid gap-2 sm:grid-cols-3">
+            {(
+              [
+                ["50-50", "Deel bij start, rest bij oplevering", "De standaard: aanbetaling en restbetaling."],
+                ["volledig", "In één keer", "100% na ondertekening."],
+                ["termijnen", "In termijnen", "Maandelijks, in een vast aantal termijnen."],
+              ] as const
+            ).map(([waarde, titel, uitleg]) => (
+              <label
+                key={waarde}
+                className={cn(
+                  "flex cursor-pointer gap-2.5 rounded-xl border p-3 transition",
+                  plan === waarde
+                    ? "border-brand bg-brand-50 ring-2 ring-brand/15"
+                    : "border-cream-200 bg-white hover:border-ink/20",
+                )}
+              >
+                <input
+                  type="radio"
+                  name="paymentPlan"
+                  value={waarde}
+                  checked={plan === waarde}
+                  onChange={() => setPlan(waarde)}
+                  className="mt-0.5 accent-[var(--color-brand)]"
+                />
+                <span>
+                  <span className="block text-[13px] font-bold text-ink">{titel}</span>
+                  <span className="block text-[11.5px] leading-snug text-ink-500">{uitleg}</span>
+                </span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+
+        {plan === "50-50" ? (
+          <div className="mt-3 grid gap-3 sm:grid-cols-3">
+            <Getal name="depositPercent" label="Eerste termijn %" def={c.depositPercent} />
+            <p className="self-end text-[12px] text-ink-300 sm:col-span-2">
+              De tweede termijn is altijd het restant — die hoef je niet apart in te vullen.
+            </p>
+          </div>
+        ) : (
+          // Niet zichtbaar, wel bewaard: terug naar 50/50 geeft het eerdere percentage terug.
+          <input type="hidden" name="depositPercent" value={c.depositPercent} />
+        )}
+
+        {plan === "termijnen" && (
+          <div className="mt-3 space-y-3 rounded-xl bg-cream-100/60 p-3.5">
+            <div>
+              <span className="text-[12.5px] font-bold text-ink-700">Aantal termijnen</span>
+              <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                {INSTALLMENT_PRESETS.map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => setAantal(String(n))}
+                    className={cn(
+                      "min-w-[44px] rounded-full px-3 py-1.5 text-[13px] font-bold transition",
+                      aantal === String(n)
+                        ? "bg-ink text-cream"
+                        : "bg-white text-ink-700 ring-1 ring-ink/10 hover:bg-cream",
+                    )}
+                  >
+                    {n}
+                  </button>
+                ))}
+                <label className="ml-1 inline-flex items-center gap-1.5 text-[12px] text-ink-500">
+                  of
+                  <input
+                    name="installmentCount"
+                    type="number"
+                    min={MIN_INSTALLMENTS}
+                    max={MAX_INSTALLMENTS}
+                    step={1}
+                    value={aantal}
+                    onChange={(e) => setAantal(e.target.value)}
+                    className="w-20 rounded-lg border border-cream-200 bg-white px-2.5 py-1.5 text-[13px] text-ink outline-none focus:border-brand"
+                    aria-label="Aangepast aantal termijnen"
+                  />
+                </label>
+              </div>
+            </div>
+            <div>
+              <span className="text-[12.5px] font-bold text-ink-700">Start van het schema</span>
+              <div className="mt-1.5 space-y-1.5">
+                <label className="flex items-start gap-2 text-[13px] text-ink-700">
+                  <input
+                    type="radio"
+                    name="installmentStart"
+                    value="bij-akkoord"
+                    checked={planStart !== "datum"}
+                    onChange={() => setPlanStart("bij-akkoord")}
+                    className="mt-0.5 accent-[var(--color-brand)]"
+                  />
+                  Eerste termijn bij ondertekening, daarna elke kalendermaand
+                </label>
+                <label className="flex flex-wrap items-center gap-2 text-[13px] text-ink-700">
+                  <input
+                    type="radio"
+                    name="installmentStart"
+                    value="datum"
+                    checked={planStart === "datum"}
+                    onChange={() => setPlanStart("datum")}
+                    className="accent-[var(--color-brand)]"
+                  />
+                  Vaste startdatum
+                  {planStart === "datum" && (
+                    <input
+                      type="date"
+                      name="installmentStartDate"
+                      defaultValue={c.installmentStartDate}
+                      required
+                      className="rounded-lg border border-cream-200 bg-white px-2.5 py-1 text-[13px] text-ink outline-none focus:border-brand"
+                    />
+                  )}
+                </label>
+              </div>
+              <p className="mt-1.5 text-[11.5px] leading-relaxed text-ink-300">
+                Een termijn kan betaald worden vanaf 14 dagen vóór de vervaldatum en heet &quot;te
+                laat&quot; een week erna. De bouw start na de eerste termijn.
+              </p>
+            </div>
+          </div>
+        )}
 
         <p className="mb-2 mt-6 text-[11px] font-bold uppercase tracking-wide text-ink-300">
           {direct ? "DogWare maandabonnement" : "Maandabonnement"}
@@ -354,6 +494,44 @@ export function ProposalEditor({ data }: { data: EditorData }) {
           <Regel label={`Btw ${c.vat}%`} value={m.vat} />
           <Regel label="Totaal incl. btw" value={m.total} sterk />
         </dl>
+        {m.regelingFout && (
+          <p className="mt-3 rounded-lg bg-brand-50 px-3 py-2 text-[12.5px] font-semibold text-brand-600">
+            {m.regelingFout}
+          </p>
+        )}
+        {m.regeling.soort !== "50-50" ? (
+          <div className="mt-4 space-y-2.5">
+            <div className="rounded-xl bg-white p-3.5 ring-1 ring-ink/5">
+              <p className="text-[10.5px] font-bold uppercase tracking-wide text-ink-300">
+                Betaalafspraak · {m.regeling.titel}
+              </p>
+              <p className="mt-1 text-[12.5px] leading-relaxed text-ink-500">{m.regeling.zin}</p>
+              <ol className="mt-2 divide-y divide-cream-100">
+                {m.regeling.termijnen.map((t) => (
+                  <li
+                    key={t.volgnummer}
+                    className="flex flex-wrap items-baseline justify-between gap-x-3 py-1.5 text-[12.5px]"
+                  >
+                    <span className="text-ink-700">
+                      {m.regeling.termijnen.length === 1 ? "Eenmalig" : `Termijn ${t.volgnummer}`}{" "}
+                      <span className="text-ink-300">· {t.wanneer}</span>
+                    </span>
+                    <span className="tabular-nums">
+                      <span className="font-extrabold text-brand">{t.exVat}</span>{" "}
+                      <span className="text-ink-300">excl. · {t.inclVat} incl.</span>
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+            <Bedrag
+              label={direct ? "DogWare maandabonnement (los van de termijnen)" : "DogWare abonnement (los van de termijnen)"}
+              value={`${m.monthlyExVat} p/m`}
+              sub="excl. btw"
+              tint="sage"
+            />
+          </div>
+        ) : (
         <div className="mt-4 grid gap-2.5 sm:grid-cols-3">
           <Bedrag
             label={direct ? `Eerste termijn: ${m.depositPercent}%` : `Betaling bij start (${m.depositPercent}%)`}
@@ -374,6 +552,7 @@ export function ProposalEditor({ data }: { data: EditorData }) {
             tint="sage"
           />
         </div>
+        )}
       </section>
 
       {/* ----------------------------------------------------------- versturen */}

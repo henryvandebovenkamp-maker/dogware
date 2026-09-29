@@ -9,4 +9,11 @@
  */
 import pakket from "@mollie/api-client";
 
-export default pakket.default ?? pakket;
+const echt = pakket.default ?? pakket;
+
+/**
+ * Een integratietest kan een nep-Mollie aanbieden via `globalThis.__fakeMollie`.
+ * Zonder die vlag is dit de echte client — bestaande tests merken niets.
+ */
+const createMollieClient = (opties) => globalThis.__fakeMollie ?? echt(opties);
+export default createMollieClient;

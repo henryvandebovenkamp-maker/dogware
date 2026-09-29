@@ -300,7 +300,12 @@ describe("4. versturen: de overeenkomst staat meteen klaar", () => {
   });
 
   it("stuurt de agreement-ready mail met een link naar de overeenkomst, en géén proposal-sent", () => {
-    assert.match(directTak, /mailAndLog\(lead, "agreement-ready", \{\}, link \? `\$\{link\}\/overeenkomst`/);
+    assert.match(
+      directTak,
+      /mailAndLog\(\s*lead,\s*"agreement-ready",[\s\S]*?link \? `\$\{link\}\/overeenkomst`/,
+    );
+    // Bij 50/50 blijft de mail letterlijk gelijk: de regelingzin gaat alleen mee bij een andere regeling.
+    assert.match(directTak, /regeling && regeling\.soort !== "50-50" \? \{ regeling: regelingZin\(regeling\) \} : \{\}/);
     assert.doesNotMatch(directTak, /proposal-sent/);
     assert.ok(directTak.includes("return gelukt"), "de directe tak moet eindigen vóór de demo-mail");
   });
@@ -408,7 +413,7 @@ describe("6. ondertekenen legt het echte akkoord vast", () => {
   it("de bestaande gevolgen van tekenen blijven: DEPOSIT_PENDING, document, mail", () => {
     assert.match(sign, /setCommerceStatus\(commerce\.id, "DEPOSIT_PENDING"\)/);
     assert.match(sign, /type: "AGREEMENT"/);
-    assert.match(sign, /mailAndLog\(lead, "agreement-signed"/);
+    assert.match(sign, /mailAndLog\(\s*lead,\s*"agreement-signed"/);
   });
 
   it("een gelijktijdige tweede poging verstuurt niets opnieuw", () => {
@@ -434,7 +439,9 @@ describe("7. betalen en bouwen", () => {
   it("het bedrag komt uit de bevroren overeenkomst, nooit uit de browser", () => {
     assert.match(start, /const snap = agreementPricing\(agreement\)/);
     assert.match(start, /amountCents = snap\.computed\.depositCents/);
-    assert.match(acties, /kind: "deposit" \| "final",\n\): Promise<CommerceState>/);
+    // De browser kiest alleen wélke betaling — nooit een bedrag of een termijn-id.
+    assert.match(acties, /export type BetaalSoort = "deposit" \| "final" \| "termijn";/);
+    assert.match(acties, /kind: BetaalSoort,\n\): Promise<CommerceState>/);
   });
 
   it("na de eerste betaling start de bestaande bouwfase — voor beide routes dezelfde code", () => {

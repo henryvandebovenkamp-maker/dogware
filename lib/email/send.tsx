@@ -28,7 +28,7 @@ import {
   DEMO_READY_TEMPLATE_VERSION,
   type DemoReadyContent,
 } from "./templates/demo-ready";
-import { CommerceEmail, type CommerceMailType } from "./templates/commerce";
+import { CommerceEmail, type CommerceMailType, type CommerceMailVars } from "./templates/commerce";
 import { branding, demoLevertijd } from "@/lib/branding";
 import { WelcomeEmail } from "./templates/welcome";
 
@@ -482,13 +482,19 @@ export const COMMERCE_SUBJECTS: Record<CommerceMailType, string> = {
   "welcome-customer": "Welkom als vaste DogWare-klant",
   "charge-failed": "Je maandbetaling is nog niet gelukt",
   "invoice-sent": "Je factuur van DogWare",
+  "delivery-ready-plan": "Je DogWare-omgeving is klaar",
+  "installment-due": "Je volgende termijn staat klaar",
+  "installment-reminder": "Je termijn staat nog open",
+  "installment-received": "Je termijn is ontvangen",
+  "installment-failed": "Je betaling is niet gelukt",
+  "installments-complete": "Alles betaald — dank je wel!",
 };
 
 export async function sendCommerceMail(
   type: CommerceMailType,
   to: string,
   naam: string,
-  vars: { amount?: string; extra?: string } = {},
+  vars: CommerceMailVars = {},
   /**
    * Persoonlijke, beveiligde link naar de klantomgeving. Zonder deze link valt
    * de mail terug op /account — dat werkt alleen voor wie al een account
@@ -498,7 +504,7 @@ export async function sendCommerceMail(
 ): Promise<MailResult> {
   const subjects = COMMERCE_SUBJECTS;
   const link = ctaUrl ?? `${branding.siteUrl}/account`;
-  return sendMail(type === "charge-failed" ? "notification" : "demo-ready", {
+  return sendMail(type === "charge-failed" || type === "installment-failed" ? "notification" : "demo-ready", {
     to,
     subject: subjects[type],
     react: (

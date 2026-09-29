@@ -19,11 +19,15 @@ import {
   addTask,
   retryMandate,
   rotatePortalToken,
+  sendReminder,
   toggleTask,
   type CommerceState,
 } from "@/app/actions/commerce";
 import { isInvoiceType } from "@/lib/db/schema";
 import { cn } from "@/lib/cn";
+import type { RegelingLabels } from "@/lib/proposals";
+import type { SchemaWeergave } from "@/lib/payment-schedule";
+import { RegelingSamenvatting, TermijnLijst } from "@/components/commerce/betaalafspraak";
 
 const IDLE: CommerceState = { status: "idle" };
 
@@ -172,12 +176,31 @@ export function CommerceSecties(props: {
   mails: MailRij[];
   tijdlijn: TijdlijnRij[];
   bouw: BouwData;
+  /** De betaalregeling uit het geldende voorstel (of de actuele afspraak). */
+  regeling: RegelingLabels;
+  /** Het betaalschema na ondertekening; null bij historisch 50/50 of vóór tekenen. */
+  schema: SchemaWeergave | null;
 }) {
   const f = props.financieel;
   const stuk = props.direct ? "opdrachtbevestiging" : "voorstel";
+  const eigenRegeling = !props.regeling.historisch && props.regeling.soort !== "50-50";
   return (
     <div className="space-y-3">
       {/* Kerncijfers — altijd zichtbaar */}
+      {eigenRegeling && props.schema ? (
+        <RegelingSamenvatting totaalEx={f.net} titel={props.regeling.titel} weergave={props.schema} />
+      ) : eigenRegeling ? (
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+          <Kaart label="Eenmalig excl. btw" value={f.net} />
+          <Kaart label="Regeling" value={props.regeling.titel} tint="brand" />
+          <Kaart
+            label={props.regeling.termijnen.length === 1 ? "Bedrag incl. btw" : "Per termijn excl."}
+            value={props.regeling.termijnen.length === 1 ? f.total : props.regeling.termijnen[0].exVat}
+            tint="brand"
+          />
+          <Kaart label="Openstaand" value={f.outstanding} />
+        </div>
+      ) : (
       <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
         <Kaart label="Totaal incl. btw" value={f.total} />
         <Kaart label={`1e termijn (${f.depositPercent}%)`} value={f.deposit} tint="brand" />
@@ -188,8 +211,47 @@ export function CommerceSecties(props: {
           tint={f.outstanding === "€ 0,00" ? "sage" : "ink"}
         />
       </div>
+      )}
 
-      <Sectie titel="Financieel" icon={<Wallet className="h-4 w-4" />} open>
+      {props.schema && (
+        <Sectie
+          titel="Betalingen"
+          icon={<Receipt className="h-4 w-4" />}
+          badge={
+            props.schema.voortgang.volledigBetaald
+              ? "volledig betaald"
+              : `${props.schema.voortgang.betaaldAantal} van ${props.schema.voortgang.aantal} betaald`
+          }
+          open={eigenRegeling}
+        >
+          <dl className="mb-4 space-y-1.5 text-[13.5px]">
+            <Regel label="Eenmalige investering" value={`${f.net} excl. btw`} sterk />
+            <Regel label="Betaalregeling" value={props.regeling.titel} />
+            <Regel label="Betaald" value={`${props.schema.voortgang.betaaldEx} excl. btw`} />
+            <Regel label="Openstaand" value={`${props.schema.voortgang.openEx} excl. btw`} sterk />
+            {props.schema.voortgang.volgende && (
+              <Regel
+                label="Volgende termijn"
+                value={`${props.schema.voortgang.volgende.exVat} — ${props.schema.voortgang.volgende.wanneer}`}
+              />
+            )}
+          </dl>
+          <TermijnLijst weergave={props.schema} admin factuurBasis="/admin/facturen/" />
+          {props.schema.plan === "termijnen" && props.schema.voortgang.volgende && (
+            <div className="mt-4 border-t border-cream-100 pt-3">
+              <MiniForm
+                leadId={props.leadId}
+                action={sendReminder}
+                extra={{ soort: "termijn" }}
+                label="Betaalherinnering volgende termijn sturen"
+                icon={<RefreshCw className="h-3.5 w-3.5" />}
+              />
+            </div>
+          )}
+        </Sectie>
+      )}
+
+      <Sectie titel="Financieel" icon={<Wallet className="h-4 w-4" />} open={!eigenRegeling || !props.schema}>
         <dl className="space-y-1.5 text-[14px]">
           <Regel label="Subtotaal" value={f.subtotal} />
           {f.discount !== "€ 0,00" && <Regel label="Korting" value={`− ${f.discount}`} />}
@@ -197,9 +259,26 @@ export function CommerceSecties(props: {
           <Regel label={`Btw ${f.vatPercent}%`} value={f.vat} />
           <Regel label="Totaal incl. btw" value={f.total} sterk />
           <div className="my-2 border-t border-cream-100" />
+          <Regel label="Betaalregeling" value={props.regeling.titel} />
           <Regel label="Reeds betaald" value={f.paid} />
           <Regel label="Nog openstaand" value={f.outstanding} sterk />
         </dl>
+        {eigenRegeling && !props.schema && (
+          <div className="mt-3 rounded-xl bg-cream-100/60 p-3.5">
+            <p className="text-[12.5px] font-bold text-ink">{props.regeling.zin}</p>
+            <ul className="mt-1.5 space-y-0.5 text-[12px] tabular-nums text-ink-500">
+              {props.regeling.termijnen.map((t) => (
+                <li key={t.volgnummer}>
+                  {props.regeling.termijnen.length === 1 ? "Eenmalig" : `Termijn ${t.volgnummer}`} ·{" "}
+                  {t.exVat} excl. ({t.inclVat} incl.) · {t.wanneer}
+                </li>
+              ))}
+            </ul>
+            <p className="mt-1.5 text-[11.5px] text-ink-300">
+              Het betaalschema met vervaldata ontstaat zodra de klant tekent.
+            </p>
+          </div>
+        )}
         <div className="mt-4 rounded-xl bg-sage-100/60 p-3.5">
           <p className="text-[12.5px] font-bold text-sage-600">DogWare abonnement</p>
           <p className="mt-0.5 text-[15px] font-extrabold text-ink">
@@ -368,8 +447,9 @@ export function CommerceSecties(props: {
             </dl>
             <p className="mt-2 text-[12px] text-ink-300">{props.abonnement.startLabel}</p>
             <p className="mt-2 rounded-lg bg-cream-100/70 px-3 py-2 text-[12px] leading-relaxed text-ink-500">
-              De klant gaf bij het tekenen inhoudelijk akkoord op het maandbedrag. Het mandaat wordt
-              technisch geactiveerd bij de tweede termijn.
+              {eigenRegeling
+                ? "De klant gaf bij het tekenen inhoudelijk akkoord op het maandbedrag. Het abonnement staat los van de eenmalige investering; het mandaat ontstaat bij de eerste betaling onder de regeling en de incasso wordt na oplevering ingepland."
+                : "De klant gaf bij het tekenen inhoudelijk akkoord op het maandbedrag. Het mandaat wordt technisch geactiveerd bij de tweede termijn."}
             </p>
             {!props.abonnement.mandaatActief && (
               <div className="mt-3">
@@ -572,6 +652,7 @@ export function CommerceSecties(props: {
 const BETAAL_LABEL: Record<string, string> = {
   DEPOSIT: "Eerste termijn",
   FINAL_PAYMENT: "Tweede termijn",
+  INSTALLMENT: "Termijn",
   SUBSCRIPTION: "Abonnement",
   MANUAL_CORRECTION: "Correctie",
   REFUND: "Terugbetaling",
@@ -729,16 +810,20 @@ function MiniForm({
   action,
   label,
   icon,
+  extra,
 }: {
   leadId: string;
   action: ActionFn;
   label: string;
   icon?: React.ReactNode;
+  extra?: Record<string, string>;
 }) {
   const [state, formAction, pending] = useActionState(action, IDLE);
   return (
     <form action={formAction} className="flex flex-wrap items-center gap-2.5">
       <input type="hidden" name="leadId" value={leadId} />
+      {extra &&
+        Object.entries(extra).map(([k, v]) => <input key={k} type="hidden" name={k} value={v} />)}
       <button
         type="submit"
         disabled={pending}

@@ -12,6 +12,7 @@ import { resolvePortal } from "@/lib/portal-access";
 import { trackProposalViewed } from "@/lib/proposals";
 import { TrajectShell } from "@/components/commerce/customer-view";
 import { isDirectJourney } from "@/lib/journey-variant";
+import { ensureSchedule, loadSchemaWeergave } from "@/lib/payment-schedule";
 
 export const metadata: Metadata = {
   title: "Jouw nieuwe website met DogWare",
@@ -49,6 +50,19 @@ export default async function TrajectPage({
 
   const documenten = await listDocuments(commerce.id, "klant");
   const tijdlijn = await getTimeline(lead.id, "klant", 40);
+
+  /*
+   * Het betaalschema. Idempotent aangevuld als het bij ondertekening niet
+   * ontstond; bij een historische overeenkomst (zonder regeling) blijft het
+   * leeg en ziet de klant precies wat hij altijd zag.
+   */
+  if (getekend && agreement) await ensureSchedule(agreement);
+  const { weergave: schemaWeergave, voortgang } = getekend
+    ? await loadSchemaWeergave(
+        commerce.id,
+        documenten.filter((d) => isInvoiceType(d.type)).map((d) => ({ id: d.id, nummer: d.nummer })),
+      )
+    : { weergave: null, voortgang: null };
 
   if (!proposal?.sentAt) {
     // Er is nog geen voorstel verstuurd; toon een rustige tussenpagina in
@@ -98,13 +112,14 @@ export default async function TrajectPage({
         geaccepteerdOp: proposal.acceptedAt?.toISOString() ?? null,
         geaccepteerdDoor: proposal.acceptedName,
         prijzen: L!,
+        schema: schemaWeergave,
       }}
       status={{
         getekend,
         getekendOp: agreement?.signedAt?.toISOString() ?? null,
         aanbetalingBetaald: betaald > 0,
         opleveringKlaar: Boolean(commerce.deliveryReadyAt),
-        volledigBetaald: openstaand === 0 && betaald > 0,
+        volledigBetaald: voortgang ? voortgang.volledigBetaald : openstaand === 0 && betaald > 0,
         live: Boolean(commerce.liveAt),
         openstaand: euroFromCents(openstaand),
         mollieKlaar: isMollieConfigured(),

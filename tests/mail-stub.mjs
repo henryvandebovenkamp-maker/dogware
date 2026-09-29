@@ -46,3 +46,6 @@ export const sendPartnerActivated = recorder("partner-activated");
 export const sendPartnerDemoSent = recorder("partner-demo-sent");
 export const sendMagicLogin = recorder("magic-login");
 export const sendGroeiBericht = recorder("groei-bericht");
+export const sendContactNotification = recorder("contact-notification");
+export const sendContactConfirmation = recorder("contact-confirmation");
+export const sendPartnerMilestone = recorder("partner-milestone");

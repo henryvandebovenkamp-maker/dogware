@@ -40,7 +40,7 @@ export default async function BetaaldPage({
     .where(
       and(
         eq(schema.payments.commerceId, ctx.commerce.id),
-        inArray(schema.payments.type, ["DEPOSIT", "FINAL_PAYMENT"]),
+        inArray(schema.payments.type, ["DEPOSIT", "FINAL_PAYMENT", "INSTALLMENT"]),
       ),
     )
     .orderBy(desc(schema.payments.createdAt))
@@ -86,7 +86,9 @@ export default async function BetaaldPage({
                   ontvangen.{" "}
                   {laatste.type === "DEPOSIT"
                     ? "Vanaf nu gaan we voor je bouwen."
-                    : "Je website gaat binnenkort live."}
+                    : laatste.type === "INSTALLMENT"
+                      ? "Je termijn is verwerkt; de factuur staat in je overzicht."
+                      : "Je website gaat binnenkort live."}
                 </p>
               </>
             ) : mislukt ? (

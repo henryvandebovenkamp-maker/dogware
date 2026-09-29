@@ -11,6 +11,9 @@ import {
   type Chapter,
 } from "@/lib/agreement";
 import { pricingLabels, readPricing, type PricingSnapshot } from "@/lib/proposals";
+import type { RegelingContext } from "@/lib/agreement";
+import { datumLang, vanDatum } from "@/lib/payment-plan";
+import { euroFromCents } from "@/lib/money";
 import { isDirectJourney } from "@/lib/journey-variant";
 
 /**
@@ -103,6 +106,27 @@ export function agreementPricing(a: Agreement): PricingSnapshot {
 }
 
 /**
+ * De betaalregeling zoals de contracttekst hem nodig heeft — uit de bevroren
+ * prijzen, nooit uit de actuele afspraak. Undefined bij een overeenkomst van
+ * vóór de betaalregelingen: dan blijft de tekst zoals hij was.
+ */
+export function regelingContext(snap: PricingSnapshot): RegelingContext | undefined {
+  const r = snap.betaalregeling;
+  if (!r) return undefined;
+  const eersteMoment =
+    r.start === "datum" && r.startDatum ? `op ${datumLang(vanDatum(r.startDatum))}` : "na ondertekening";
+  return {
+    soort: r.soort,
+    aantal: r.termijnen.length,
+    eersteMoment,
+    schema: r.termijnen.map(
+      (t) =>
+        `termijn ${t.volgnummer} van ${r.termijnen.length}: ${euroFromCents(t.exVatCents)} exclusief btw (${euroFromCents(t.inclVatCents)} inclusief btw)${t.maandenNaStart === 0 ? `, ${eersteMoment}` : `, ${t.maandenNaStart} ${t.maandenNaStart === 1 ? "maand" : "maanden"} na de eerste termijn`}`,
+    ),
+  };
+}
+
+/**
  * Bouwt de contracttekst uit de BEVROREN gegevens van de overeenkomst.
  * Nooit uit de actuele commerce-rij: een getekend contract mag niet
  * meebewegen met een latere prijswijziging.
@@ -131,6 +155,7 @@ export function renderAgreement(
     subscriptionStartLabel: L.startLabel,
     bijzonderheden: proposal.bijzonderheden,
     opdrachtDocument: isDirectJourney(variant) ? "opdrachtbevestiging" : "voorstel",
+    betaalregeling: regelingContext(snap),
   };
   const versie = resolveContractVersion(a.voorwaardenVersie);
   return {
@@ -142,8 +167,11 @@ export function renderAgreement(
 
 /** De akkoordverklaringen die de klant moet aanvinken, met de echte bedragen. */
 export function agreementConsents(a: Agreement, variant?: string | null) {
-  const L = pricingLabels(agreementPricing(a));
+  const snap = agreementPricing(a);
+  const L = pricingLabels(snap);
   return consentLabels({
+    setupInclLabel: L.total,
+    betaalregeling: regelingContext(snap),
     setupExclLabel: L.netExVat,
     depositLabel: L.deposit,
     depositPercent: L.depositPercent,

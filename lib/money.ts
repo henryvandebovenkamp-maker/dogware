@@ -185,11 +185,22 @@ export function euroFromCents(cents: number): string {
 export function subscriptionStartLabel(
   rule: SubscriptionStartRule,
   handmatig?: Date | null,
+  /**
+   * De betaalregeling. Alleen bij "in termijnen" of "in één keer" verandert
+   * de zin; zonder (bestaande afspraken) blijft hij letterlijk zoals hij was.
+   */
+  regeling?: "50-50" | "volledig" | "termijnen",
 ): string {
   switch (rule) {
     case "na-oplevering":
       return "De incasso van het maandbedrag start na oplevering van het project.";
     case "na-laatste-betaling":
+      if (regeling === "termijnen") {
+        return "De incasso van het maandbedrag start na oplevering, zodra de laatste termijn is ontvangen.";
+      }
+      if (regeling === "volledig") {
+        return "De incasso van het maandbedrag start na oplevering van het project.";
+      }
       return "De incasso van het maandbedrag start na ontvangst van de tweede termijn.";
     case "eerste-volgende-maand":
       return "De incasso van het maandbedrag start op de eerste dag van de maand die volgt op de oplevering.";

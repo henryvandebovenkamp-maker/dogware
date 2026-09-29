@@ -55,9 +55,29 @@ export interface AgreementContext {
    * waardoor de tekst van bestaande overeenkomsten letterlijk gelijk blijft.
    */
   opdrachtDocument?: OpdrachtDocument;
+  /**
+   * De gekozen betaalregeling, als die afwijkt van 50/50. Leeg (of "50-50")
+   * betekent: de tekst van artikel 2.3, 6.1 en 6.3 blijft letterlijk zoals
+   * hij was — zodat bestaande overeenkomsten nooit andere woorden tonen.
+   */
+  betaalregeling?: RegelingContext;
 }
 
+export type RegelingContext = {
+  soort: "50-50" | "volledig" | "termijnen";
+  aantal: number;
+  /** "na ondertekening" of "op 1 november 2026". */
+  eersteMoment: string;
+  /** Eén regel per termijn, met bedragen, klaar om op te nemen. */
+  schema: string[];
+};
+
 export type OpdrachtDocument = "voorstel" | "opdrachtbevestiging";
+
+/** Moet de tekst de afwijkende regeling beschrijven? */
+function afwijkend(r?: RegelingContext): r is RegelingContext {
+  return Boolean(r && r.soort !== "50-50");
+}
 
 /** De woorden die de tekst per soort onderliggend stuk gebruikt. */
 function documentWoorden(d: OpdrachtDocument = "voorstel") {
@@ -124,6 +144,30 @@ function maatwerkArtikelen(bijzonderheden: string, hoofdstuk: number): Article[]
   return artikelen;
 }
 
+/**
+ * Artikel 6.1, tweede deel: wanneer de eenmalige investering betaald wordt.
+ * Bij 50/50 (en bij elke overeenkomst zonder vastgelegde regeling) exact de
+ * oorspronkelijke zin.
+ */
+function betalingArtikel(ctx: AgreementContext): string[] {
+  const r = ctx.betaalregeling;
+  if (!afwijkend(r)) {
+    return [
+      `Hiervan is ${ctx.depositPercent}% (${ctx.depositLabel} inclusief btw) verschuldigd bij het aangaan van deze overeenkomst, vóór aanvang van de bouwfase. De resterende ${ctx.finalPercent}% (${ctx.finalLabel} inclusief btw) is verschuldigd bij oplevering, voorafgaand aan de livegang.`,
+    ];
+  }
+  if (r.soort === "volledig") {
+    return [
+      `De eenmalige investering is in één keer verschuldigd (${ctx.setupInclLabel} inclusief btw) bij het aangaan van deze overeenkomst, vóór aanvang van de bouwfase.`,
+    ];
+  }
+  return [
+    `De eenmalige investering wordt betaald in ${nl(r.aantal)} maandelijkse termijnen. De eerste termijn is verschuldigd ${r.eersteMoment}, vóór aanvang van de bouwfase; elke volgende termijn één kalendermaand na de vorige. Een termijn kan worden voldaan vanaf veertien dagen vóór de vervaldatum.`,
+    `Betaalschema: ${r.schema.join("; ")}.`,
+    "De termijnen tellen samen exact op tot de eenmalige investering. Het maandelijkse abonnement uit artikel 6.2 staat los van deze termijnen en wordt apart gefactureerd.",
+  ];
+}
+
 /* =========================================================================
  * Versie 1.0 (actief)
  * ========================================================================= */
@@ -182,7 +226,11 @@ function buildV1(ctx: AgreementContext): Chapter[] {
           title: "Oplevering",
           paragraphs: [
             "Oplevering vindt plaats na afronding van de bouwfase en de overeengekomen feedbackronde(s), mits Opdrachtgever de benodigde content en gegevens tijdig heeft aangeleverd. De opgegeven doorlooptijd is een inspanningsverplichting en kan in onderling overleg worden bijgesteld.",
-            "De website gaat live nadat de tweede termijn is voldaan.",
+            !afwijkend(ctx.betaalregeling)
+              ? "De website gaat live nadat de tweede termijn is voldaan."
+              : ctx.betaalregeling.soort === "volledig"
+                ? "De website gaat live nadat de eenmalige investering is voldaan."
+                : "De website gaat live zodra de termijnen die op dat moment verschuldigd zijn, zijn voldaan. De overige termijnen blijven verschuldigd volgens het betaalschema in artikel 6.1.",
           ],
         },
       ],
@@ -295,7 +343,7 @@ function buildV1(ctx: AgreementContext): Chapter[] {
           title: "Eenmalige investering",
           paragraphs: [
             `De eenmalige investering bedraagt ${ctx.setupExclLabel} exclusief btw, oftewel ${ctx.setupInclLabel} inclusief ${ctx.vatPercent}% btw.`,
-            `Hiervan is ${ctx.depositPercent}% (${ctx.depositLabel} inclusief btw) verschuldigd bij het aangaan van deze overeenkomst, vóór aanvang van de bouwfase. De resterende ${ctx.finalPercent}% (${ctx.finalLabel} inclusief btw) is verschuldigd bij oplevering, voorafgaand aan de livegang.`,
+            ...betalingArtikel(ctx),
           ],
         },
         {
@@ -314,7 +362,11 @@ function buildV1(ctx: AgreementContext): Chapter[] {
           title: "Automatische incasso",
           paragraphs: [
             "Het maandbedrag wordt automatisch geïncasseerd. Opdrachtgever verleent Opdrachtnemer hiertoe een doorlopende machtiging via Mollie.",
-            "De machtiging wordt technisch geactiveerd bij de betaling van de tweede termijn. Vanaf dat moment kan de maandelijkse incasso plaatsvinden volgens het in artikel 6.2 bepaalde startmoment; niet eerder.",
+            !afwijkend(ctx.betaalregeling)
+              ? "De machtiging wordt technisch geactiveerd bij de betaling van de tweede termijn. Vanaf dat moment kan de maandelijkse incasso plaatsvinden volgens het in artikel 6.2 bepaalde startmoment; niet eerder."
+              : ctx.betaalregeling.soort === "volledig"
+                ? "De machtiging wordt technisch geactiveerd bij de betaling van de eenmalige investering. Vanaf dat moment kan de maandelijkse incasso plaatsvinden volgens het in artikel 6.2 bepaalde startmoment; niet eerder."
+                : "De machtiging wordt technisch geactiveerd bij de eerste betaling onder het betaalschema van artikel 6.1. Vanaf dat moment kan de maandelijkse incasso plaatsvinden volgens het in artikel 6.2 bepaalde startmoment; niet eerder. De termijnen van de eenmalige investering worden niet automatisch geïncasseerd: Opdrachtgever voldoet elke termijn zelf via zijn persoonlijke omgeving.",
             "Lukt een incasso niet, dan informeert Opdrachtnemer Opdrachtgever en kan het bedrag alsnog handmatig worden voldaan.",
           ],
         },
@@ -502,11 +554,18 @@ export function consentLabels(ctx: {
   monthlyExclLabel: string;
   versionLabel: string;
   opdrachtDocument?: OpdrachtDocument;
+  setupInclLabel?: string;
+  betaalregeling?: RegelingContext;
 }): Record<ConsentKey, string> {
+  const r = ctx.betaalregeling;
   return {
     agreesOpdracht: `Ik ga akkoord met de opdracht zoals omschreven in ${documentWoorden(ctx.opdrachtDocument).het}.`,
     agreesInvestering: `Ik ga akkoord met de eenmalige investering van ${ctx.setupExclLabel} excl. btw.`,
-    agreesTermijnen: `Ik ga akkoord met de betaling in twee termijnen: ${ctx.depositPercent}% (${ctx.depositLabel} incl. btw) nu en ${ctx.finalPercent}% (${ctx.finalLabel} incl. btw) bij oplevering.`,
+    agreesTermijnen: !afwijkend(r)
+      ? `Ik ga akkoord met de betaling in twee termijnen: ${ctx.depositPercent}% (${ctx.depositLabel} incl. btw) nu en ${ctx.finalPercent}% (${ctx.finalLabel} incl. btw) bij oplevering.`
+      : r.soort === "volledig"
+        ? `Ik ga akkoord met de betaling van de eenmalige investering in één keer${ctx.setupInclLabel ? ` (${ctx.setupInclLabel} incl. btw)` : ""}, na ondertekening.`
+        : `Ik ga akkoord met de betaling van de eenmalige investering in ${r.aantal} maandelijkse termijnen, de eerste ${r.eersteMoment}, volgens het betaalschema in artikel 6.1.`,
     agreesMaandbedrag: `Ik ga akkoord met de maandelijkse DogWare-kosten van ${ctx.monthlyExclLabel} excl. btw en met automatische incasso daarvan.`,
     agreesVoorwaarden: `Ik heb de ${ctx.versionLabel} gelezen en ga daarmee akkoord.`,
     agreesBevoegd: "Ik ben bevoegd om namens dit bedrijf te tekenen.",

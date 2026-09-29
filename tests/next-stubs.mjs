@@ -20,10 +20,16 @@ export async function headers() {
   };
 }
 
+/**
+ * Standaard een lege koektrommel (anonieme bezoeker). Een integratietest die
+ * een ingelogde beheerder nodig heeft, zet `globalThis.__testCookies` op
+ * { naam: waarde } — de echte sessiecontrole van DogWare doet de rest.
+ */
 export async function cookies() {
+  const bak = globalThis.__testCookies ?? {};
   return {
-    get: () => undefined,
-    getAll: () => [],
+    get: (naam) => (naam in bak ? { name: naam, value: bak[naam] } : undefined),
+    getAll: () => Object.entries(bak).map(([name, value]) => ({ name, value })),
     set: () => {},
     delete: () => {},
     has: () => false,

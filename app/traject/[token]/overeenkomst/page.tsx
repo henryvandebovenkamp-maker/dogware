@@ -6,6 +6,7 @@ import { resolvePortal } from "@/lib/portal-access";
 import { getActiveProposal } from "@/lib/proposals";
 import {
   agreementConsents,
+  agreementPricing,
   ensureAgreement,
   getCurrentAgreement,
   isSigned,
@@ -15,6 +16,7 @@ import { contractVersionDateLabel } from "@/lib/agreement";
 import { AgreementView } from "@/components/commerce/agreement-view";
 import { logJourneyEvent } from "@/lib/journey";
 import { isDirectJourney, overeenkomstPoort } from "@/lib/journey-variant";
+import { regelingZin } from "@/lib/payment-plan";
 
 export const metadata: Metadata = {
   title: "Samenwerkingsovereenkomst",
@@ -73,6 +75,7 @@ export default async function OvereenkomstPage({
 
   const { chapters, versionName } = renderAgreement(agreement, proposal, lead.journeyVariant);
   const consents = agreementConsents(agreement, lead.journeyVariant);
+  const regeling = agreementPricing(agreement).betaalregeling;
 
   return (
     <AgreementView
@@ -86,6 +89,7 @@ export default async function OvereenkomstPage({
       getekendOp={agreement.signedAt?.toISOString() ?? null}
       getekendDoor={agreement.signerName}
       voorstelVersie={agreement.proposalVersion}
+      regelingZin={regeling && regeling.soort !== "50-50" ? regelingZin(regeling) : undefined}
       klant={{
         bedrijfsnaam: agreement.signerCompany ?? lead.bedrijfsnaam,
         naam: agreement.signerName ?? lead.naam,

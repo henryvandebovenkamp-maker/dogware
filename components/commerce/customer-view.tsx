@@ -8,6 +8,9 @@ import { JourneyBar } from "@/components/commerce/journey-bar";
 import { BrandMark } from "@/components/brand";
 import { legalFooterLine } from "@/lib/legal-entity";
 import { cn } from "@/lib/cn";
+import type { RegelingLabels } from "@/lib/proposals";
+import type { SchemaWeergave } from "@/lib/payment-schedule";
+import { RegelingVoorstel, TermijnLijst, TermijnPil, Voortgangsbalk } from "@/components/commerce/betaalafspraak";
 
 /* ------------------------------------------------------------------ types -- */
 
@@ -26,6 +29,8 @@ export type Prijzen = {
   vatPercent: number;
   freeMonths: number;
   startLabel: string;
+  /** De gekozen betaalregeling met het bevroren termijnschema. */
+  regeling: RegelingLabels;
 };
 
 export type VoorstelData = {
@@ -48,7 +53,17 @@ export type VoorstelData = {
   geaccepteerdOp: string | null;
   geaccepteerdDoor: string | null;
   prijzen: Prijzen;
+  /**
+   * Het betaalschema na ondertekening (null bij een historische 50/50-
+   * overeenkomst of zolang er niet getekend is).
+   */
+  schema?: SchemaWeergave | null;
 };
+
+/** In één keer of in termijnen — alles behalve de klassieke 50/50. */
+function heeftEigenRegeling(v: VoorstelData): boolean {
+  return !v.prijzen.regeling.historisch && v.prijzen.regeling.soort !== "50-50";
+}
 
 export type StatusData = {
   getekend: boolean;
@@ -238,13 +253,31 @@ function VolgendeStap({ voorstel, status }: { voorstel: VoorstelData; status: St
     });
   }
 
-  function betaal(kind: "deposit" | "final") {
+  function betaal(kind: "deposit" | "final" | "termijn") {
     setFout(null);
     start(async () => {
       const res = await startPayment(voorstel.token, kind);
       if (res.checkoutUrl) window.location.href = res.checkoutUrl;
       else setFout(res.message ?? "Betalen lukt nu even niet.");
     });
+  }
+
+  /*
+   * In één keer of in termijnen, na ondertekening: één kaart die de hele
+   * betaalafspraak uitlegt — wat betaald is, wat openstaat, wat de volgende
+   * betaling is en wanneer — met hooguit één knop.
+   */
+  if (status.getekend && voorstel.schema && heeftEigenRegeling(voorstel)) {
+    return (
+      <BetaalAfspraakKaart
+        voorstel={voorstel}
+        schema={voorstel.schema}
+        status={status}
+        pending={pending}
+        fout={fout}
+        onBetaal={(eerste) => betaal(eerste ? "deposit" : "termijn")}
+      />
+    );
   }
 
   /* Alles live en betaald */
@@ -372,9 +405,11 @@ function VolgendeStap({ voorstel, status }: { voorstel: VoorstelData; status: St
       <Kaart tint="brand">
         <Kop>Je opdrachtbevestiging staat klaar</Kop>
         <Tekst>
-          Hieronder staat precies wat we voor je gaan bouwen, wat de investering is en welk
-          maandbedrag is afgesproken. Lees de afspraken rustig door en onderteken de overeenkomst
-          digitaal. Daarna kun je de eerste termijn voldoen en kunnen we starten.
+          Hieronder staat precies wat we voor je gaan bouwen, wat de investering is, hoe je die
+          betaalt en welk maandbedrag is afgesproken. Lees de afspraken rustig door en onderteken
+          de overeenkomst digitaal. Daarna kun je de eerste{" "}
+          {voorstel.prijzen.regeling.soort === "volledig" ? "betaling" : "termijn"} voldoen en
+          kunnen we starten.
         </Tekst>
         <a
           href={`/traject/${voorstel.token}/overeenkomst`}
@@ -542,6 +577,17 @@ function VoorstelDetails({ voorstel }: { voorstel: VoorstelData }) {
           </dl>
         </div>
 
+        {heeftEigenRegeling(voorstel) ? (
+          <div className="border-b border-cream-100">
+            <RegelingVoorstel
+              regeling={p.regeling}
+              totaalEx={p.netExVat}
+              totaalIncl={p.total}
+              vat={p.vat}
+              vatPercent={p.vatPercent}
+            />
+          </div>
+        ) : (
         <div className="grid gap-px bg-cream-100 sm:grid-cols-2">
           <div className="bg-white p-6 sm:p-7">
             <p className="text-[12.5px] font-bold uppercase tracking-wide text-ink-300">
@@ -560,11 +606,12 @@ function VoorstelDetails({ voorstel }: { voorstel: VoorstelData }) {
             <p className="mt-0.5 text-[12px] text-ink-300">incl. btw, vóór livegang</p>
           </div>
         </div>
+        )}
 
         {p.monthlyExVat !== "€ 0,00" && (
           <div className="bg-sage-100/60 p-6 sm:p-7">
             <p className="text-[12.5px] font-bold uppercase tracking-wide text-sage-600">
-              DogWare abonnement
+              {heeftEigenRegeling(voorstel) ? "Maandelijkse DogWare-kosten" : "DogWare abonnement"}
             </p>
             <p className="mt-1 text-[24px] font-extrabold leading-none text-ink">
               {p.monthlyExVat}{" "}
@@ -579,10 +626,196 @@ function VoorstelDetails({ voorstel }: { voorstel: VoorstelData }) {
             <p className="mt-2 text-[12.5px] leading-relaxed text-ink-500">
               Hierin zit hosting, onderhoud, beveiligingsupdates en persoonlijke ondersteuning.
             </p>
+            {heeftEigenRegeling(voorstel) && (
+              <p className="mt-2 text-[12.5px] leading-relaxed text-ink-500">
+                Dit abonnement staat los van de eenmalige investering hierboven en wordt apart
+                maandelijks afgeschreven.
+              </p>
+            )}
           </div>
         )}
       </div>
     </section>
+  );
+}
+
+/* ------------------------------------------------- de betaalafspraak -- */
+
+/**
+ * De kaart voor "in één keer" en "in termijnen" na ondertekening.
+ *
+ * Wat de klant zonder financiële kennis moet kunnen zien: wat al betaald is,
+ * wat nog openstaat, wat de volgende betaling is en wanneer — en dat het
+ * maandabonnement daar los van staat. Eén knop, en alleen als er echt iets
+ * te betalen valt.
+ */
+function BetaalAfspraakKaart({
+  voorstel,
+  schema,
+  status,
+  pending,
+  fout,
+  onBetaal,
+}: {
+  voorstel: VoorstelData;
+  schema: SchemaWeergave;
+  status: StatusData;
+  pending: boolean;
+  fout: string | null;
+  onBetaal: (eerste: boolean) => void;
+}) {
+  const p = voorstel.prijzen;
+  const v = schema.voortgang;
+  const volgende = v.volgende;
+  const volledig = schema.plan === "volledig";
+  const eersteBetaald = schema.rijen[0]?.status === "betaald";
+
+  const kop = status.live
+    ? "Je website staat live 🎉"
+    : v.volledigBetaald && status.opleveringKlaar
+      ? "Helemaal rond 🐾"
+      : status.opleveringKlaar
+        ? "Je omgeving is klaar!"
+        : eersteBetaald
+          ? "We bouwen aan jouw website"
+          : "Nog één stap en we beginnen";
+
+  const tekst = status.live
+    ? "Fijn dat je erbij bent. Hieronder zie je hoe je betaalafspraak ervoor staat."
+    : v.volledigBetaald && status.opleveringKlaar
+      ? "Alles is betaald. We zetten je website live en laten het je weten."
+      : status.opleveringKlaar
+        ? "Wat leuk om je dit te laten zien. Je betaalafspraak loopt gewoon door zoals afgesproken."
+        : eersteBetaald
+          ? "Dank je wel voor je betaling! Vanaf nu zijn wij aan zet — je hoort van ons zodra er iets te zien is."
+          : `De overeenkomst is getekend${status.getekendOp ? ` op ${datum(status.getekendOp)}` : ""}. Zodra de eerste ${volledig ? "betaling" : "termijn"} binnen is, beginnen we met bouwen.`;
+
+  const knopLabel = volgende
+    ? volledig
+      ? `Betaal ${volgende.inclVat}`
+      : `Betaal termijn ${volgende.volgnummer} — ${volgende.inclVat}`
+    : "";
+
+  return (
+    <>
+      <Kaart tint={volgende?.betaalbaar ? "brand" : "sage"}>
+        <Kop>{kop}</Kop>
+        <Tekst>{tekst}</Tekst>
+
+        <div className="mt-5 rounded-xl bg-cream-100/70 p-4 sm:p-5">
+          <p className="text-[12.5px] font-bold uppercase tracking-wide text-ink-300">
+            Jouw betaalafspraak
+          </p>
+          <p className="mt-1 text-[14px] leading-relaxed text-ink-700">
+            {volledig
+              ? `Je betaalt de eenmalige investering van ${p.netExVat} excl. btw in één keer.`
+              : `Je hebt gekozen om de eenmalige investering van ${p.netExVat} excl. btw in ${v.aantal} termijnen te betalen.`}
+          </p>
+
+          {!volledig && (
+            <div className="mt-4">
+              <Voortgangsbalk betaald={v.betaaldAantal} aantal={v.aantal} />
+              <p className="mt-2 text-[13px] font-bold text-ink">
+                {v.betaaldAantal} van {v.aantal} termijnen betaald
+              </p>
+            </div>
+          )}
+
+          <dl className="mt-3 grid grid-cols-2 gap-3">
+            <div className="rounded-lg bg-white px-3 py-2.5">
+              <dt className="text-[11px] font-bold uppercase tracking-wide text-ink-300">Betaald</dt>
+              <dd className="text-[16px] font-extrabold tabular-nums text-sage-600">{v.betaaldEx}</dd>
+              <dd className="text-[11px] text-ink-300">excl. btw</dd>
+            </div>
+            <div className="rounded-lg bg-white px-3 py-2.5">
+              <dt className="text-[11px] font-bold uppercase tracking-wide text-ink-300">
+                Nog te betalen
+              </dt>
+              <dd className="text-[16px] font-extrabold tabular-nums text-ink">{v.openEx}</dd>
+              <dd className="text-[11px] text-ink-300">excl. btw</dd>
+            </div>
+          </dl>
+
+          {volgende && (
+            <div className="mt-3 rounded-lg bg-white px-3 py-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-[11px] font-bold uppercase tracking-wide text-ink-300">
+                  Volgende betaling
+                </p>
+                <TermijnPil
+                  status={volgende.status}
+                  label={
+                    volgende.status === "gepland"
+                      ? "Gepland"
+                      : volgende.status === "te-laat"
+                        ? "Te laat"
+                        : volgende.status === "mislukt"
+                          ? "Mislukt — probeer opnieuw"
+                          : volgende.status === "wacht-op-oplevering"
+                            ? "Bij oplevering"
+                            : "Te betalen"
+                  }
+                />
+              </div>
+              <p className="mt-1 text-[20px] font-extrabold tabular-nums leading-none text-ink">
+                {volgende.exVat}{" "}
+                <span className="text-[12px] font-semibold text-ink-500">excl. btw</span>
+              </p>
+              <p className="mt-1 text-[12.5px] text-ink-500">
+                {volgende.inclVat} incl. btw ·{" "}
+                {volgende.betaalbaar ? `vervaldatum ${volgende.wanneer}` : `te betalen rond ${volgende.wanneer}`}
+              </p>
+            </div>
+          )}
+
+          {volgende?.betaalbaar && (
+            <>
+              <Primair
+                onClick={() => onBetaal(volgende.volgnummer === 1)}
+                pending={pending}
+                label={knopLabel}
+                disabled={!status.mollieKlaar}
+              />
+              <Fout tekst={fout} />
+              {!status.mollieKlaar && <Wacht />}
+            </>
+          )}
+          {volgende && !volgende.betaalbaar && (
+            <p className="mt-3 text-[12.5px] leading-relaxed text-ink-500">
+              Je hoeft nu niets te doen. Zodra deze termijn aan de beurt is, sturen we je een
+              mailtje met een betaallink.
+            </p>
+          )}
+        </div>
+
+        {p.monthlyExVat !== "€ 0,00" && (
+          <div className="mt-3 rounded-xl bg-sage-100/60 p-4">
+            <p className="text-[12.5px] font-bold text-sage-600">Maandelijkse DogWare-kosten</p>
+            <p className="mt-0.5 text-[14px] font-extrabold text-ink">
+              {p.monthlyExVat}{" "}
+              <span className="text-[12px] font-semibold text-ink-500">
+                excl. btw per maand ({p.monthlyInclVat} incl.)
+              </span>
+            </p>
+            <p className="mt-1 text-[12px] leading-relaxed text-ink-500">
+              Staat los van je termijnen. {p.startLabel}
+              {status.heeftAbonnement && status.mandaatActief && " De automatische incasso staat klaar."}
+            </p>
+          </div>
+        )}
+      </Kaart>
+
+      {!volledig && (
+        <section className="mt-6">
+          <h2 className="text-[13px] font-bold uppercase tracking-[0.12em] text-ink-300">
+            Alle termijnen
+          </h2>
+          <div className="mt-3 rounded-2xl bg-white p-5 shadow-soft ring-1 ring-ink/5">
+            <TermijnLijst weergave={schema} factuurBasis={`/traject/${voorstel.token}/factuur/`} />
+          </div>
+        </section>
+      )}
+    </>
   );
 }
 

@@ -1,20 +1,40 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
-import type { Agreement, Commerce, Lead } from "@/lib/db/schema";
+import type { Agreement, Commerce, Lead, PaymentInstallment, PaymentType } from "@/lib/db/schema";
 import { getAdminActor } from "@/lib/admin-auth";
 import { logActivity } from "@/lib/audit";
+import { isUniekeSchending } from "@/lib/db-errors";
 import { logJourneyEvent, setStage } from "@/lib/journey";
 import {
+  abonnementNaOplevering,
   activateMandateAndSubscription,
   getCommerceForLead,
   mailAndLog,
   paidTotal,
+  processPaymentByMollieId,
   setCommerceStatus,
 } from "@/lib/commerce";
 import {
+  attachAttempt,
+  ensureSchedule,
+  feitenVan,
+  laatstePogingen,
+  scheduleForCommerce,
+  setDeliveryDueDates,
+} from "@/lib/payment-schedule";
+import {
+  datumLang,
+  isBetaalbaar,
+  normalizePlan,
+  opentOp,
+  regelingTitel,
+  regelingZin,
+} from "@/lib/payment-plan";
+import {
+  checkRegeling,
   createOrGetDraft,
   ensureCommerce,
   freezePricing,
@@ -37,7 +57,12 @@ import {
 import { isDirectJourney, opdrachtWoord, overeenkomstPoort } from "@/lib/journey-variant";
 import { registerDocument } from "@/lib/documents";
 import { notifyPartner } from "@/lib/partner-notify";
-import { createMolliePayment, isMollieConfigured } from "@/lib/mollie";
+import {
+  createMolliePayment,
+  getMolliePayment,
+  isMollieConfigured,
+  mapMollieStatus,
+} from "@/lib/mollie";
 import { computeOutstanding, euroFromCents } from "@/lib/money";
 import { newPortalToken, portalUrl, requestFingerprint, resolvePortal } from "@/lib/portal-access";
 
@@ -128,6 +153,25 @@ export async function saveCommerceConfig(
   const startRule = normalizeStartRule(String(formData.get("startRule") ?? ""));
   const startAtRaw = String(formData.get("startAt") ?? "").trim();
 
+  /*
+   * De betaalregeling. Alleen de KEUZE komt uit het formulier — soort, aantal
+   * en startmoment. Bedragen per termijn worden nooit ingevoerd: die rekent de
+   * server uit bij versturen (zie freezePricing). Onbekende invoer wordt 50/50.
+   */
+  const plan = normalizePlan({
+    soort: String(formData.get("paymentPlan") ?? ctx.commerce.paymentPlan),
+    aantal: String(formData.get("installmentCount") ?? ctx.commerce.installmentCount),
+    start: String(formData.get("installmentStart") ?? ctx.commerce.installmentStart),
+    startDatum: String(formData.get("installmentStartDate") ?? "").trim() || null,
+  });
+  if (
+    formData.get("installmentStart") === "datum" &&
+    plan.soort === "termijnen" &&
+    !plan.startDatum
+  ) {
+    return FOUT("Kies een geldige startdatum voor de eerste termijn.");
+  }
+
   await db
     .update(schema.commerce)
     .set({
@@ -148,11 +192,53 @@ export async function saveCommerceConfig(
       subscriptionStartAt:
         startRule === "handmatig" && startAtRaw ? new Date(`${startAtRaw}T00:00:00`) : null,
       opmerkingen: String(formData.get("opmerkingen") ?? "").trim() || null,
+      paymentPlan: plan.soort,
+      // Bij 50/50 en "in één keer" blijft het laatst gekozen aantal staan, zodat
+      // terugschakelen naar termijnen de eerdere keuze teruggeeft.
+      installmentCount: plan.soort === "termijnen" ? plan.aantal : ctx.commerce.installmentCount,
+      installmentStart: plan.start,
+      installmentStartDate: plan.startDatum,
       updatedAt: new Date(),
     })
     .where(eq(schema.commerce.id, ctx.commerce.id));
 
+  const vorige = normalizePlan({
+    soort: ctx.commerce.paymentPlan,
+    aantal: ctx.commerce.installmentCount,
+    start: ctx.commerce.installmentStart,
+    startDatum: ctx.commerce.installmentStartDate,
+  });
+  if (JSON.stringify(vorige) !== JSON.stringify(plan)) {
+    await logActivity({
+      actorUserId: ctx.actorId,
+      action: "PAYMENT_PLAN_CHANGED",
+      objectType: "lead",
+      objectId: leadId,
+      oldValue: vorige,
+      newValue: plan,
+    });
+    await logJourneyEvent(
+      leadId,
+      "payment_plan_changed",
+      `Betaalregeling in concept gewijzigd: ${regelingTitel(plan)}`,
+      { actor: "admin", internal: true, plan },
+    );
+  }
+
+  /*
+   * Direct terugmelden als de regeling zo niet verstuurd kan worden (een
+   * termijn van een paar cent), in plaats van pas bij het versturen.
+   */
+  const [bijgewerkt] = await db
+    .select()
+    .from(schema.commerce)
+    .where(eq(schema.commerce.id, ctx.commerce.id))
+    .limit(1);
+  const check = bijgewerkt ? checkRegeling(bijgewerkt) : { ok: true as const };
   refresh(leadId);
+  if (!check.ok && bijgewerkt && bijgewerkt.projectCents + bijgewerkt.setupCents > 0) {
+    return FOUT(`Opgeslagen, maar zo kan het niet de deur uit: ${check.reden}`);
+  }
   return OK("Afspraak opgeslagen.");
 }
 
@@ -258,6 +344,8 @@ export async function sendProposal(
     return FOUT(`Vul eerst de eenmalige investering in — ${direct ? "een opdrachtbevestiging" : "een voorstel"} van € 0,00 versturen we niet.`);
   }
   if (!draft.titel.trim()) return FOUT(`Geef ${w.deNaam} een titel.`);
+  const regelingCheck = checkRegeling(commerce);
+  if (!regelingCheck.ok) return FOUT(regelingCheck.reden);
 
   /*
    * Is er al getekend, dan ligt de opdracht juridisch vast. Een nieuwe versie
@@ -315,7 +403,13 @@ export async function sendProposal(
       { actor: "admin", voorwaardenVersie: agreement.voorwaardenVersie, version: sent.version },
     );
 
-    const gelukt = await mailAndLog(lead, "agreement-ready", {}, link ? `${link}/overeenkomst` : undefined);
+    const regeling = readPricing(sent, commerce).betaalregeling;
+    const gelukt = await mailAndLog(
+      lead,
+      "agreement-ready",
+      regeling && regeling.soort !== "50-50" ? { regeling: regelingZin(regeling) } : {},
+      link ? `${link}/overeenkomst` : undefined,
+    );
     await notifyPartner(leadId, "voorstel-verstuurd");
     await logActivity({
       actorUserId: ctx.actorId,
@@ -371,15 +465,41 @@ export async function sendReminder(
   const L = pricingLabels(snap);
   const outstanding = computeOutstanding(snap.config, await paidTotal(commerce.id));
 
-  const map: Record<string, { type: Parameters<typeof mailAndLog>[1]; vars: { amount?: string } }> = {
+  /*
+   * Bij een betaalschema komt het bedrag van de eerste betaling uit de
+   * getekende termijn — niet uit "totaal × aanbetalingspercentage", want bij
+   * termijnen of "in één keer" is dat een ander bedrag.
+   */
+  const rijen = await scheduleForCommerce(commerce.id);
+  const plan = rijen[0]?.plan ?? null;
+  const eersteBedrag = rijen[0] ? euroFromCents(rijen[0].amountInclVatCents) : L.deposit;
+  const volgendeTermijn = rijen.find((r) => r.status === "GEPLAND" && r.volgnummer > 1 && r.dueAt);
+
+  const map: Record<string, { type: Parameters<typeof mailAndLog>[1]; vars: Parameters<typeof mailAndLog>[2] }> = {
     demo: { type: "demo-reminder", vars: {} },
     voorstel: { type: "proposal-reminder", vars: {} },
     overeenkomst: { type: "agreement-reminder", vars: {} },
-    aanbetaling: { type: "deposit-reminder", vars: { amount: L.deposit } },
+    aanbetaling: { type: "deposit-reminder", vars: { amount: eersteBedrag } },
     restbetaling: { type: "final-reminder", vars: { amount: euroFromCents(outstanding) } },
+    ...(volgendeTermijn
+      ? {
+          termijn: {
+            type: "installment-reminder" as const,
+            vars: {
+              amount: euroFromCents(volgendeTermijn.amountInclVatCents),
+              extra: `Termijn ${volgendeTermijn.volgnummer} van ${volgendeTermijn.aantal} (vervaldatum ${datumLang(volgendeTermijn.dueAt!)})`,
+            },
+          },
+        }
+      : {}),
   };
   const keuze = map[soort];
-  if (!keuze) return FOUT("Onbekende herinnering.");
+  if (!keuze) {
+    return FOUT(soort === "termijn" ? "Er staat geen volgende termijn open." : "Onbekende herinnering.");
+  }
+  if (soort === "restbetaling" && plan && plan !== "50-50") {
+    return FOUT("Bij deze betaalregeling is er geen slotbetaling bij oplevering.");
+  }
   // Een directe klant heeft geen demo en geen los voorstel om aan te herinneren.
   if (isDirectJourney(lead.journeyVariant) && (soort === "demo" || soort === "voorstel")) {
     return FOUT("Dit is een directe klant — stuur een herinnering voor de opdrachtbevestiging.");
@@ -431,8 +551,34 @@ export async function markDeliveryReady(
   await setStage(leadId, "oplevering", { actor: "admin", reden: "oplevering klaargezet" });
   await logJourneyEvent(leadId, "delivery_ready", "Oplevering klaargezet", { actor: "admin" });
 
-  const outstanding = computeOutstanding(snap.config, betaald);
+  // Een termijn "bij oplevering" (50/50 met schema) krijgt nu zijn datum.
+  await setDeliveryDueDates(commerce.id, commerce.deliveryReadyAt ?? new Date());
+
   const link = commerce.portalToken ? portalUrl(commerce.portalToken) : undefined;
+
+  /*
+   * In één keer of in termijnen: er is geen slotbetaling die de oplevering
+   * afrondt. De klant krijgt te horen dat het klaar is en hoe zijn termijnen
+   * doorlopen; het abonnement wordt nu ingepland (als het mandaat er is).
+   */
+  const rijen = await scheduleForCommerce(commerce.id);
+  const plan = rijen[0]?.plan;
+  if (plan && plan !== "50-50") {
+    const open = rijen.filter((r) => r.status === "GEPLAND");
+    const volgende = open[0];
+    const extra =
+      open.length === 0
+        ? "De eenmalige investering is helemaal voldaan — er staat niets meer voor je open."
+        : `Je termijnen lopen gewoon door volgens je betaalafspraak: nog ${euroFromCents(open.reduce((s2, r) => s2 + r.amountExVatCents, 0))} excl. btw in ${open.length === 1 ? "1 termijn" : `${open.length} termijnen`}${volgende?.dueAt ? `, de volgende op ${datumLang(volgende.dueAt)}` : ""}.`;
+    const gelukt = await mailAndLog(lead, "delivery-ready-plan", { extra }, link);
+    await abonnementNaOplevering(commerce.id);
+    refresh(leadId);
+    return gelukt
+      ? OK("Oplevering klaargezet en de klant is geïnformeerd.")
+      : OK("Oplevering klaargezet, maar de mail kon niet worden verzonden.");
+  }
+
+  const outstanding = computeOutstanding(snap.config, betaald);
   const gelukt = await mailAndLog(
     lead,
     "delivery-ready",
@@ -458,9 +604,29 @@ export async function markWebsiteLive(
 
   const proposal = await getActiveProposal(commerce.id);
   const snap = proposal ? readPricing(proposal, commerce) : freezePricing(commerce);
-  const openstaand = computeOutstanding(snap.config, await paidTotal(commerce.id));
-  if (openstaand > 0) {
-    return FOUT(`Er staat nog ${euroFromCents(openstaand)} open — live zetten kan pas na de laatste termijn.`);
+  const rijen = await scheduleForCommerce(commerce.id);
+  const plan = rijen[0]?.plan;
+  if (plan && plan !== "50-50") {
+    /*
+     * Bij termijnen gaat de website live terwijl er nog termijnen lopen — dat
+     * is precies de afspraak. Wat niet mag: live gaan terwijl een termijn die
+     * al verschuldigd IS, nog openstaat.
+     */
+    const nu = new Date();
+    const achterstallig = rijen.find(
+      (r) => r.status === "GEPLAND" && r.dueAt && r.dueAt.getTime() <= nu.getTime(),
+    );
+    if (achterstallig || rijen[0].status !== "BETAALD") {
+      const t = achterstallig ?? rijen[0];
+      return FOUT(
+        `Termijn ${t.volgnummer} van ${t.aantal} (${euroFromCents(t.amountInclVatCents)}) is verschuldigd en nog niet betaald — live zetten kan pas als de verschuldigde termijnen binnen zijn.`,
+      );
+    }
+  } else {
+    const openstaand = computeOutstanding(snap.config, await paidTotal(commerce.id));
+    if (openstaand > 0) {
+      return FOUT(`Er staat nog ${euroFromCents(openstaand)} open — live zetten kan pas na de laatste termijn.`);
+    }
   }
   if (commerce.monthlyCents > 0 && !commerce.mandateActivatedAt) {
     return FOUT("Er is nog geen actief incassomandaat. Regel dat eerst, anders kan het abonnement niet lopen.");
@@ -891,6 +1057,14 @@ export async function signAgreement(token: string, input: SignInput): Promise<Co
     );
   }
 
+  /*
+   * Het betaalschema ontstaat hier, uit de bevroren regeling in precies deze
+   * getekende overeenkomst. Idempotent; bij een historische overeenkomst
+   * (zonder regeling) gebeurt er niets en loopt alles zoals altijd.
+   */
+  const termijnen = await ensureSchedule(definitief);
+  const regeling = agreementPricing(definitief).betaalregeling;
+
   await setCommerceStatus(commerce.id, "DEPOSIT_PENDING");
   await setStage(lead.id, "aanbetaling", { actor: "klant", reden: "overeenkomst getekend" });
   await logJourneyEvent(
@@ -925,8 +1099,38 @@ export async function signAgreement(token: string, input: SignInput): Promise<Co
     },
   });
 
+  /*
+   * Het akkoord op de betaalregeling, apart en herleidbaar vastgelegd: welke
+   * regeling, welke versie, welke bedragen. De juridische bron blijft de
+   * getekende overeenkomst zelf (bevroren prijzen + het aangevinkte akkoord op
+   * de termijnen); dit is de leesbare regel op de tijdlijn.
+   */
+  if (regeling) {
+    await logJourneyEvent(
+      lead.id,
+      "payment_plan_agreed",
+      `Akkoord op betaalregeling: ${regelingTitel(regeling, agreementPricing(definitief).computed.depositPercent)} (${direct ? "opdrachtbevestiging" : "voorstel"} versie ${definitief.proposalVersion})`,
+      {
+        actor: "klant",
+        agreementId: definitief.id,
+        proposalVersion: definitief.proposalVersion,
+        plan: regeling.soort,
+        termijnen: regeling.termijnen.map((t) => t.inclVatCents),
+      },
+    );
+  }
+
   const L = pricingLabels(agreementPricing(definitief));
-  await mailAndLog(lead, "agreement-signed", { amount: L.deposit }, portalUrl(token));
+  const eerste = termijnen?.[0];
+  await mailAndLog(
+    lead,
+    "agreement-signed",
+    {
+      amount: eerste ? euroFromCents(eerste.amountInclVatCents) : L.deposit,
+      regeling: regeling && regeling.soort !== "50-50" ? regelingZin(regeling) : undefined,
+    },
+    portalUrl(token),
+  );
   await notifyPartner(lead.id, "overeenkomst-getekend");
 
   revalidatePath(`/traject/${token}`);
@@ -935,22 +1139,34 @@ export async function signAgreement(token: string, input: SignInput): Promise<Co
 }
 
 /**
+ * Wat de browser mag vragen: wélke betaling, nooit welk bedrag.
+ *
+ *   deposit — de eerste betaling (aanbetaling, of termijn 1, of alles ineens);
+ *   final   — het restant bij oplevering (alleen 50/50);
+ *   termijn — de eerstvolgende termijn van een termijnregeling. Wélke termijn
+ *             dat is, bepaalt de server: een termijn-id uit de browser wordt
+ *             nergens geaccepteerd, dus er valt niets te raden.
+ */
+export type BetaalSoort = "deposit" | "final" | "termijn";
+
+/**
  * Start een betaling. Het bedrag wordt UITSLUITEND hier server-side bepaald;
  * de browser geeft alleen door wélke termijn het betreft.
  */
 export async function startPayment(
   token: string,
-  kind: "deposit" | "final",
+  kind: BetaalSoort,
 ): Promise<CommerceState> {
   const ctx = await klantContext(token);
   if (!ctx) return FOUT("Deze link is niet (meer) geldig.");
+  if (!["deposit", "final", "termijn"].includes(kind)) return FOUT("Onbekende betaling.");
   return startPaymentInternal(ctx.lead, ctx.commerce, kind, "klant", token);
 }
 
 /** Dezelfde betaalstap vanuit de admin (bijv. om de link te controleren). */
 export async function startPaymentAsAdmin(
   leadId: string,
-  kind: "deposit" | "final",
+  kind: BetaalSoort,
 ): Promise<CommerceState> {
   const ctx = await adminContext(leadId);
   if (!ctx) return FOUT("Geen toegang.");
@@ -966,7 +1182,7 @@ export async function startPaymentAsAdmin(
 async function startPaymentInternal(
   lead: Lead,
   commerce: Commerce,
-  kind: "deposit" | "final",
+  kind: BetaalSoort,
   actor: "klant" | "admin",
   token: string,
 ): Promise<CommerceState> {
@@ -995,17 +1211,62 @@ async function startPaymentInternal(
   // afspraak. Anders zou een prijswijziging na tekenen doorwerken.
   const snap = agreementPricing(agreement);
   const betaald = await paidTotal(commerce.id);
-  const type = kind === "deposit" ? "DEPOSIT" : "FINAL_PAYMENT";
 
+  /*
+   * Het betaalschema van deze overeenkomst (null bij een historische, van
+   * vóór de betaalregelingen: die loopt precies zoals altijd). Idempotent —
+   * ontbrak het door een onderbroken ondertekening, dan ontstaat het nu.
+   */
+  const rijen = await ensureSchedule(agreement);
+  const plan = rijen?.[0]?.plan ?? null;
+  const nu = new Date();
+
+  let type: PaymentType;
   let amountCents: number;
-  if (kind === "deposit") {
+  let termijn: PaymentInstallment | null = null;
+
+  if (kind === "termijn") {
+    if (plan !== "termijnen" || !rijen) return FOUT("Er is geen termijnregeling afgesproken.");
+    const volgende = rijen.find((r) => r.status === "GEPLAND");
+    if (!volgende) return FOUT("Alle termijnen zijn al betaald. Dank je wel!");
+    // De eerste termijn is de start van de opdracht; die loopt via de aanbetaling.
+    if (volgende.volgnummer === 1) return startPaymentInternal(lead, commerce, "deposit", actor, token);
+    const pogingen = await laatstePogingen(rijen);
+    const feiten = rijen.map((r) => feitenVan(r, pogingen.get(r.id)));
+    if (!isBetaalbaar(feitenVan(volgende, pogingen.get(volgende.id)), feiten, nu)) {
+      return FOUT(
+        volgende.dueAt
+          ? `Termijn ${volgende.volgnummer} kun je betalen vanaf ${datumLang(opentOp(volgende.dueAt))}.`
+          : `Termijn ${volgende.volgnummer} is nog niet aan de beurt.`,
+      );
+    }
+    termijn = volgende;
+    type = "INSTALLMENT";
+    amountCents = volgende.amountInclVatCents;
+  } else if (kind === "deposit") {
     if (betaald > 0) return FOUT("De eerste termijn is al voldaan.");
-    amountCents = snap.computed.depositCents;
+    type = "DEPOSIT";
+    if (rijen) {
+      termijn = rijen[0];
+      if (termijn.status === "BETAALD") return FOUT("De eerste termijn is al voldaan.");
+      // Een termijnschema met een latere startdatum: niet vóór het venster.
+      if (plan === "termijnen" && termijn.dueAt && nu.getTime() < opentOp(termijn.dueAt).getTime()) {
+        return FOUT(`De eerste termijn kun je betalen vanaf ${datumLang(opentOp(termijn.dueAt))}.`);
+      }
+      amountCents = termijn.amountInclVatCents;
+    } else {
+      amountCents = snap.computed.depositCents;
+    }
   } else {
+    if (plan && plan !== "50-50") {
+      return FOUT("Bij deze betaalregeling is er geen slotbetaling bij oplevering.");
+    }
     if (!commerce.deliveryReadyAt) {
       return FOUT("De laatste termijn komt beschikbaar zodra het project wordt opgeleverd.");
     }
+    type = "FINAL_PAYMENT";
     amountCents = computeOutstanding(snap.config, betaald);
+    termijn = rijen?.find((r) => r.moment === "oplevering" && r.status === "GEPLAND") ?? null;
   }
   if (amountCents <= 0) return FOUT("Er staat op dit moment niets open.");
 
@@ -1013,9 +1274,10 @@ async function startPaymentInternal(
   if (!isMollieConfigured()) return FOUT("Betalen is nog niet geconfigureerd.");
 
   /*
-   * Dubbelklik en dubbele betaling. Bestaat er al een openstaande betaling van
-   * dit type, dan sturen we de klant naar diezelfde Mollie-checkout in plaats
-   * van een tweede aan te maken.
+   * Dubbelklik en dubbele betaling. Bestaat er al een openstaande betaling
+   * voor deze termijn, dan sturen we de klant naar diezelfde Mollie-checkout
+   * in plaats van een tweede aan te maken. Bij het betaalschema wordt op de
+   * termijn zelf gezocht; bij historische betalingen, zoals altijd, op type.
    */
   const [bestaand] = await db
     .select()
@@ -1023,7 +1285,9 @@ async function startPaymentInternal(
     .where(
       and(
         eq(schema.payments.commerceId, commerce.id),
-        eq(schema.payments.type, type),
+        termijn && type === "INSTALLMENT"
+          ? eq(schema.payments.installmentId, termijn.id)
+          : eq(schema.payments.type, type),
         inArray(schema.payments.status, ["CREATED", "OPEN", "PENDING", "PAID"]),
       ),
     )
@@ -1031,23 +1295,74 @@ async function startPaymentInternal(
     .limit(1);
 
   if (bestaand?.status === "PAID") return FOUT("Deze termijn is al betaald.");
+  if (bestaand?.status === "CREATED" && termijn) {
+    return FOUT("Er wordt al een betaling voor deze termijn gestart. Een moment geduld.");
+  }
   if (bestaand?.molliePaymentId && ["OPEN", "PENDING"].includes(bestaand.status)) {
-    const { getMolliePayment } = await import("@/lib/mollie");
     const live = await getMolliePayment(bestaand.molliePaymentId);
     const url = live?.getCheckoutUrl?.();
     if (url) return { status: "success", checkoutUrl: url };
+
+    if (termijn && live) {
+      /*
+       * Geen checkout meer. Dan eerst de echte stand bij Mollie volgen: is er
+       * intussen betaald, dan verwerken we dat en starten we beslist geen
+       * tweede betaling. Is hij verlopen of afgebroken, dan leggen we dat vast
+       * (daarmee komt de termijn vrij) en maken we een nieuwe aan.
+       */
+      const echt = mapMollieStatus(live.status);
+      if (echt === "PAID") {
+        await processPaymentByMollieId(bestaand.molliePaymentId);
+        return FOUT("Deze termijn is zojuist betaald. Ververs de pagina.");
+      }
+      if (echt === "OPEN" || echt === "PENDING") {
+        return FOUT("Je vorige betaling wordt nog verwerkt. Probeer het over een paar minuten opnieuw.");
+      }
+      await db
+        .update(schema.payments)
+        .set({ status: echt })
+        .where(and(eq(schema.payments.id, bestaand.id), inArray(schema.payments.status, ["OPEN", "PENDING"])));
+    }
   }
 
-  const referentie = `DW-${lead.bedrijfsnaam.replace(/[^a-zA-Z0-9]/g, "").slice(0, 12).toUpperCase()}-${type}-${Date.now().toString(36)}`;
+  const soortLabel =
+    type === "INSTALLMENT" && termijn
+      ? `TERMIJN${termijn.volgnummer}`
+      : type;
+  const referentie = `DW-${lead.bedrijfsnaam.replace(/[^a-zA-Z0-9]/g, "").slice(0, 12).toUpperCase()}-${soortLabel}-${Date.now().toString(36)}`;
 
   /*
-   * Bij de laatste termijn vestigen we tegelijk het SEPA-mandaat: de klant
-   * ging bij het tekenen al akkoord met het maandbedrag; dit is de technische
-   * activatie. Bij de eerste termijn bewust NIET — daar is nog geen
-   * abonnement in zicht.
+   * Het SEPA-mandaat voor het maandabonnement.
+   *
+   * 50/50 (en historisch): bij de laatste termijn, precies zoals altijd — de
+   * klant ging bij het tekenen al akkoord met het maandbedrag; dit is de
+   * technische activatie. Bij de eerste termijn bewust NIET.
+   *
+   * In één keer / in termijnen: er is geen slotbetaling. Het mandaat wordt
+   * daarom gevestigd bij de eerste betaling onder de regeling (zo staat het
+   * ook in artikel 6.3), en bij elke volgende zolang er nog geen is. Een
+   * mandaat is geen incasso: er wordt pas geïncasseerd vanaf het afgesproken
+   * startmoment van het abonnement.
    */
   let mollieCustomerId = commerce.mollieCustomerId;
-  const wilMandaat = kind === "final" && commerce.monthlyCents > 0;
+  const heeftMandaat =
+    Boolean(commerce.mandateActivatedAt) ||
+    (
+      await db
+        .select({ id: schema.payments.id })
+        .from(schema.payments)
+        .where(
+          and(
+            eq(schema.payments.commerceId, commerce.id),
+            eq(schema.payments.status, "PAID"),
+            isNotNull(schema.payments.mollieMandateId),
+          ),
+        )
+        .limit(1)
+    ).length > 0;
+  const wilMandaat =
+    commerce.monthlyCents > 0 &&
+    (kind === "final" || (plan !== null && plan !== "50-50" && !heeftMandaat));
   if (wilMandaat) {
     const { ensureMollieCustomer } = await import("@/lib/mollie");
     mollieCustomerId = await ensureMollieCustomer({
@@ -1063,26 +1378,58 @@ async function startPaymentInternal(
     }
   }
 
-  const [record] = await db
-    .insert(schema.payments)
-    .values({
-      commerceId: commerce.id,
-      type,
-      amountCents,
-      status: "CREATED",
-      proposalId: proposal.id,
-      agreementId: agreement.id,
-      referentie,
-      sequenceType: wilMandaat ? "first" : "oneoff",
-      mollieCustomerId: wilMandaat ? mollieCustomerId : null,
-    })
-    .returning();
+  /*
+   * De unieke index `payments_installment_active_idx` laat per termijn maar
+   * één lopende betaling toe. Twee gelijktijdige kliks die allebei langs de
+   * controle hierboven kwamen, stranden hier — de tweede krijgt een nette
+   * melding in plaats van een tweede checkout.
+   */
+  let record: typeof schema.payments.$inferSelect;
+  try {
+    [record] = await db
+      .insert(schema.payments)
+      .values({
+        commerceId: commerce.id,
+        type,
+        amountCents,
+        status: "CREATED",
+        proposalId: proposal.id,
+        agreementId: agreement.id,
+        installmentId: termijn?.id ?? null,
+        referentie,
+        sequenceType: wilMandaat ? "first" : "oneoff",
+        mollieCustomerId: wilMandaat ? mollieCustomerId : null,
+      })
+      .returning();
+  } catch (err) {
+    if (isUniekeSchending(err, "payments_installment_active_idx")) {
+      return FOUT("Er loopt al een betaling voor deze termijn. Ververs de pagina.");
+    }
+    throw err;
+  }
+
+  const omschrijving =
+    type === "INSTALLMENT" && termijn
+      ? `termijn ${termijn.volgnummer} van ${termijn.aantal}`
+      : plan === "volledig"
+        ? "eenmalige investering"
+        : plan === "termijnen" && termijn
+          ? `termijn 1 van ${termijn.aantal}`
+          : kind === "deposit"
+            ? "eerste termijn"
+            : "laatste termijn";
 
   const result = await createMolliePayment({
     amountCents,
-    description: `DogWare ${kind === "deposit" ? "eerste termijn" : "laatste termijn"} — ${lead.bedrijfsnaam}`.slice(0, 255),
+    description: `DogWare ${omschrijving} — ${lead.bedrijfsnaam}`.slice(0, 255),
     redirectUrl: portalUrl(token, "/betaald"),
-    metadata: { paymentId: record.id, leadId: lead.id, commerceId: commerce.id, type },
+    metadata: {
+      paymentId: record.id,
+      leadId: lead.id,
+      commerceId: commerce.id,
+      type,
+      ...(termijn ? { installmentId: termijn.id } : {}),
+    },
     reference: referentie,
     sequenceType: wilMandaat ? "first" : "oneoff",
     mollieCustomerId: wilMandaat ? mollieCustomerId : null,
@@ -1104,16 +1451,20 @@ async function startPaymentInternal(
       sequenceType: result.usedSequence,
     })
     .where(eq(schema.payments.id, record.id));
+  if (termijn) await attachAttempt(termijn.id, { id: record.id, molliePaymentId: result.molliePaymentId });
 
-  await setCommerceStatus(
-    commerce.id,
-    kind === "deposit" ? "DEPOSIT_PENDING" : "FINAL_PAYMENT_PENDING",
-  );
+  // Een latere termijn zet de commerciële status nooit terug.
+  if (type !== "INSTALLMENT") {
+    await setCommerceStatus(
+      commerce.id,
+      kind === "deposit" ? "DEPOSIT_PENDING" : "FINAL_PAYMENT_PENDING",
+    );
+  }
   await logJourneyEvent(
     lead.id,
     "payment_created",
-    `${kind === "deposit" ? "Eerste" : "Laatste"} termijn gestart (${euroFromCents(amountCents)})`,
-    { actor, referentie, molliePaymentId: result.molliePaymentId },
+    `${omschrijving.charAt(0).toUpperCase()}${omschrijving.slice(1)} gestart (${euroFromCents(amountCents)})`,
+    { actor, referentie, molliePaymentId: result.molliePaymentId, installmentId: termijn?.id },
   );
 
   return { status: "success", checkoutUrl: result.checkoutUrl };
@@ -1130,7 +1481,19 @@ export async function retryMandate(
   const leadId = String(formData.get("leadId") ?? "");
   const ctx = await adminContext(leadId);
   if (!ctx) return FOUT("Geen toegang.");
-  await activateMandateAndSubscription(ctx.commerce.id);
+  /*
+   * In één keer / in termijnen: het abonnement hoort pas na oplevering te
+   * lopen. Deze knop mag dat moment niet naar voren halen.
+   */
+  const plan = (await scheduleForCommerce(ctx.commerce.id))[0]?.plan;
+  if (plan && plan !== "50-50") {
+    if (!ctx.commerce.deliveryReadyAt) {
+      return FOUT("Het abonnement wordt pas na oplevering ingepland — het mandaat volgt vanzelf bij een termijnbetaling.");
+    }
+    await abonnementNaOplevering(ctx.commerce.id);
+  } else {
+    await activateMandateAndSubscription(ctx.commerce.id);
+  }
   const bijgewerkt = await getCommerceForLead(leadId);
   refresh(leadId);
   return bijgewerkt?.mandateActivatedAt

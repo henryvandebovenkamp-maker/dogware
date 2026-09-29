@@ -41,6 +41,7 @@ export function AgreementView({
   getekendDoor,
   voorstelVersie,
   klant,
+  regelingZin,
 }: {
   token: string;
   /** Directe klant: deze overeenkomst ís de opdrachtbevestiging die hij tekent. */
@@ -54,6 +55,8 @@ export function AgreementView({
   getekendDoor: string | null;
   voorstelVersie: number;
   klant: Klant;
+  /** De gekozen betaalregeling in één zin; leeg bij 50/50 (tekst blijft dan gelijk). */
+  regelingZin?: string;
 }) {
   const [form, setForm] = useState<Klant>(klant);
   const [vinkjes, setVinkjes] = useState<Record<ConsentKey, boolean>>(
@@ -118,9 +121,9 @@ export function AgreementView({
         </p>
         {direct && !getekend && (
           <p className="mt-3 text-[14px] leading-relaxed text-ink-500">
-            Hierin staat precies wat we voor je bouwen, de investering, de betaling in twee
-            termijnen en het afgesproken maandbedrag. Met je digitale handtekening onderaan geef je
-            daar akkoord op.
+            {regelingZin
+              ? `Hierin staat precies wat we voor je bouwen, de investering, je betaalafspraak en het afgesproken maandbedrag. ${regelingZin} Met je digitale handtekening onderaan geef je daar akkoord op.`
+              : "Hierin staat precies wat we voor je bouwen, de investering, de betaling in twee termijnen en het afgesproken maandbedrag. Met je digitale handtekening onderaan geef je daar akkoord op."}
           </p>
         )}
 

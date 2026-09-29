@@ -269,6 +269,7 @@ export type KlantFactuur = {
   paidAt: Date | null;
   status: InvoiceStatus;
   totalInclVatCents: number;
+  vatCents: number;
   isCreditnota: boolean;
 };
 
@@ -305,6 +306,7 @@ export async function invoicesForUser(userId: string): Promise<KlantFactuur[]> {
       paidAt: d.paidAt,
       status: effectieveStatus(d, nu),
       totalInclVatCents: d.totalInclVatCents,
+      vatCents: d.vatCents,
       isCreditnota: d.type === "CREDIT_NOTE",
     }));
 }

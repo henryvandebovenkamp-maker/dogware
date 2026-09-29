@@ -4,11 +4,13 @@ import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth/session";
 import {
+  checkRegeling,
   createOrGetDraft,
   ensureCommerce,
   freezePricing,
   getDraftProposal,
   listProposals,
+  regelingLabels,
   toConfig,
 } from "@/lib/proposals";
 import { computeOneOff, euroFromCents } from "@/lib/money";
@@ -55,7 +57,9 @@ export default async function VoorstelEditorPage({
 
   const cfg = toConfig(commerce);
   const berekend = computeOneOff(cfg);
-  void freezePricing;
+  // De regeling zoals hij bij versturen bevroren zou worden — server-side berekend.
+  const snapshot = freezePricing(commerce);
+  const regelingCheck = checkRegeling(commerce);
 
   const data: EditorData = {
     leadId: id,
@@ -94,6 +98,10 @@ export default async function VoorstelEditorPage({
       startRule: commerce.subscriptionStartRule,
       startAt: dateInput(commerce.subscriptionStartAt),
       opmerkingen: commerce.opmerkingen ?? "",
+      paymentPlan: commerce.paymentPlan,
+      installmentCount: String(commerce.installmentCount),
+      installmentStart: commerce.installmentStart,
+      installmentStartDate: commerce.installmentStartDate ?? "",
     },
     computed: {
       subtotal: euroFromCents(berekend.subtotalCents),
@@ -107,6 +115,9 @@ export default async function VoorstelEditorPage({
       finalPercent: berekend.finalPercent,
       monthlyExVat: euroFromCents(berekend.monthlyExVatCents),
       monthlyInclVat: euroFromCents(berekend.monthlyInclVatCents),
+      regeling: regelingLabels(snapshot),
+      regelingFout:
+        !regelingCheck.ok && cfg.projectCents + cfg.setupCents > 0 ? regelingCheck.reden : null,
     },
     eerderVerstuurd,
   };

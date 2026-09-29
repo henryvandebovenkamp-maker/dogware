@@ -26,6 +26,9 @@ import { computeOutstanding, euroFromCents } from "@/lib/money";
 import { isMollieConfigured } from "@/lib/mollie";
 import { portalUrl } from "@/lib/portal-access";
 import { entityReady } from "@/lib/legal-entity";
+import { ensureSchedule, loadSchemaWeergave } from "@/lib/payment-schedule";
+import { regelingStand } from "@/lib/payment-plan";
+import { isInvoiceType } from "@/lib/db/schema";
 import { findPartnerByUserId, findUserByEmail } from "@/lib/partner-activation";
 import { JourneyBar } from "@/components/commerce/journey-bar";
 import { NextActionPanel } from "@/components/commerce/next-action";
@@ -169,6 +172,16 @@ export default async function LeadDetailPage({
   const openstaand = computeOutstanding(snapshotPricing.config, betaald);
 
   const getekend = isSigned(agreement);
+
+  // Het betaalschema van de getekende overeenkomst (leeg bij historisch 50/50).
+  if (getekend) await ensureSchedule(agreement);
+  const { rijen: termijnRijen, weergave: schemaWeergave } = getekend
+    ? await loadSchemaWeergave(
+        commerce.id,
+        documents.filter((d) => isInvoiceType(d.type)).map((d) => ({ id: d.id, nummer: d.nummer })),
+      )
+    : { rijen: [], weergave: null };
+
   const aanbetalingBetaald = payments.some((p) => p.type === "DEPOSIT" && p.status === "PAID");
   const restbetalingBetaald = payments.some(
     (p) => p.type === "FINAL_PAYMENT" && p.status === "PAID",
@@ -195,6 +208,7 @@ export default async function LeadDetailPage({
     mandaatActief: Boolean(commerce.mandateActivatedAt),
     live: Boolean(commerce.liveAt),
     heeftAbonnement: commerce.monthlyCents > 0,
+    regeling: regelingStand(termijnRijen),
   };
   const volgende = nextAction(snapshot, id);
 
@@ -382,6 +396,8 @@ export default async function LeadDetailPage({
             paid: euroFromCents(betaald),
             outstanding: euroFromCents(openstaand),
           }}
+          regeling={L.regeling}
+          schema={schemaWeergave}
           voorstellen={proposals.map((p) => ({
             id: p.id,
             version: p.version,

@@ -8,6 +8,7 @@ import {
   markDeliveryReady,
   markWebsiteLive,
   createProposalDraft,
+  retryMandate,
   sendReminder,
   type CommerceState,
 } from "@/app/actions/commerce";
@@ -116,6 +117,10 @@ function ActionButton({
       return <ReminderButton leadId={leadId} soort="aanbetaling" label={cta.label} klas={klas} />;
     case "restbetaling-herinneren":
       return <ReminderButton leadId={leadId} soort="restbetaling" label={cta.label} klas={klas} />;
+    case "termijn-herinneren":
+      return <ReminderButton leadId={leadId} soort="termijn" label={cta.label} klas={klas} />;
+    case "mandaat-opnieuw":
+      return <FormButton leadId={leadId} action={retryMandate} label={cta.label} klas={klas} />;
     default:
       return null;
   }

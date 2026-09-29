@@ -12,6 +12,7 @@ import type {
 import { isInvoiceType } from "@/lib/db/schema";
 import { legalEntity, entityReady } from "@/lib/legal-entity";
 import { logJourneyEvent } from "@/lib/journey";
+import { isUniekeSchending } from "@/lib/db-errors";
 import {
   betaalmethodeLabel,
   euroFromCents,
@@ -238,16 +239,18 @@ export async function registerDocument(input: DocumentInput): Promise<DogDocumen
         .returning();
       return created ?? null;
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "";
       /*
        * Botste de unieke index op `payment_id`, dan was een gelijktijdige
        * webhook ons net voor. Die factuur is dan al gemaakt — teruggeven, niet
        * opnieuw proberen, want een tweede poging maakt alsnog een duplicaat.
+       *
+       * De indexnaam staat in de onderliggende Postgres-fout, niet in de
+       * melding van Drizzle — zie isUniekeSchending.
        */
-      if (/documents_payment_idx/i.test(msg) && input.paymentId) {
+      if (isUniekeSchending(err, "documents_payment_idx") && input.paymentId) {
         return (await documentForPayment(input.paymentId)) ?? null;
       }
-      if (!/documents_nummer_idx|duplicate key/i.test(msg)) throw err;
+      if (!isUniekeSchending(err)) throw err;
     }
   }
   return null;
@@ -276,6 +279,11 @@ function omschrijvingVoor(payment: Payment): { titel: string; toelichting: strin
       return {
         titel: "Ontwikkeling & inrichting DogWare-platform",
         toelichting: "Resterende termijn",
+      };
+    case "INSTALLMENT":
+      return {
+        titel: "Ontwikkeling & inrichting DogWare-platform",
+        toelichting: "Termijn",
       };
     case "SUBSCRIPTION":
       return {
@@ -314,7 +322,9 @@ export async function registerInvoiceForPayment(
       ? "INVOICE_DEPOSIT"
       : payment.type === "FINAL_PAYMENT"
         ? "INVOICE_FINAL"
-        : "INVOICE_SUBSCRIPTION";
+        : payment.type === "INSTALLMENT"
+          ? "INVOICE_INSTALLMENT"
+          : "INVOICE_SUBSCRIPTION";
 
   const [lead] = await db
     .select()
@@ -324,14 +334,62 @@ export async function registerInvoiceForPayment(
   if (!lead) return null;
 
   const agreement = await findAgreement(ctx.commerceId, payment.agreementId);
-  const { titel, toelichting } = omschrijvingVoor(payment);
+  const termijn = payment.installmentId
+    ? (
+        await db
+          .select()
+          .from(schema.paymentInstallments)
+          .where(
+            and(
+              eq(schema.paymentInstallments.id, payment.installmentId),
+              eq(schema.paymentInstallments.commerceId, ctx.commerceId),
+            ),
+          )
+          .limit(1)
+      )[0]
+    : undefined;
+  const basis = omschrijvingVoor(payment);
+  /*
+   * Bij het betaalschema zegt de factuur precies welke termijn hij dekt —
+   * "Termijn 3 van 6" — zodat klant en boekhouder hem zonder uitleg kunnen
+   * plaatsen. Bij 50/50 blijft de omschrijving zoals hij altijd was.
+   */
+  const inSchema = termijn && termijn.plan !== "50-50";
+  const titel =
+    inSchema && termijn.plan === "termijnen"
+      ? `${basis.titel} — termijn ${termijn.volgnummer} van ${termijn.aantal}`
+      : basis.titel;
+  const toelichting = inSchema
+    ? termijn.plan === "volledig"
+      ? "Eenmalige investering, volledig"
+      : `Termijn ${termijn.volgnummer} van ${termijn.aantal}`
+    : basis.toelichting;
 
-  const regel = invoiceLineFromGross({
-    omschrijving: titel,
-    toelichting,
-    grossCents: payment.amountCents,
-    vatPercent: Math.max(0, ctx.vatPercent),
-  });
+  /*
+   * De regel. Is er een termijn uit het schema en klopt het ontvangen bedrag
+   * met die termijn, dan staan op de factuur exact de bevroren bedragen excl.
+   * btw en btw die de klant heeft getekend — zo tellen de facturen van alle
+   * termijnen samen precies op tot de opdracht. In elk ander geval (50/50,
+   * abonnement) wordt, zoals altijd, teruggerekend uit wat Mollie bevestigde.
+   */
+  const regel =
+    inSchema && termijn.amountInclVatCents === payment.amountCents
+      ? {
+          omschrijving: titel,
+          toelichting,
+          aantal: 1,
+          prijsExVatCents: termijn.amountExVatCents,
+          vatPercent: termijn.vatPercent,
+          regelExVatCents: termijn.amountExVatCents,
+          regelVatCents: termijn.vatCents,
+          regelInclVatCents: termijn.amountInclVatCents,
+        }
+      : invoiceLineFromGross({
+          omschrijving: titel,
+          toelichting,
+          grossCents: payment.amountCents,
+          vatPercent: Math.max(0, ctx.vatPercent),
+        });
   const totalen = sumInvoiceLines([regel]);
   const betaald = payment.status === "PAID";
 

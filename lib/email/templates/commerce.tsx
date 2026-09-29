@@ -21,7 +21,13 @@ export type CommerceMailType =
   | "website-live"
   | "welcome-customer"
   | "charge-failed"
-  | "invoice-sent";
+  | "invoice-sent"
+  | "delivery-ready-plan"
+  | "installment-due"
+  | "installment-reminder"
+  | "installment-received"
+  | "installment-failed"
+  | "installments-complete";
 
 const COPY: Record<
   CommerceMailType,
@@ -66,8 +72,10 @@ const COPY: Record<
    */
   "agreement-ready": {
     heading: (n) => `Je opdrachtbevestiging staat klaar, ${n}`,
-    body: () => [
-      "Leuk dat we samen aan de slag gaan! Zoals besproken heb ik je opdrachtbevestiging klaargezet. Daarin staat precies wat we voor je bouwen, wat de investering is, dat je in twee termijnen betaalt (de helft bij de start, de rest bij oplevering) en welk maandbedrag we hebben afgesproken.",
+    body: (v) => [
+      v.regeling
+        ? `Leuk dat we samen aan de slag gaan! Zoals besproken heb ik je opdrachtbevestiging klaargezet. Daarin staat precies wat we voor je bouwen, wat de investering is, hoe je die betaalt en welk maandbedrag we hebben afgesproken. ${v.regeling}`
+        : "Leuk dat we samen aan de slag gaan! Zoals besproken heb ik je opdrachtbevestiging klaargezet. Daarin staat precies wat we voor je bouwen, wat de investering is, dat je in twee termijnen betaalt (de helft bij de start, de rest bij oplevering) en welk maandbedrag we hebben afgesproken.",
       "Lees het rustig door — er staat niets in wat we niet al besproken hebben. Onderaan vul je je gegevens in en onderteken je digitaal. Daarna kun je de eerste termijn voldoen en beginnen we met bouwen.",
     ],
     cta: "Bekijk en onderteken",
@@ -84,7 +92,9 @@ const COPY: Record<
     heading: (n) => `Getekend, ${n} — dank je wel`,
     body: (v) => [
       "De overeenkomst is ondertekend. Je krijgt hem in je eigen omgeving te zien, dus je kunt hem altijd teruglezen.",
-      `Nu de laatste stap voordat we beginnen: de eerste termijn van ${v.amount}. Zodra die binnen is, gaan we voor je bouwen.`,
+      // De bevestiging van de betaalafspraak, als er een andere dan 50/50 is gekozen.
+      ...(v.regeling ? [v.regeling] : []),
+      `Nu de laatste stap voordat we beginnen: ${v.regeling ? "de eerste betaling" : "de eerste termijn"} van ${v.amount}. Zodra die binnen is, gaan we voor je bouwen.`,
     ],
     cta: "Betaal de eerste termijn",
   },
@@ -107,7 +117,8 @@ const COPY: Record<
   "deposit-received": {
     heading: (n) => `Gelukt, ${n}! We gaan bouwen.`,
     body: (v) => [
-      `We hebben je eerste termijn van ${v.amount} ontvangen. Dank je wel!`,
+      `We hebben je ${v.regeling ?? "eerste termijn"} van ${v.amount} ontvangen. Dank je wel!`,
+      ...(v.extra ? [v.extra] : []),
       "Vanaf nu bouwen wij jouw DogWare-omgeving. Je hoort van ons zodra er iets te zien is.",
     ],
   },
@@ -176,6 +187,59 @@ const COPY: Record<
     ],
     cta: "Bekijk je factuur",
   },
+  /**
+   * Oplevering bij een regeling zonder slotbetaling (in één keer, of in
+   * termijnen). Er staat dan geen "laatste termijn" klaar; de lopende
+   * termijnen gaan gewoon door op hun eigen datum.
+   */
+  "delivery-ready-plan": {
+    heading: (n) => `Het is klaar, ${n}!`,
+    body: (v) => [
+      "Je DogWare-omgeving is opgeleverd. Benieuwd wat je ervan vindt.",
+      v.extra ?? "Er staat op dit moment niets voor je open.",
+    ],
+    cta: "Bekijk oplevering",
+  },
+  "installment-due": {
+    heading: (n) => `Je volgende termijn staat klaar, ${n}`,
+    body: (v) => [
+      `Zoals afgesproken staat ${v.extra ?? "je volgende termijn"} voor je klaar: ${v.amount}.`,
+      "Je betaalt hem met één klik in je eigen omgeving, via iDEAL of een andere betaalmethode die je gewend bent.",
+    ],
+    cta: "Betaal je termijn",
+  },
+  "installment-reminder": {
+    heading: (n) => `Even een seintje, ${n}`,
+    body: (v) => [
+      `${v.extra ?? "Je termijn"} van ${v.amount} staat nog open. Waarschijnlijk is hij gewoon ondergesneeuwd — dat gebeurt.`,
+      "Je kunt hem hieronder met één klik voldoen. Past het deze maand even niet? Laat het me weten, dan zoeken we samen een oplossing.",
+    ],
+    cta: "Betaal je termijn",
+  },
+  "installment-received": {
+    heading: (n) => `Ontvangen, ${n} — dank je wel`,
+    body: (v) => [
+      `We hebben ${v.extra ?? "je termijn"} van ${v.amount} ontvangen. De factuur staat in je omgeving.`,
+      ...(v.regeling ? [v.regeling] : []),
+    ],
+    cta: "Bekijk je betaalafspraak",
+  },
+  "installment-failed": {
+    heading: (n) => `Je betaling is niet gelukt, ${n}`,
+    body: (v) => [
+      `De betaling van ${v.extra ?? "je termijn"} (${v.amount}) is niet gelukt. Er is niets afgeschreven.`,
+      "Je kunt het gewoon opnieuw proberen in je eigen omgeving. Lukt het niet? Laat het me weten, dan kijk ik mee.",
+    ],
+    cta: "Opnieuw betalen",
+  },
+  "installments-complete": {
+    heading: (n) => `Alles betaald, ${n} 🐾`,
+    body: (v) => [
+      `Met deze laatste termijn van ${v.amount} is de eenmalige investering helemaal voldaan. Dank je wel voor het vertrouwen!`,
+      v.extra ?? "Je maandelijkse DogWare-abonnement loopt gewoon door zoals afgesproken.",
+    ],
+    cta: "Bekijk je omgeving",
+  },
   "charge-failed": {
     heading: (n) => `Even een seintje, ${n}`,
     body: () => [
@@ -186,7 +250,12 @@ const COPY: Record<
   },
 };
 
-type Vars = { amount?: string; extra?: string };
+/**
+ * `regeling` is de zin over de gekozen betaalregeling. Leeg bij 50/50: dan
+ * blijft de mail letterlijk zoals hij altijd was.
+ */
+export type CommerceMailVars = { amount?: string; extra?: string; regeling?: string };
+type Vars = CommerceMailVars;
 
 export function CommerceEmail({
   type,
@@ -258,6 +327,12 @@ const SIGN: Record<CommerceMailType, { groet: string; regel?: string }> = {
   "welcome-customer": { groet: "Hartelijke groet,", regel: "Meer tijd voor wat telt." },
   "charge-failed": { groet: "Met vriendelijke groet," },
   "invoice-sent": { groet: "Met vriendelijke groet," },
+  "delivery-ready-plan": { groet: "Hartelijke groet,", regel: "Wat leuk om je dit te laten zien." },
+  "installment-due": { groet: "Met vriendelijke groet," },
+  "installment-reminder": { groet: "Met vriendelijke groet," },
+  "installment-received": { groet: "Hartelijke groet," },
+  "installment-failed": { groet: "Met vriendelijke groet," },
+  "installments-complete": { groet: "Hartelijke groet,", regel: "Meer tijd voor de honden. Daar doen we het voor." },
 };
 
 /**
@@ -279,4 +354,9 @@ const TOONT_ENTITEIT: CommerceMailType[] = [
   "charge-failed",
   // Een factuurmail zonder de facturerende partij eronder is geen factuurmail.
   "invoice-sent",
+  "installment-due",
+  "installment-reminder",
+  "installment-received",
+  "installment-failed",
+  "installments-complete",
 ];

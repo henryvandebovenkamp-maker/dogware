@@ -4,6 +4,7 @@ import { getDb, schema } from "@/lib/db";
 import type { Lead } from "@/lib/db/schema";
 import { leidAf, type AanvraagAfleiding } from "@/lib/aanvragen";
 import type { JourneySnapshot } from "@/lib/journey-next";
+import { regelingStand } from "@/lib/payment-plan";
 
 /**
  * Het aanvragenoverzicht in één keer laden.
@@ -73,7 +74,7 @@ export async function laadAanvragen(nu: Date = new Date()): Promise<Aanvraag[] |
   ]);
 
   const commerceIds = commerceRijen.map((c) => c.id);
-  const [voorstellen, overeenkomsten, betalingen] = await Promise.all([
+  const [voorstellen, overeenkomsten, betalingen, termijnen] = await Promise.all([
     commerceIds.length
       ? db
           .select({
@@ -103,6 +104,19 @@ export async function laadAanvragen(nu: Date = new Date()): Promise<Aanvraag[] |
           })
           .from(schema.payments)
           .where(inArray(schema.payments.commerceId, commerceIds))
+      : [],
+    commerceIds.length
+      ? db
+          .select({
+            commerceId: schema.paymentInstallments.commerceId,
+            plan: schema.paymentInstallments.plan,
+            volgnummer: schema.paymentInstallments.volgnummer,
+            aantal: schema.paymentInstallments.aantal,
+            status: schema.paymentInstallments.status,
+            dueAt: schema.paymentInstallments.dueAt,
+          })
+          .from(schema.paymentInstallments)
+          .where(inArray(schema.paymentInstallments.commerceId, commerceIds))
       : [],
   ]);
 
@@ -147,6 +161,9 @@ export async function laadAanvragen(nu: Date = new Date()): Promise<Aanvraag[] |
       mandaatActief: Boolean(commerce?.mandateActivatedAt),
       live: Boolean(commerce?.liveAt),
       heeftAbonnement: (commerce?.monthlyCents ?? 0) > 0,
+      regeling: commerce
+        ? regelingStand(termijnen.filter((t) => t.commerceId === commerce.id), nu)
+        : null,
     };
 
     const laatsteContactAt = contactPerLead.get(lead.id) ?? null;

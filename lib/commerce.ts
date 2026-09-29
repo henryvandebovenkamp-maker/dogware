@@ -1,7 +1,14 @@
 import "server-only";
-import { and, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, notInArray, sql } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
-import type { Commerce, CommerceStatus, JourneyStage, Lead, Payment } from "@/lib/db/schema";
+import type {
+  Commerce,
+  CommerceStatus,
+  JourneyStage,
+  Lead,
+  Payment,
+  PaymentInstallment,
+} from "@/lib/db/schema";
 import { logEmail, logJourneyEvent, setStage } from "@/lib/journey";
 import {
   createMollieSubscription,
@@ -13,6 +20,13 @@ import {
 } from "@/lib/mollie";
 import { euroFromCents, firstChargeDate } from "@/lib/money";
 import { registerInvoiceForPayment } from "@/lib/documents";
+import { isUniekeSchending } from "@/lib/db-errors";
+import {
+  markInstallmentPaid,
+  scheduleForAgreement,
+  scheduleForCommerce,
+} from "@/lib/payment-schedule";
+import { datumLang } from "@/lib/payment-plan";
 import { COMMERCE_SUBJECTS, sendCommerceMail } from "@/lib/email/send";
 import { portalUrl } from "@/lib/portal-access";
 
@@ -56,7 +70,7 @@ export async function paidTotal(commerceId: string): Promise<number> {
       and(
         eq(schema.payments.commerceId, commerceId),
         eq(schema.payments.status, "PAID"),
-        inArray(schema.payments.type, ["DEPOSIT", "FINAL_PAYMENT", "MANUAL_CORRECTION"]),
+        inArray(schema.payments.type, ["DEPOSIT", "FINAL_PAYMENT", "INSTALLMENT", "MANUAL_CORRECTION"]),
       ),
     );
   return row?.total ?? 0;
@@ -96,6 +110,44 @@ export async function processPaymentByMollieId(molliePaymentId: string): Promise
 
   // Al volledig afgehandeld? Dan is er niets meer te doen.
   if (payment.processedAt && payment.status === "PAID") return;
+
+  /*
+   * Bedragcontrole. Het bedrag is door ons server-side bepaald bij het
+   * aanmaken; wat Mollie als betaald meldt, hoort daar exact aan gelijk te
+   * zijn. Wijkt het af, dan verwerken we de betaling NIET als voldaan — geen
+   * factuur, geen termijn op betaald, geen mail — maar maken we het zichtbaar
+   * voor de beheerder. Zonder betaalgegevens in het logboek.
+   */
+  const mollieCenten = mollieBedragInCenten(
+    (mollie as unknown as { amount?: { value?: string } }).amount?.value,
+  );
+  if (bestaand && nieuweStatus === "PAID" && mollieCenten !== payment.amountCents) {
+    const reden = `Bedrag wijkt af: Mollie meldt ${mollieCenten === null ? "onbekend" : euroFromCents(mollieCenten)}, verwacht ${euroFromCents(payment.amountCents)}.`;
+    if (payment.failureReason !== reden) {
+      await db
+        .update(schema.payments)
+        .set({ failureReason: reden })
+        .where(eq(schema.payments.id, payment.id));
+      console.error(
+        JSON.stringify({
+          evt: "mollie.amount_mismatch",
+          at: new Date().toISOString(),
+          paymentId: payment.id,
+          type: payment.type,
+        }),
+      );
+      const ctx = await loadContext(payment.commerceId);
+      if (ctx) {
+        await logJourneyEvent(
+          ctx.lead.id,
+          "payment_amount_mismatch",
+          `Betaling niet verwerkt — ${reden} Controleer dit in Mollie.`,
+          { actor: "systeem", internal: true, paymentId: payment.id, molliePaymentId },
+        );
+      }
+    }
+    return;
+  }
 
   await db
     .update(schema.payments)
@@ -189,11 +241,8 @@ async function adoptSubscriptionPayment(
   if (!commerce) return null;
 
   // Bedrag uit Mollie in centen, zonder ooit via een float te gaan.
-  const waarde = ruw.amount?.value ?? "0";
-  const [heel, decimalen = ""] = waarde.split(".");
-  const amountCents =
-    Number(heel) * 100 + Number(`${decimalen}00`.slice(0, 2)) * (waarde.startsWith("-") ? -1 : 1);
-  if (!Number.isFinite(amountCents) || amountCents <= 0) return null;
+  const amountCents = mollieBedragInCenten(ruw.amount?.value) ?? 0;
+  if (amountCents <= 0) return null;
 
   const moment = new Date(ruw.paidAt ?? ruw.createdAt ?? Date.now());
   const periode = `${moment.getUTCFullYear()}-${String(moment.getUTCMonth() + 1).padStart(2, "0")}`;
@@ -217,8 +266,7 @@ async function adoptSubscriptionPayment(
       .returning();
     return nieuw ?? null;
   } catch (err) {
-    const msg = err instanceof Error ? err.message : "";
-    if (!/payments_sub_period_idx|payments_mollie_idx|duplicate key/i.test(msg)) throw err;
+    if (!isUniekeSchending(err)) throw err;
   }
 
   /*
@@ -249,6 +297,17 @@ async function adoptSubscriptionPayment(
     .where(eq(schema.payments.id, vanDieMaand.id))
     .returning();
   return overgenomen ?? null;
+}
+
+/**
+ * Een Mollie-bedrag ("504.17") in hele centen, zonder ooit via een float te
+ * gaan. Null bij alles wat geen bedrag is.
+ */
+export function mollieBedragInCenten(waarde: string | null | undefined): number | null {
+  const m = /^(-)?(\d+)(?:\.(\d{1,2}))?$/.exec(String(waarde ?? "").trim());
+  if (!m) return null;
+  const centen = Number(m[2]) * 100 + Number(`${m[3] ?? ""}00`.slice(0, 2));
+  return m[1] ? -centen : centen;
 }
 
 /* ------------------------------------------------------------- betaald ---- */
@@ -283,14 +342,73 @@ async function onPaymentPaid(payment: Payment): Promise<void> {
 
   // Factuur registreren vóór de mail: de klant mag nooit een bevestiging
   // krijgen van iets dat administratief niet is vastgelegd.
-  await registerInvoiceForPayment(payment, {
+  const factuur = await registerInvoiceForPayment(payment, {
     leadId: lead.id,
     commerceId: commerce.id,
     vatPercent: commerce.vatPercent,
     bedrijfsnaam: lead.bedrijfsnaam,
   });
 
+  /*
+   * Hoort deze betaling bij een termijn uit het betaalschema, dan gaat die
+   * termijn nu op betaald, met de factuur eraan. Historische betalingen
+   * (zonder schema) slaan dit over en lopen precies zoals altijd.
+   */
+  const termijn = payment.installmentId
+    ? await markInstallmentPaid(payment, factuur?.id ?? null)
+    : null;
+  // Een tweede betaling voor een al betaalde termijn: gemeld, verder niets.
+  if (termijn && !termijn.eersteKeer) return;
+  const plan = termijn?.termijn.plan ?? null;
+  const schemaPlan = plan && plan !== "50-50" ? plan : null;
+
   const link = commerce.portalToken ? portalUrl(commerce.portalToken) : undefined;
+
+  if (payment.type === "INSTALLMENT") {
+    await onInstallmentPaid(payment, termijn?.termijn ?? null, { commerce, lead }, link);
+    return;
+  }
+
+  if (payment.type === "DEPOSIT" && schemaPlan && termijn) {
+    /*
+     * Eerste betaling van "in één keer" of "in termijnen". Zelfde gevolgen als
+     * de aanbetaling bij 50/50 — de bouw start — met de woorden van de
+     * gekozen regeling.
+     */
+    const t = termijn.termijn;
+    const wat =
+      schemaPlan === "volledig" ? "Betaling" : `Termijn ${t.volgnummer} van ${t.aantal}`;
+    await db
+      .update(schema.commerce)
+      .set({
+        status: "BUILDING",
+        buildStartedAt: commerce.buildStartedAt ?? new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(schema.commerce.id, commerce.id));
+    await logJourneyEvent(
+      lead.id,
+      "deposit_paid",
+      `${wat} ontvangen (${euroFromCents(payment.amountCents)})`,
+      { actor: "systeem", molliePaymentId: payment.molliePaymentId, installmentId: t.id },
+    );
+    await setStage(lead.id, "gestart", { reden: `${wat.toLowerCase()} betaald` });
+    await logJourneyEvent(lead.id, "build_started", "Bouwfase gestart", { actor: "systeem" });
+    await ensureBuildTasks(lead.id);
+    const rest = await restantZin(t.agreementId);
+    await mailAndLog(
+      lead,
+      "deposit-received",
+      {
+        amount: euroFromCents(payment.amountCents),
+        regeling: schemaPlan === "volledig" ? "betaling" : `termijn ${t.volgnummer} van ${t.aantal}`,
+        extra: rest ?? undefined,
+      },
+      link,
+    );
+    await naSchemaBetaling(commerce.id, t.agreementId);
+    return;
+  }
 
   if (payment.type === "DEPOSIT") {
     await db
@@ -343,6 +461,129 @@ async function onPaymentPaid(payment: Payment): Promise<void> {
   }
 }
 
+/**
+ * Termijn 2 t/m n van een termijnregeling is betaald. De factuur staat er al
+ * (hierboven), de termijn staat op betaald; hier volgen tijdlijn en mail, en
+ * — als dit de laatste was — de afronding.
+ */
+async function onInstallmentPaid(
+  payment: Payment,
+  termijn: PaymentInstallment | null,
+  ctx: { commerce: Commerce; lead: Lead },
+  link: string | undefined,
+): Promise<void> {
+  const { commerce, lead } = ctx;
+  const wat = termijn ? `Termijn ${termijn.volgnummer} van ${termijn.aantal}` : "Termijn";
+  await logJourneyEvent(
+    lead.id,
+    "installment_paid",
+    `${wat} ontvangen (${euroFromCents(payment.amountCents)})`,
+    { actor: "systeem", molliePaymentId: payment.molliePaymentId, installmentId: termijn?.id },
+  );
+
+  const rijen = termijn ? await scheduleForAgreement(termijn.agreementId) : [];
+  const alles = rijen.length > 0 && rijen.every((r) => r.status === "BETAALD");
+  if (alles) {
+    await mailAndLog(
+      lead,
+      "installments-complete",
+      {
+        amount: euroFromCents(payment.amountCents),
+        extra:
+          commerce.monthlyCents > 0
+            ? `Je maandelijkse DogWare-abonnement van ${euroFromCents(commerce.monthlyCents)} excl. btw staat daar los van en loopt gewoon door zoals afgesproken.`
+            : "Er staat nu niets meer voor je open.",
+      },
+      link,
+    );
+  } else {
+    await mailAndLog(
+      lead,
+      "installment-received",
+      {
+        amount: euroFromCents(payment.amountCents),
+        extra: wat.toLowerCase(),
+        regeling: termijn ? ((await restantZin(termijn.agreementId)) ?? undefined) : undefined,
+      },
+      link,
+    );
+  }
+  if (termijn) await naSchemaBetaling(commerce.id, termijn.agreementId);
+}
+
+/** "Nog te betalen: … De volgende termijn van … staat gepland op …" */
+async function restantZin(agreementId: string): Promise<string | null> {
+  const rijen = await scheduleForAgreement(agreementId);
+  const open = rijen.filter((r) => r.status === "GEPLAND");
+  if (open.length === 0 || rijen[0]?.plan !== "termijnen") return null;
+  const volgende = open[0];
+  const openEx = open.reduce((s, r) => s + r.amountExVatCents, 0);
+  return `Nog te betalen: ${euroFromCents(openEx)} excl. btw in ${open.length === 1 ? "1 termijn" : `${open.length} termijnen`}. De volgende termijn van ${euroFromCents(volgende.amountInclVatCents)} incl. btw staat gepland op ${volgende.dueAt ? datumLang(volgende.dueAt) : "de opleverdatum"}.`;
+}
+
+/**
+ * Na elke betaling onder een regeling zonder slotbetaling ("in één keer",
+ * "in termijnen"): is alles binnen, en is het tijd voor het abonnement?
+ *
+ * Bij 50/50 gebeurt dit bij de tweede termijn (ongewijzigd). Bij de andere
+ * regelingen is er geen tweede termijn die dat moment markeert; daarom hier,
+ * en bij het klaarzetten van de oplevering (zie `abonnementNaOplevering`).
+ */
+async function naSchemaBetaling(commerceId: string, agreementId: string): Promise<void> {
+  const db = getDb();
+  if (!db) return;
+  const rijen = await scheduleForAgreement(agreementId);
+  if (rijen.length === 0 || rijen[0].plan === "50-50") return;
+  const alles = rijen.every((r) => r.status === "BETAALD");
+  const ctx = await loadContext(commerceId);
+  if (!ctx) return;
+
+  if (alles) {
+    // Status alleen vooruit: een klant die al actief is, wordt niet teruggezet.
+    const [bijgewerkt] = await db
+      .update(schema.commerce)
+      .set({ status: "FULLY_PAID", updatedAt: new Date() })
+      .where(
+        and(
+          eq(schema.commerce.id, commerceId),
+          notInArray(schema.commerce.status, ["FULLY_PAID", "SUBSCRIPTION_SCHEDULED", "ACTIVE_CUSTOMER"]),
+        ),
+      )
+      .returning({ id: schema.commerce.id });
+    if (bijgewerkt && rijen.length > 1) {
+      await logJourneyEvent(
+        ctx.lead.id,
+        "schedule_completed",
+        `Eenmalige investering volledig betaald (${rijen.length} termijnen)`,
+        { actor: "systeem", agreementId },
+      );
+    }
+    if (ctx.commerce.deliveryReadyAt) {
+      await setStage(ctx.lead.id, "restbetaling", { reden: "alle termijnen betaald" });
+    }
+  }
+  await abonnementNaOplevering(commerceId, alles);
+}
+
+/**
+ * Plant het abonnement in voor een regeling zonder slotbetaling — pas ná
+ * oplevering, en bij de regel "na de laatste betaling" pas als alles binnen
+ * is. Idempotent: een bestaand abonnement wordt nooit opnieuw aangemaakt.
+ */
+export async function abonnementNaOplevering(commerceId: string, allesBetaald?: boolean): Promise<void> {
+  const ctx = await loadContext(commerceId);
+  if (!ctx) return;
+  const { commerce } = ctx;
+  if (!commerce.deliveryReadyAt || commerce.mollieSubscriptionId) return;
+  if (commerce.subscriptionStartRule === "na-laatste-betaling") {
+    const alles =
+      allesBetaald ??
+      (await scheduleForCommerce(commerceId)).every((r) => r.status === "BETAALD");
+    if (!alles) return;
+  }
+  await activateMandateAndSubscription(commerceId);
+}
+
 async function onPaymentNotPaid(payment: Payment, status: string): Promise<void> {
   const ctx = await loadContext(payment.commerceId);
   if (!ctx) return;
@@ -361,6 +602,32 @@ async function onPaymentNotPaid(payment: Payment, status: string): Promise<void>
   // De klant kan het gewoon opnieuw proberen; de CTA blijft staan.
   if (payment.type === "SUBSCRIPTION") {
     await mailAndLog(ctx.lead, "charge-failed", {});
+  }
+  /*
+   * Een echt mislukte termijnbetaling (geweigerd, niet: de klant liet de
+   * checkout verlopen) onder "in één keer" of "in termijnen" krijgt een mail
+   * met een knop om het opnieuw te proberen. Bij 50/50 verandert er niets.
+   */
+  if (status === "FAILED" && payment.installmentId) {
+    const db = getDb();
+    const [t] = db
+      ? await db
+          .select()
+          .from(schema.paymentInstallments)
+          .where(eq(schema.paymentInstallments.id, payment.installmentId))
+          .limit(1)
+      : [];
+    if (t && t.plan !== "50-50" && t.status !== "BETAALD") {
+      await mailAndLog(
+        ctx.lead,
+        "installment-failed",
+        {
+          amount: euroFromCents(payment.amountCents),
+          extra: t.plan === "volledig" ? "je betaling" : `termijn ${t.volgnummer} van ${t.aantal}`,
+        },
+        ctx.commerce.portalToken ? portalUrl(ctx.commerce.portalToken) : undefined,
+      );
+    }
   }
 }
 
@@ -552,7 +819,7 @@ const BUILD_TASKS = [
 export async function mailAndLog(
   lead: Lead,
   type: Parameters<typeof sendCommerceMail>[0],
-  vars: { amount?: string; extra?: string } = {},
+  vars: Parameters<typeof sendCommerceMail>[3] = {},
   ctaUrl?: string,
   opts: { naar?: string } = {},
 ): Promise<boolean> {
