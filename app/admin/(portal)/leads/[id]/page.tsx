@@ -44,6 +44,10 @@ import { AfgerondPanel, DemoAfronden, type VoorbereideAfronding } from "@/compon
 import { demoPdfsVan } from "@/lib/demo-afronding";
 import {
   AFRONDEN_ADVIES_NA_DAGEN,
+  EVENT_DEMO_AFGEROND,
+  EVENT_HANDMATIG_AFGEVALLEN,
+  EVENT_HEROPEND,
+  demoAfgerondOp,
   magDemoAfronden,
   standaardAfsluitmail,
   voornaamVan,
@@ -240,12 +244,17 @@ export default async function LeadDetailPage({
    * is; een eerder voorbereide maar niet verstuurde PDF pakken we weer op.
    */
   const demoPdfs = direct ? [] : await demoPdfsVan(lead.id);
-  const laatsteHeropend = [...events].reverse().find((e) => e.kind === "aanvraag_heropend");
-  const laatsteAfgerond = [...events].reverse().find((e) => e.kind === "demo_afgerond");
-  const afgerondEvent =
-    laatsteAfgerond && (!laatsteHeropend || laatsteAfgerond.createdAt > laatsteHeropend.createdAt)
-      ? laatsteAfgerond
-      : null;
+  const laatste = (kind: string) => [...events].reverse().find((e) => e.kind === kind) ?? null;
+  const laatsteAfgerond = laatste(EVENT_DEMO_AFGEROND);
+  // Dezelfde classificatie als de aanvragenlijst: alleen een geslaagde afronding
+  // die niet daarna is heropend of met de hand is veranderd.
+  const afgerondEvent = demoAfgerondOp(lead.status, {
+    demoAfgerond: laatsteAfgerond?.createdAt ?? null,
+    heropend: laatste(EVENT_HEROPEND)?.createdAt ?? null,
+    handmatigAfgevallen: laatste(EVENT_HANDMATIG_AFGEVALLEN)?.createdAt ?? null,
+  })
+    ? laatsteAfgerond
+    : null;
   const afgerondPdf = afgerondEvent
     ? demoPdfs.find((d) => d.id === (afgerondEvent.meta as { documentId?: string } | null)?.documentId) ?? null
     : null;
@@ -321,7 +330,11 @@ export default async function LeadDetailPage({
 
       {/* De journey in één oogopslag */}
       <div className="mt-6 rounded-2xl bg-white p-5 shadow-soft ring-1 ring-ink/5">
-        <JourneyBar current={lead.stage} variant={lead.journeyVariant} />
+        <JourneyBar
+          current={lead.stage}
+          variant={lead.journeyVariant}
+          gestopt={lead.status === "afgevallen" ? (afgerondEvent ? "Afgerond" : "Afgevallen") : undefined}
+        />
       </div>
 
       {/* Afgerond of afgevallen: wat er gebeurde, en de weg terug. */}
@@ -340,6 +353,10 @@ export default async function LeadDetailPage({
                             (afgerondPdf.snapshot as { bestandsnaam?: string }).bestandsnaam ?? afgerondPdf.titel,
                         }
                       : null,
+                    mail:
+                      afgerondPdf?.sentAt && afgerondPdf.sentTo
+                        ? { naar: afgerondPdf.sentTo, op: afgerondPdf.sentAt.toISOString() }
+                        : null,
                   }
                 : null
             }
@@ -366,10 +383,13 @@ export default async function LeadDetailPage({
         </div>
       )}
 
-      {/* Wat moet ik nu doen? */}
-      <div className="mt-4">
-        <NextActionPanel leadId={id} next={volgende} />
-      </div>
+      {/* Wat moet ik nu doen? Niet bij een afgevallen of afgeronde aanvraag:
+          daar is "Aanvraag heropenen" hierboven de enige volgende stap. */}
+      {lead.status !== "afgevallen" && (
+        <div className="mt-4">
+          <NextActionPanel leadId={id} next={volgende} />
+        </div>
+      )}
 
       {direct ? (
         /* Directe klant: er is geen demo, dus ook geen demosectie. */

@@ -1,10 +1,16 @@
 import "server-only";
-import { and, desc, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import type { Lead } from "@/lib/db/schema";
 import { leidAf, type AanvraagAfleiding } from "@/lib/aanvragen";
 import type { JourneySnapshot } from "@/lib/journey-next";
 import { regelingStand } from "@/lib/payment-plan";
+import {
+  EVENT_DEMO_AFGEROND,
+  EVENT_HANDMATIG_AFGEVALLEN,
+  EVENT_HEROPEND,
+  demoAfgerondOp,
+} from "@/lib/demo-afronding-tekst";
 
 /**
  * Het aanvragenoverzicht in één keer laden.
@@ -41,6 +47,15 @@ export type Aanvraag = {
     opleveringKlaarAt: Date | null;
     liveAt: Date | null;
   } | null;
+  /**
+   * Alleen bij een afgeronde demo: wanneer, de PDF die meeging en naar wie de
+   * afsluitmail ging. Null voor alle andere aanvragen.
+   */
+  demoAfsluiting: {
+    afgerondOp: Date;
+    pdfId: string | null;
+    mailNaar: string | null;
+  } | null;
 };
 
 /** Gebeurtenissen die tellen als "de klant heeft van zich laten horen". */
@@ -58,7 +73,7 @@ export async function laadAanvragen(nu: Date = new Date()): Promise<Aanvraag[] |
 
   const ids = leads.map((l) => l.id);
 
-  const [commerceRijen, contactRijen] = await Promise.all([
+  const [commerceRijen, contactRijen, afsluitRijen, demoPdfRijen] = await Promise.all([
     db
       .select()
       .from(schema.commerce)
@@ -71,6 +86,41 @@ export async function laadAanvragen(nu: Date = new Date()): Promise<Aanvraag[] |
       .from(schema.journeyEvents)
       .where(and(inArray(schema.journeyEvents.leadId, ids), KLANT_CONTACT))
       .groupBy(schema.journeyEvents.leadId),
+    // De momenten die bepalen of een aanvraag een afgeronde demo is.
+    db
+      .select({
+        leadId: schema.journeyEvents.leadId,
+        kind: schema.journeyEvents.kind,
+        laatste: sql<string | null>`max(${schema.journeyEvents.createdAt})`,
+      })
+      .from(schema.journeyEvents)
+      .where(
+        and(
+          inArray(schema.journeyEvents.leadId, ids),
+          inArray(schema.journeyEvents.kind, [
+            EVENT_DEMO_AFGEROND,
+            EVENT_HEROPEND,
+            EVENT_HANDMATIG_AFGEVALLEN,
+          ]),
+        ),
+      )
+      .groupBy(schema.journeyEvents.leadId, schema.journeyEvents.kind),
+    // De verstuurde demo-PDF's (de afsluitmail ging mee als bijlage).
+    db
+      .select({
+        id: schema.documents.id,
+        leadId: schema.documents.leadId,
+        sentAt: schema.documents.sentAt,
+        sentTo: schema.documents.sentTo,
+      })
+      .from(schema.documents)
+      .where(
+        and(
+          inArray(schema.documents.leadId, ids),
+          eq(schema.documents.type, "DEMO_PDF"),
+          isNotNull(schema.documents.sentAt),
+        ),
+      ),
   ]);
 
   const commerceIds = commerceRijen.map((c) => c.id);
@@ -121,6 +171,10 @@ export async function laadAanvragen(nu: Date = new Date()): Promise<Aanvraag[] |
   ]);
 
   const commercePerLead = new Map(commerceRijen.map((c) => [c.leadId, c]));
+  const moment = (leadId: string, kind: string) => {
+    const r = afsluitRijen.find((x) => x.leadId === leadId && x.kind === kind);
+    return r?.laatste ? new Date(r.laatste) : null;
+  };
   const contactPerLead = new Map(
     contactRijen.map((c) => [c.leadId, c.laatste ? new Date(c.laatste) : null]),
   );
@@ -167,6 +221,17 @@ export async function laadAanvragen(nu: Date = new Date()): Promise<Aanvraag[] |
     };
 
     const laatsteContactAt = contactPerLead.get(lead.id) ?? null;
+    const demoAfgerondAt = demoAfgerondOp(lead.status, {
+      demoAfgerond: moment(lead.id, EVENT_DEMO_AFGEROND),
+      heropend: moment(lead.id, EVENT_HEROPEND),
+      handmatigAfgevallen: moment(lead.id, EVENT_HANDMATIG_AFGEVALLEN),
+    });
+    // De PDF die bij déze afronding hoort: de laatst verstuurde.
+    const pdf = demoAfgerondAt
+      ? [...demoPdfRijen]
+          .filter((d) => d.leadId === lead.id)
+          .sort((x, y) => (y.sentAt?.getTime() ?? 0) - (x.sentAt?.getTime() ?? 0))[0] ?? null
+      : null;
 
     return {
       lead,
@@ -178,6 +243,9 @@ export async function laadAanvragen(nu: Date = new Date()): Promise<Aanvraag[] |
             liveAt: commerce.liveAt,
           }
         : null,
+      demoAfsluiting: demoAfgerondAt
+        ? { afgerondOp: demoAfgerondAt, pdfId: pdf?.id ?? null, mailNaar: pdf?.sentTo ?? null }
+        : null,
       afleiding: leidAf(
         {
           id: lead.id,
@@ -186,6 +254,7 @@ export async function laadAanvragen(nu: Date = new Date()): Promise<Aanvraag[] |
           demoSentAt: lead.demoSentAt,
           laatsteContactAt,
           snapshot,
+          demoAfgerondAt,
         },
         nu,
       ),

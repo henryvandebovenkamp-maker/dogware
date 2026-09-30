@@ -215,8 +215,10 @@ describe("demo afronden: 35 dagen oud, met eerdere herinnering", async () => {
     assert.ok(doc.sentAt);
     assert.equal(doc.sentTo, lead.email);
 
-    const a = leidAf({ id: l.id, stage: l.stage, status: l.status, demoSentAt: l.demoSentAt, laatsteContactAt: null, snapshot: { stage: l.stage, demoVerstuurd: true } as never }, NU);
-    assert.equal(a.bakje, "afgerond");
+    const afgerondOp = tekst.demoAfgerondOp(l.status, { demoAfgerond: afgerond.createdAt, heropend: null, handmatigAfgevallen: null });
+    assert.ok(afgerondOp, "dit is een afgeronde demo");
+    const a = leidAf({ id: l.id, stage: l.stage, status: l.status, demoSentAt: l.demoSentAt, laatsteContactAt: null, snapshot: { stage: l.stage, demoVerstuurd: true } as never, demoAfgerondAt: afgerondOp }, NU);
+    assert.equal(a.afgerondeDemo, true);
     assert.equal(a.actieNodig, false);
 
     const [activiteit] = await db.select().from(schema.activityLog).where(eq(schema.activityLog.action, "DEMO_CLOSED"));

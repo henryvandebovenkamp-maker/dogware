@@ -276,7 +276,7 @@ describe("3. de journeybalk van een directe klant", () => {
   });
 
   it("wordt zowel in de admin als in het klantportaal met de route aangeroepen", () => {
-    assert.match(detailPagina, /<JourneyBar current=\{lead\.stage\} variant=\{lead\.journeyVariant\}/);
+    assert.match(detailPagina, /<JourneyBar\s+current=\{lead\.stage\}\s+variant=\{lead\.journeyVariant\}/);
     assert.match(klantView, /<JourneyBar current=\{stage\} variant=\{variant\} toon="klant"/);
   });
 });

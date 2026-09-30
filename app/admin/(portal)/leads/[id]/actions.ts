@@ -6,6 +6,8 @@ import { getDb, schema } from "@/lib/db";
 import { LEAD_STATUSES, type LeadStatus } from "@/lib/db/schema";
 import { getAdminActor } from "@/lib/admin-auth";
 import { bouwprompt } from "@/lib/bouwprompt";
+import { logJourneyEvent } from "@/lib/journey";
+import { EVENT_HANDMATIG_AFGEVALLEN, EVENT_HEROPEND } from "@/lib/demo-afronding-tekst";
 
 export type UpdateLeadState = {
   status: "idle" | "success" | "error";
@@ -36,13 +38,35 @@ export async function updateLead(
     return { status: "error", message: "Ongeldige invoer." };
   }
 
+  let vorige: LeadStatus | null = null;
   try {
+    const [huidig] = await db
+      .select({ status: schema.leads.status })
+      .from(schema.leads)
+      .where(eq(schema.leads.id, id))
+      .limit(1);
+    vorige = huidig?.status ?? null;
     await db
       .update(schema.leads)
       .set({ status, notities: notities || null })
       .where(eq(schema.leads.id, id));
   } catch {
     return { status: "error", message: "Opslaan mislukt. Probeer opnieuw." };
+  }
+
+  /*
+   * Van of naar "afgevallen" met de hand: op de tijdlijn, zodat later
+   * ondubbelzinnig blijft waarom een aanvraag afgevallen is. Een handmatig
+   * afgevallen aanvraag is géén afgeronde demo, en een handmatig
+   * teruggezette aanvraag is heropend (zie demoAfgerondOp).
+   */
+  if (vorige && vorige !== status && (vorige === "afgevallen" || status === "afgevallen")) {
+    await logJourneyEvent(
+      id,
+      status === "afgevallen" ? EVENT_HANDMATIG_AFGEVALLEN : EVENT_HEROPEND,
+      status === "afgevallen" ? "Aanvraag met de hand op afgevallen gezet" : "Aanvraag heropend (status met de hand aangepast)",
+      { actor: "admin", internal: true, door: actor.id, vorigeStatus: vorige, status },
+    );
   }
 
   revalidatePath(`/admin/leads/${id}`);

@@ -10,7 +10,7 @@ import { nextAction, type JourneySnapshot, type NextAction } from "@/lib/journey
  *
  * Dit bestand voegt bewust géén tweede statussysteem toe. De twintig stages in
  * `JOURNEY_STAGES` blijven de enige waarheid; hier worden ze alleen gegroepeerd
- * tot de bakjes waarin een mens denkt (plus "afgerond" als archief), en wordt afgeleid wie vandaag
+ * tot de bakjes waarin een mens denkt (plus "afgevallen"), en wordt afgeleid wie vandaag
  * aandacht nodig heeft. Alles is puur: geen database, geen tijdzones, geen
  * verrassingen — en daardoor te testen zonder omgeving.
  *
@@ -31,7 +31,7 @@ export const BAKJES = [
   "akkoord",
   "bouw",
   "klant",
-  "afgerond",
+  "afgevallen",
 ] as const;
 export type Bakje = (typeof BAKJES)[number];
 
@@ -45,7 +45,7 @@ export const BAKJE_LABEL: Record<Bakje, string> = {
   akkoord: "Akkoord",
   bouw: "Bouw",
   klant: "Klant",
-  afgerond: "Afgerond",
+  afgevallen: "Afgevallen",
 };
 
 /**
@@ -105,6 +105,11 @@ export type AanvraagInput = {
   laatsteContactAt: Date | null;
   /** De feitelijke commerciële toestand, voor `nextAction`. */
   snapshot: JourneySnapshot;
+  /**
+   * Wanneer de demo is afgerond, als dit een afgeronde demo is (zie
+   * demoAfgerondOp). Null voor alles wat geen afgeronde demo is.
+   */
+  demoAfgerondAt?: Date | null;
 };
 
 export type AanvraagAfleiding = {
@@ -126,6 +131,11 @@ export type AanvraagAfleiding = {
   dagenSindsDemo: number | null;
   /** De volledige volgende stap uit de bestaande motor. */
   actie: NextAction;
+  /**
+   * Een afgeronde demo hoort niet in de werkvoorraad maar in "Afgeronde
+   * demo's". Andere afgevallen aanvragen zijn dat niet.
+   */
+  afgerondeDemo: boolean;
 };
 
 /**
@@ -141,16 +151,17 @@ export function leidAf(a: AanvraagInput, nu: Date): AanvraagAfleiding {
   const dagenSindsDemo = a.demoSentAt ? dagenTussen(a.demoSentAt, nu) : null;
   const klant = a.snapshot.aanbetalingBetaald;
 
-  // Afgevallen of afgeronde demo: in het archiefbakje, nooit actie. De stage
-  // blijft staan, zodat heropenen de journey gewoon laat verdergaan.
+  // Afgevallen (ook een afgeronde demo): nooit actie. De stage blijft staan,
+  // zodat heropenen de journey gewoon laat verdergaan.
   if (a.status === "afgevallen") {
     return {
-      bakje: "afgerond",
+      bakje: "afgevallen",
       klant,
       actieNodig: false,
       reden: "",
       dagenSindsDemo,
       actie,
+      afgerondeDemo: Boolean(a.demoAfgerondAt),
     };
   }
 
@@ -158,7 +169,7 @@ export function leidAf(a: AanvraagInput, nu: Date): AanvraagAfleiding {
 
   // Klant: het commerciële traject is geslaagd en vraagt niets meer.
   if (bakje === "klant") {
-    return { bakje, klant, actieNodig: false, reden: "", dagenSindsDemo, actie };
+    return { bakje, klant, actieNodig: false, reden: "", dagenSindsDemo, actie, afgerondeDemo: false };
   }
 
   // Stilte na een verstuurde demo weegt zwaarder dan "wachten op de klant":
@@ -177,6 +188,7 @@ export function leidAf(a: AanvraagInput, nu: Date): AanvraagAfleiding {
       reden: `Demo ${dagenSindsDemo} dagen geleden verstuurd, nog geen reactie`,
       dagenSindsDemo,
       actie,
+      afgerondeDemo: false,
     };
   }
 
@@ -189,10 +201,30 @@ export function leidAf(a: AanvraagInput, nu: Date): AanvraagAfleiding {
       reden: actie.volgende,
       dagenSindsDemo,
       actie,
+      afgerondeDemo: false,
     };
   }
 
-  return { bakje, klant, actieNodig: false, reden: "", dagenSindsDemo, actie };
+  return { bakje, klant, actieNodig: false, reden: "", dagenSindsDemo, actie, afgerondeDemo: false };
+}
+
+/* ------------------------------------------------- werkvoorraad en archief -- */
+
+/**
+ * Aanvragen is de werkvoorraad: alles behalve afgeronde demo's. Die staan in
+ * een eigen overzicht; er wordt niets verwijderd, ze worden alleen niet meer
+ * tussen het lopende werk getoond.
+ */
+export function inWerkvoorraad(a: Pick<AanvraagAfleiding, "afgerondeDemo">): boolean {
+  return !a.afgerondeDemo;
+}
+
+/**
+ * Wat "Alles" in de werkvoorraad toont: alles waar nog iets mee gebeurt of
+ * kan gebeuren. Afgevallen aanvragen blijven via hun eigen bakje vindbaar.
+ */
+export function actiefInWerkvoorraad(a: Pick<AanvraagAfleiding, "afgerondeDemo" | "bakje">): boolean {
+  return inWerkvoorraad(a) && a.bakje !== "afgevallen";
 }
 
 /* ---------------------------------------------------------------- tellen -- */

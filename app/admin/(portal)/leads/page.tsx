@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { AlertCircle, Inbox, Phone, Plus, Search } from "lucide-react";
+import { AlertCircle, Archive, ExternalLink, FileText, Inbox, Phone, Plus, Search } from "lucide-react";
 import { laadAanvragen, type Aanvraag } from "@/lib/aanvragen-lijst";
 import {
   BAKJES,
@@ -10,6 +10,7 @@ import {
   type Bakje,
 } from "@/lib/aanvragen";
 import { stageMeta } from "@/lib/journey-stages";
+import { aanvragenWeergave } from "@/lib/aanvragen-weergave";
 import { cn } from "@/lib/cn";
 
 export const metadata: Metadata = {
@@ -28,6 +29,11 @@ export const metadata: Metadata = {
  * stilliggend bovenaan. Daarna de balk met bakjes om te filteren. Pas daarna
  * alle aanvragen. Wie niets hoeft te doen, hoeft ook niet te scrollen.
  *
+ * Aanvragen is de werkvoorraad. Een afgeronde demo verdwijnt daaruit naar het
+ * tabblad "Afgeronde demo's" — niets wordt verwijderd, hij staat alleen niet
+ * meer tussen het lopende werk. Andere afgevallen aanvragen blijven via hun
+ * eigen bakje in de werkvoorraad vindbaar.
+ *
  * Alle afleiding gebeurt in lib/aanvragen.ts, dus dit bestand kiest alleen wat
  * het toont. Wat de volgende stap ís komt uit dezelfde motor als de
  * detailpagina; die twee kunnen dus niet uit elkaar lopen.
@@ -35,12 +41,12 @@ export const metadata: Metadata = {
 export default async function AanvragenPage({
   searchParams,
 }: {
-  searchParams: Promise<{ bakje?: string; q?: string }>;
+  searchParams: Promise<{ bakje?: string; q?: string; weergave?: string }>;
 }) {
-  const { bakje: bakjeParam, q } = await searchParams;
-  const aanvragen = await laadAanvragen();
+  const { bakje: bakjeParam, q, weergave } = await searchParams;
+  const alle = await laadAanvragen();
 
-  if (!aanvragen) {
+  if (!alle) {
     return (
       <Kader>
         <div className="rounded-2xl bg-brand-100 p-5 text-sm text-brand-600">
@@ -52,21 +58,18 @@ export default async function AanvragenPage({
     );
   }
 
-  const telling = telPerBakje(aanvragen.map((a) => a.afleiding));
+  const archief = weergave === "afgeronde-demos";
   const actief = BAKJES.includes(bakjeParam as Bakje)
     ? (bakjeParam as Bakje)
     : null;
-
   const zoek = (q ?? "").trim().toLowerCase();
-  const zichtbaar = aanvragen.filter((a) => {
-    if (actief && a.afleiding.bakje !== actief) return false;
-    if (!zoek) return true;
-    const l = a.lead;
-    return [l.bedrijfsnaam, l.naam, l.email, l.plaats]
-      .join(" ")
-      .toLowerCase()
-      .includes(zoek);
-  });
+  const {
+    werkvoorraad: aanvragen,
+    lopend,
+    afgerondeDemos,
+    zichtbaar,
+  } = aanvragenWeergave(alle, { archief, bakje: actief, zoek });
+  const telling = telPerBakje(aanvragen.map((a) => a.afleiding));
 
   // Het langst stilliggend eerst: wie het langst wacht, wacht ook het langst.
   const actieNodig = [...aanvragen]
@@ -78,19 +81,23 @@ export default async function AanvragenPage({
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-extrabold tracking-tight text-ink">
-            Aanvragen
+            {archief ? "Afgeronde demo's" : "Aanvragen"}
           </h1>
           <p className="mt-1 text-[13px] text-ink-500">
-            {aanvragen.length} in totaal ·{" "}
-            {actieNodig.length === 0
-              ? "niets wat op je wacht"
-              : `${actieNodig.length} wachten op jou`}
+            {archief
+              ? "Demo's die netjes zijn afgesloten. Alles blijft bewaard en je kunt ze altijd heropenen."
+              : `${lopend.length} actief · ${
+                  actieNodig.length === 0
+                    ? "niets wat op je wacht"
+                    : `${actieNodig.length} wachten op jou`
+                }`}
           </p>
         </div>
 
         <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
           <form className="relative min-w-0 flex-1 sm:flex-none" action="/admin/leads">
-            {actief && <input type="hidden" name="bakje" value={actief} />}
+            {archief && <input type="hidden" name="weergave" value="afgeronde-demos" />}
+            {!archief && actief && <input type="hidden" name="bakje" value={actief} />}
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-300" />
             <input
               name="q"
@@ -109,6 +116,29 @@ export default async function AanvragenPage({
         </div>
       </div>
 
+      {/* Werkvoorraad of archief — binnen hetzelfde scherm */}
+      <nav className="mt-5 flex gap-1 border-b border-cream-200" aria-label="Weergave">
+        <Tab href="/admin/leads" actief={!archief} label="Aanvragen" aantal={lopend.length} />
+        <Tab
+          href="/admin/leads?weergave=afgeronde-demos"
+          actief={archief}
+          label="Afgeronde demo's"
+          aantal={afgerondeDemos.length}
+        />
+      </nav>
+
+      {archief ? (
+        zichtbaar.length === 0 ? (
+          <Leeg tekst={zoek ? "Pas je zoekopdracht aan." : "Er zijn nog geen demo's afgerond."} />
+        ) : (
+          <ul className="mt-4 space-y-2">
+            {zichtbaar.map((a) => (
+              <AfgerondeRij key={a.lead.id} a={a} />
+            ))}
+          </ul>
+        )
+      ) : (
+      <>
       {/* Actie nodig — het enige blok dat er echt toe doet */}
       {actieNodig.length > 0 && (
         <section className="mt-6">
@@ -145,7 +175,7 @@ export default async function AanvragenPage({
       <div className="mt-7 flex flex-wrap gap-1.5">
         <Bakjeknop
           label="Alles"
-          aantal={aanvragen.length}
+          aantal={lopend.length}
           actief={!actief}
           href="/admin/leads"
         />
@@ -162,19 +192,15 @@ export default async function AanvragenPage({
       </div>
 
       {zichtbaar.length === 0 ? (
-        <div className="mt-6 flex flex-col items-center gap-2 rounded-3xl bg-white p-12 text-center shadow-soft ring-1 ring-ink/5">
-          <Inbox className="h-7 w-7 text-ink-300" />
-          <p className="text-sm font-semibold text-ink">Niets gevonden</p>
-          <p className="text-[13px] text-ink-500">
-            Pas je filter of zoekopdracht aan.
-          </p>
-        </div>
+        <Leeg tekst="Pas je filter of zoekopdracht aan." />
       ) : (
         <ul className="mt-4 space-y-2">
           {zichtbaar.map((a) => (
             <Rij key={a.lead.id} a={a} />
           ))}
         </ul>
+      )}
+      </>
       )}
     </Kader>
   );
@@ -189,8 +215,101 @@ export default async function AanvragenPage({
  */
 function knopLabel(a: Aanvraag): string {
   if (a.afleiding.bakje === "opvolgen") return "Opvolgen";
-  if (a.afleiding.bakje === "afgerond") return "Openen";
+  if (a.afleiding.bakje === "afgevallen") return "Openen";
   return a.afleiding.actie.cta?.label ?? "Openen";
+}
+
+function Tab({ href, actief, label, aantal }: { href: string; actief: boolean; label: string; aantal: number }) {
+  return (
+    <Link
+      href={href}
+      aria-current={actief ? "page" : undefined}
+      className={cn(
+        "-mb-px inline-flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-[13.5px] font-bold transition",
+        actief ? "border-ink text-ink" : "border-transparent text-ink-300 hover:text-ink-700",
+      )}
+    >
+      {label}
+      <span className={cn("rounded-full px-1.5 text-[11.5px] tabular-nums", actief ? "bg-ink text-cream" : "bg-cream-100 text-ink-500")}>
+        {aantal}
+      </span>
+    </Link>
+  );
+}
+
+function Leeg({ tekst }: { tekst: string }) {
+  return (
+    <div className="mt-6 flex flex-col items-center gap-2 rounded-3xl bg-white p-12 text-center shadow-soft ring-1 ring-ink/5">
+      <Inbox className="h-7 w-7 text-ink-300" />
+      <p className="text-sm font-semibold text-ink">Niets gevonden</p>
+      <p className="text-[13px] text-ink-500">{tekst}</p>
+    </div>
+  );
+}
+
+const kort = (d: Date | null) =>
+  d ? d.toLocaleDateString("nl-NL", { day: "numeric", month: "short", year: "numeric", timeZone: "Europe/Amsterdam" }) : "—";
+
+/** Waar deze aanvraag vandaan kwam, als dat iets toevoegt. */
+function bronVan(lead: Aanvraag["lead"]): string | null {
+  if (lead.referralCodeSnapshot) return `Partner · ${lead.referralCodeSnapshot}`;
+  if (lead.source && lead.source !== "website") return lead.source;
+  return null;
+}
+
+/**
+ * Een afgeronde demo in het archief: wie het was, wanneer er contact was,
+ * wanneer hij is afgesloten, en waar de oude demo en de PDF te vinden zijn.
+ */
+function AfgerondeRij({ a }: { a: Aanvraag }) {
+  const { lead } = a;
+  const af = a.demoAfsluiting!;
+  const dagenActief =
+    lead.demoSentAt ? Math.max(0, Math.round((af.afgerondOp.getTime() - lead.demoSentAt.getTime()) / 86_400_000)) : null;
+  const bron = bronVan(lead);
+  const host = (() => {
+    try {
+      return lead.demoDomain ? new URL(lead.demoDomain).host : null;
+    } catch {
+      return null;
+    }
+  })();
+
+  return (
+    <li className="rounded-2xl bg-white px-4 py-3 shadow-soft ring-1 ring-ink/5 transition hover:shadow-lift">
+      <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1">
+        <Link href={`/admin/leads/${lead.id}`} className="min-w-0 flex-1 basis-60">
+          <span className="block truncate text-[14px] font-extrabold text-ink">{lead.bedrijfsnaam}</span>
+          <span className="block truncate text-[12px] text-ink-500">
+            {lead.naam} · {lead.email}
+          </span>
+        </Link>
+        <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-cream-100 px-2.5 py-1 text-[11.5px] font-bold text-ink-500">
+          <Archive className="h-3.5 w-3.5" />
+          Afgerond {kort(af.afgerondOp)}
+        </span>
+      </div>
+      <p className="mt-2 text-[12px] text-ink-500">
+        Aangevraagd {kort(lead.createdAt)} · demo verstuurd {kort(lead.demoSentAt)}
+        {dagenActief !== null && ` · ${dagenActief} dagen actief`}
+        {bron && ` · ${bron}`}
+      </p>
+      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] font-bold">
+        {af.pdfId ? (
+          <a href={`/api/admin/documenten/${af.pdfId}/bestand`} target="_blank" rel="noopener" className="inline-flex items-center gap-1 text-brand hover:text-brand-600">
+            <FileText className="h-3.5 w-3.5" /> PDF
+          </a>
+        ) : (
+          <span className="text-ink-300">Geen PDF</span>
+        )}
+        {host && (
+          <a href={lead.demoDomain!} target="_blank" rel="noopener noreferrer" className="inline-flex min-w-0 items-center gap-1 text-ink-500 hover:text-ink">
+            <ExternalLink className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">{host}</span>
+          </a>
+        )}
+      </div>
+    </li>
+  );
 }
 
 function Kader({ children }: { children: React.ReactNode }) {

@@ -10,6 +10,8 @@ import { ensureCommerce } from "@/lib/proposals";
 import { sendDemoAfsluiting, sendDemoAfsluitingProef } from "@/lib/email/send";
 import { DemoPdfFout, maakDemoPdf, type DemoPdf } from "@/lib/demo-pdf/maak";
 import {
+  EVENT_DEMO_AFGEROND,
+  EVENT_HEROPEND,
   afsluitmailOnderwerp,
   alineasUit,
   bestandsnaamVoor,
@@ -310,7 +312,7 @@ export async function verstuurDemoAfsluiting(input: {
   await db.update(schema.leads).set({ status: "afgevallen" }).where(eq(schema.leads.id, lead.id));
   await logJourneyEvent(
     lead.id,
-    "demo_afgerond",
+    EVENT_DEMO_AFGEROND,
     "Demo afgerond — geen reactie na opvolging. Aanvraag blijft bewaard; de demo is klaar om offline te halen.",
     { actor: "admin", internal: true, documentId: pdf.doc.id, door: input.actorId, vorigeStatus: oud },
   );
@@ -345,7 +347,7 @@ export async function heropenAanvraag(input: { leadId: string; actorId: string }
     .returning({ id: schema.leads.id });
   if (!bijgewerkt) return { ok: false, reden: "Deze aanvraag is al heropend." };
 
-  await logJourneyEvent(lead.id, "aanvraag_heropend", "Aanvraag heropend — de journey kan verder", {
+  await logJourneyEvent(lead.id, EVENT_HEROPEND, "Aanvraag heropend — de journey kan verder", {
     actor: "admin",
     internal: true,
     door: input.actorId,

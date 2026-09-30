@@ -309,10 +309,17 @@ export function AfgerondPanel({
 }: {
   leadId: string;
   /** Null bij een aanvraag die met de hand op afgevallen is gezet. */
-  afgerond: { op: string; pdf: { id: string; bestandsnaam: string } | null } | null;
+  afgerond: {
+    op: string;
+    pdf: { id: string; bestandsnaam: string } | null;
+    mail: { naar: string; op: string } | null;
+  } | null;
   demoUrl: string | null;
 }) {
   const [state, action, pending] = useActionState(heropen, IDLE);
+  const [bevestigen, setBevestigen] = useState(false);
+  const datum = (iso: string) =>
+    new Date(iso).toLocaleDateString("nl-NL", { day: "numeric", month: "long", year: "numeric", timeZone: "Europe/Amsterdam" });
   return (
     <div className="rounded-2xl bg-cream-100/70 p-5 ring-1 ring-ink/5">
       <div className="flex items-start gap-3">
@@ -325,9 +332,15 @@ export function AfgerondPanel({
           </p>
           <p className="mt-1 text-[13px] leading-relaxed text-ink-500">
             {afgerond
-              ? `Afgerond op ${new Date(afgerond.op).toLocaleDateString("nl-NL", { day: "numeric", month: "long", year: "numeric" })}. De afsluitmail met de PDF is verstuurd; de aanvraag, mails en tijdlijn blijven bewaard.`
+              ? `Afgerond op ${datum(afgerond.op)}. De aanvraag, mails, documenten en tijdlijn blijven bewaard.`
               : "Deze aanvraag is als afgevallen gemarkeerd. Alles blijft bewaard."}
           </p>
+          {afgerond?.mail && (
+            <p className="mt-1 text-[12.5px] text-ink-500">
+              <span className="font-bold text-ink-700">Afsluitmail:</span> verstuurd aan {afgerond.mail.naar} op{" "}
+              {datum(afgerond.mail.op)}, met de PDF als bijlage.
+            </p>
+          )}
           {afgerond?.pdf && (
             <a
               href={`/api/admin/documenten/${afgerond.pdf.id}/bestand`}
@@ -346,17 +359,39 @@ export function AfgerondPanel({
               </span>
             </p>
           )}
-          <form action={action} className="mt-4 flex flex-wrap items-center gap-3">
+          {!bevestigen ? (
+            <div className="mt-4">
+              <button
+                type="button"
+                onClick={() => setBevestigen(true)}
+                className="rounded-full bg-white px-4 py-2 text-[12.5px] font-bold text-ink-700 ring-1 ring-ink/10 transition hover:bg-cream"
+              >
+                Aanvraag heropenen
+              </button>
+            </div>
+          ) : (
+          <form action={action} className="mt-4 rounded-xl bg-white p-4 ring-1 ring-ink/10">
             <input type="hidden" name="leadId" value={leadId} />
-            <button type="submit" disabled={pending} className="rounded-full bg-white px-4 py-2 text-[12.5px] font-bold text-ink-700 ring-1 ring-ink/10 transition hover:bg-cream disabled:opacity-60">
-              {pending ? "Een moment…" : "Aanvraag heropenen"}
-            </button>
+            <p className="text-[13px] font-bold text-ink">Aanvraag weer actief maken?</p>
+            <p className="mt-1 text-[12.5px] leading-relaxed text-ink-500">
+              De aanvraag gaat terug naar Aanvragen en de journey gaat verder waar hij stond. De PDF,
+              de afsluitmail en de tijdlijn blijven gewoon bewaard.
+            </p>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <button type="submit" disabled={pending} className="rounded-full bg-ink px-4 py-2 text-[12.5px] font-bold text-cream transition hover:bg-ink-700 disabled:opacity-60">
+                {pending ? "Een moment…" : "Ja, heropenen"}
+              </button>
+              <button type="button" onClick={() => setBevestigen(false)} disabled={pending} className="rounded-full px-3 py-2 text-[12.5px] font-bold text-ink-500 transition hover:bg-cream">
+                Annuleren
+              </button>
+            </div>
             {state.message && (
               <span className={cn("text-[12px] font-semibold", state.status === "error" ? "text-brand-600" : "text-sage-600")}>
                 {state.message}
               </span>
             )}
           </form>
+          )}
         </div>
       </div>
     </div>

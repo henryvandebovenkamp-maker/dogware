@@ -110,3 +110,38 @@ export function bestandsnaamVoor(bedrijfsnaam: string, datum: Date, versie = 1):
   }).format(datum);
   return `${slug}-dogware-demo-${dag}${versie > 1 ? `-v${versie}` : ""}.pdf`;
 }
+
+/* =========================================================================
+ * Is dit een afgeronde demo?
+ * ========================================================================= */
+
+/** Tijdlijnsoorten die bepalen of een aanvraag (nog) een afgeronde demo is. */
+export const EVENT_DEMO_AFGEROND = "demo_afgerond";
+export const EVENT_HEROPEND = "aanvraag_heropend";
+export const EVENT_HANDMATIG_AFGEVALLEN = "aanvraag_afgevallen";
+
+export type AfsluitMomenten = {
+  /** Laatste geslaagde afronding (alleen gelogd na een verstuurde afsluitmail). */
+  demoAfgerond: Date | null;
+  /** Laatste heropening, via de knop of door de status met de hand terug te zetten. */
+  heropend: Date | null;
+  /** Laatste keer dat de status met de hand op "afgevallen" is gezet. */
+  handmatigAfgevallen: Date | null;
+};
+
+/**
+ * Wanneer deze aanvraag als demo is afgerond — of null als het geen
+ * afgeronde demo is.
+ *
+ * "Afgevallen" alleen zegt dat niet: een aanvraag kan ook om een andere reden
+ * zijn afgevallen (geen interesse, vóór de demo al). Een afgeronde demo is
+ * afgevallen ÉN de laatste afsluitgebeurtenis is een geslaagde demo-afronding
+ * — niet een heropening en niet een handmatige statuswijziging daarna.
+ */
+export function demoAfgerondOp(status: string, m: AfsluitMomenten): Date | null {
+  if (status !== "afgevallen" || !m.demoAfgerond) return null;
+  const t = m.demoAfgerond.getTime();
+  if (m.heropend && m.heropend.getTime() >= t) return null;
+  if (m.handmatigAfgevallen && m.handmatigAfgevallen.getTime() > t) return null;
+  return m.demoAfgerond;
+}

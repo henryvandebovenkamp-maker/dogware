@@ -15,18 +15,27 @@ export function JourneyBar({
   variant = "demo",
   toon = "admin",
   className,
+  gestopt,
 }: {
   current: JourneyStage;
   variant?: JourneyVariant;
   toon?: "admin" | "klant";
   className?: string;
+  /**
+   * De journey is hier gestopt (afgeronde demo of afgevallen aanvraag). De
+   * huidige fase krijgt dan een vinkje met dit label, alles erna blijft
+   * neutraal — niets suggereert een volgende stap.
+   */
+  gestopt?: string;
 }) {
   const fases = journeyPhasesFor(variant);
   return (
     <div className={cn("-mx-1 overflow-x-auto pb-1", className)}>
       <ol className="flex min-w-max items-start gap-1 px-1">
         {fases.map((phase, i) => {
-          const state = phaseStateFor(i, current, variant);
+          const echt = phaseStateFor(i, current, variant);
+          const stopHier = Boolean(gestopt) && echt === "current";
+          const state = stopHier ? "done" : echt;
           const laatste = i === fases.length - 1;
           return (
             <li key={phase.key} className="flex items-start">
@@ -63,6 +72,9 @@ export function JourneyBar({
                   )}
                 >
                   {phase.label}
+                  {stopHier && (
+                    <span className="mt-0.5 block text-[10px] font-semibold text-ink-300">{gestopt}</span>
+                  )}
                 </span>
               </div>
               {!laatste && (
@@ -70,7 +82,7 @@ export function JourneyBar({
                   aria-hidden
                   className={cn(
                     "mt-3.5 h-0.5 w-3 rounded-full sm:w-5",
-                    state === "done" ? "bg-sage" : "bg-cream-200",
+                    state === "done" && !stopHier ? "bg-sage" : "bg-cream-200",
                   )}
                 />
               )}
