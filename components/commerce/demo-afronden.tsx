@@ -104,9 +104,15 @@ function Venster({
     setFase("bezig");
     try {
       const res = await fetch(`/api/admin/leads/${leadId}/demo-afronden`, { method: "POST" });
-      const json = await res.json();
-      if (!json.ok) {
-        setFout(json.reden ?? "De PDF kon niet worden gemaakt.");
+      // Een time-out of storing van de server geeft geen JSON terug maar een foutpagina.
+      const json = await res.json().catch(() => null);
+      if (!json?.ok) {
+        setFout(
+          json?.reden ??
+            (res.status === 504 || res.status === 502
+              ? "De demo kon niet op tijd worden vastgelegd. Er is niets verstuurd en de aanvraag is niet afgerond. Probeer het opnieuw of controleer de demo."
+              : "De PDF kon niet worden gemaakt. Er is niets verstuurd en de aanvraag is niet afgerond."),
+        );
         setFase(data ? "controleren" : "bevestigen");
         return;
       }
@@ -114,7 +120,8 @@ function Venster({
       setFase("controleren");
       router.refresh();
     } catch {
-      setFout("De PDF kon niet worden gemaakt. Controleer je verbinding en probeer het opnieuw.");
+      // Het verzoek kwam niet eens terug. Er is niets verstuurd; een eventueel toch gemaakte PDF verschijnt na vernieuwen.
+      setFout("De server gaf geen antwoord. Er is niets verstuurd en de aanvraag is niet afgerond. Vernieuw de pagina en probeer het opnieuw.");
       setFase(data ? "controleren" : "bevestigen");
     }
   }

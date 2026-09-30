@@ -1,6 +1,6 @@
 import "server-only";
 import { createHash } from "node:crypto";
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import type { DogDocument, Lead } from "@/lib/db/schema";
 import { registerDocument } from "@/lib/documents";
@@ -8,7 +8,7 @@ import { logEmail, logJourneyEvent, statusBijStage } from "@/lib/journey";
 import { logActivity } from "@/lib/audit";
 import { ensureCommerce } from "@/lib/proposals";
 import { sendDemoAfsluiting, sendDemoAfsluitingProef } from "@/lib/email/send";
-import { DemoPdfFout, maakDemoPdf, type DemoPdf } from "@/lib/demo-pdf/maak";
+import { DemoPdfFout, LIMIETEN, maakDemoPdf, type DemoPdf, type DemoPdfFoutCode } from "@/lib/demo-pdf/maak";
 import {
   EVENT_DEMO_AFGEROND,
   EVENT_HEROPEND,
@@ -85,25 +85,99 @@ export async function demoPdfsVan(leadId: string): Promise<DogDocument[]> {
     .orderBy(desc(schema.documents.issuedAt));
 }
 
+/** Wat de beheerder ziet als de PDF niet lukt. Technische details staan in de serverlog. */
+export const PDF_MELDING: Record<DemoPdfFoutCode | "ONBEKEND" | "BEZIG", string> = {
+  TIJD: "De demo kon niet op tijd worden vastgelegd. Er is niets verstuurd en de aanvraag is niet afgerond. Probeer het opnieuw of controleer de demo.",
+  ONBEREIKBAAR: "De demo kon niet worden geopend. Controleer of de demo-URL nog online is. Er is niets verstuurd en de aanvraag is niet afgerond.",
+  TE_GROOT: "De PDF werd te groot om te mailen. Er is niets verstuurd en de aanvraag is niet afgerond.",
+  AFGEBROKEN: "Het maken van de PDF is afgebroken. Er is niets verstuurd en de aanvraag is niet afgerond.",
+  BROWSER: "De PDF kon niet worden gemaakt. Er is niets verstuurd en de aanvraag is niet afgerond.",
+  LEEG: "De PDF kon niet worden gemaakt. Er is niets verstuurd en de aanvraag is niet afgerond.",
+  ONBEKEND: "De PDF kon niet worden gemaakt. Er is niets verstuurd en de aanvraag is niet afgerond.",
+  BEZIG: "Er wordt op dit moment al een PDF van deze demo gemaakt. Wacht tot die klaar is en vernieuw dan de pagina.",
+};
+
+const EVENT_PDF_GESTART = "demo_pdf_gestart";
+/** Aanvragen waarvoor deze serverinstantie nu een PDF maakt. */
+const bezigHier = new Set<string>();
+
+/**
+ * Wordt er op een andere instantie al een PDF gemaakt voor deze aanvraag?
+ * Dat zie je aan een "gestart" zonder "gemaakt" of "mislukt" erna, binnen
+ * de tijd die de generator maximaal mag duren. Een tweede
+ * gelijktijdige browser zou beide pogingen trager maken, dus die start niet.
+ */
+async function pdfAlBezig(leadId: string): Promise<boolean> {
+  const db = getDb();
+  if (!db) return false;
+  const sinds = new Date(Date.now() - (LIMIETEN.totaal + 60_000));
+  const [gestart] = await db
+    .select({ createdAt: schema.journeyEvents.createdAt })
+    .from(schema.journeyEvents)
+    .where(
+      and(
+        eq(schema.journeyEvents.leadId, leadId),
+        eq(schema.journeyEvents.kind, EVENT_PDF_GESTART),
+        gte(schema.journeyEvents.createdAt, sinds),
+      ),
+    )
+    .orderBy(desc(schema.journeyEvents.createdAt))
+    .limit(1);
+  if (!gestart) return false;
+  const [afgelopen] = await db
+    .select({ id: schema.journeyEvents.id })
+    .from(schema.journeyEvents)
+    .where(
+      and(
+        eq(schema.journeyEvents.leadId, leadId),
+        inArray(schema.journeyEvents.kind, ["demo_pdf_gemaakt", "demo_pdf_mislukt"]),
+        gte(schema.journeyEvents.createdAt, gestart.createdAt),
+      ),
+    )
+    .limit(1);
+  return !afgelopen;
+}
+
 /**
  * Stap 1: de PDF maken en bewaren, en een concept van de mail klaarzetten.
  * Er gaat niets naar de klant en de status van de aanvraag verandert niet.
+ * Lukt de PDF niet (of niet op tijd), dan wordt er ook niets bewaard.
  */
 export async function bereidDemoAfrondingVoor(input: {
   leadId: string;
   actorId: string;
   nu?: Date;
+  /** Valt het verzoek weg, dan stopt de browser en wordt er niets bewaard. */
+  signal?: AbortSignal;
   /** Te vervangen in tests; standaard de echte browser. */
   maak?: typeof maakDemoPdf;
 }): Promise<Uitkomst<Voorbereid>> {
-  const db = getDb();
-  if (!db) return { ok: false, reden: "Database niet beschikbaar." };
-  const lead = await laadLead(input.leadId);
-  if (!lead) return { ok: false, reden: "Aanvraag niet gevonden." };
-  const mag = magDemoAfronden(lead);
-  if (!mag.ok) return mag;
-  const commerce = await ensureCommerce(lead.id);
-  if (!commerce) return { ok: false, reden: "Aanvraag niet gevonden." };
+  // Synchroon, vóór de eerste await: een dubbele klik op deze instantie komt hier niet langs.
+  if (bezigHier.has(input.leadId)) return { ok: false, reden: PDF_MELDING.BEZIG };
+  bezigHier.add(input.leadId);
+  try {
+    const db = getDb();
+    if (!db) return { ok: false, reden: "Database niet beschikbaar." };
+    const lead = await laadLead(input.leadId);
+    if (!lead) return { ok: false, reden: "Aanvraag niet gevonden." };
+    const mag = magDemoAfronden(lead);
+    if (!mag.ok) return mag;
+    if (await pdfAlBezig(lead.id)) return { ok: false, reden: PDF_MELDING.BEZIG };
+    const commerce = await ensureCommerce(lead.id);
+    if (!commerce) return { ok: false, reden: "Aanvraag niet gevonden." };
+    return await maakEnBewaar(lead, commerce.id, input);
+  } finally {
+    bezigHier.delete(input.leadId);
+  }
+}
+
+async function maakEnBewaar(
+  lead: Lead,
+  commerceId: string,
+  input: { actorId: string; nu?: Date; signal?: AbortSignal; maak?: typeof maakDemoPdf },
+): Promise<Uitkomst<Voorbereid>> {
+  const db = getDb()!;
+  await logJourneyEvent(lead.id, EVENT_PDF_GESTART, "Demo-PDF wordt gemaakt", { actor: "admin", internal: true });
 
   const nu = input.nu ?? new Date();
   let pdf: DemoPdf;
@@ -114,24 +188,45 @@ export async function bereidDemoAfrondingVoor(input: {
       bedrijfsnaam: lead.bedrijfsnaam,
       demoDatum: lead.demoSentAt,
       nu,
+      signal: input.signal,
     });
   } catch (err) {
-    const reden =
-      err instanceof DemoPdfFout ? err.message : "De PDF kon niet worden gemaakt. Probeer het later opnieuw.";
-    await logJourneyEvent(lead.id, "demo_pdf_mislukt", `Demo-PDF maken mislukt: ${reden}`, {
+    const code = err instanceof DemoPdfFout ? err.code : "ONBEKEND";
+    console.error(
+      JSON.stringify({ evt: "demo_pdf:bereid_mislukt", leadId: lead.id, code, reden: err instanceof Error ? err.message : String(err) }),
+    );
+    await logJourneyEvent(lead.id, "demo_pdf_mislukt", `Demo-PDF maken mislukt: ${PDF_MELDING[code].split(".")[0]}.`, {
       actor: "admin",
       internal: true,
+      code,
     });
-    return { ok: false, reden };
+    return { ok: false, reden: PDF_MELDING[code] };
+  }
+  // Is de beheerder intussen weg (verzoek afgebroken), dan bewaren we niets.
+  if (input.signal?.aborted) {
+    await logJourneyEvent(lead.id, "demo_pdf_mislukt", "Demo-PDF maken afgebroken: niets bewaard.", {
+      actor: "admin",
+      internal: true,
+      code: "AFGEBROKEN",
+    });
+    return { ok: false, reden: PDF_MELDING.AFGEBROKEN };
   }
 
+  const dbStart = Date.now();
+  console.info(JSON.stringify({ evt: "demo_pdf:database:start", leadId: lead.id }));
   const versie = (await demoPdfsVan(lead.id)).length + 1;
   const bestandsnaam = bestandsnaamVoor(lead.bedrijfsnaam, nu, versie);
   const sha256 = createHash("sha256").update(pdf.pdf).digest("hex");
 
+  const opslagMislukt = async (err?: unknown) => {
+    console.error(JSON.stringify({ evt: "demo_pdf:opslaan_mislukt", leadId: lead.id, reden: err instanceof Error ? err.message : "geen document" }));
+    await logJourneyEvent(lead.id, "demo_pdf_mislukt", "Demo-PDF maken mislukt: opslaan lukte niet.", { actor: "admin", internal: true, code: "OPSLAG" });
+    return { ok: false as const, reden: "De PDF kon niet worden opgeslagen. Er is niets verstuurd en de aanvraag is niet afgerond." };
+  };
+  let opslagFout: unknown;
   const doc = await registerDocument({
     leadId: lead.id,
-    commerceId: commerce.id,
+    commerceId,
     type: "DEMO_PDF",
     titel: `Demo-PDF — ${lead.bedrijfsnaam}`,
     visibleToCustomer: false,
@@ -144,22 +239,34 @@ export async function bereidDemoAfrondingVoor(input: {
       paginas: pdf.paginas,
       schermen: pdf.schermen,
       routes: pdf.routes,
+      overgeslagen: pdf.overgeslagen,
+      duurMs: pdf.duurMs,
       grootte: pdf.pdf.byteLength,
       sha256,
       gemaaktDoor: input.actorId,
       gemaaktOp: nu.toISOString(),
     },
+  }).catch((err) => {
+    opslagFout = err;
+    return null;
   });
-  if (!doc) return { ok: false, reden: "De PDF kon niet worden opgeslagen." };
+  if (!doc) return opslagMislukt(opslagFout);
 
-  await db.insert(schema.documentFiles).values({
-    documentId: doc.id,
-    bestandsnaam,
-    mime: "application/pdf",
-    grootte: pdf.pdf.byteLength,
-    sha256,
-    inhoud: pdf.pdf,
-  });
+  try {
+    await db.insert(schema.documentFiles).values({
+      documentId: doc.id,
+      bestandsnaam,
+      mime: "application/pdf",
+      grootte: pdf.pdf.byteLength,
+      sha256,
+      inhoud: pdf.pdf,
+    });
+  } catch (err) {
+    // Geen half document: zonder bestand verdwijnt ook het document weer.
+    await db.delete(schema.documents).where(eq(schema.documents.id, doc.id)).catch(() => {});
+    return opslagMislukt(err);
+  }
+  console.info(JSON.stringify({ evt: "demo_pdf:database:done", leadId: lead.id, duurMs: Date.now() - dbStart }));
 
   await logJourneyEvent(
     lead.id,

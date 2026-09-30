@@ -1,8 +1,9 @@
 import { strict as assert } from "node:assert";
 import { describe, it } from "node:test";
-import { kiesDemoRoutes, titelUitPad } from "../lib/demo-pdf/routes.ts";
+import { MAX_ROUTES, kiesDemoRoutes, titelUitPad } from "../lib/demo-pdf/routes.ts";
+import { beoordeelVerzoek } from "../lib/demo-pdf/blokkeren.ts";
 import { aantalPaginas, bouwRapportHtml } from "../lib/demo-pdf/rapport.ts";
-import { fotoHoogtes } from "../lib/demo-pdf/maak.ts";
+import { LIMIETEN, binnen, fotoHoogtes } from "../lib/demo-pdf/maak.ts";
 import { branding } from "../lib/branding.ts";
 
 /**
@@ -106,5 +107,114 @@ describe("de opmaak van het rapport", () => {
   it("afbeeldingen worden nooit uitgerekt: altijd met behoud van verhouding", () => {
     assert.match(html, /object-fit: contain/);
     assert.doesNotMatch(html, /object-fit: (fill|cover)/);
+  });
+});
+
+describe("route-discovery blijft klein en op het eigen domein", () => {
+  const basisUrl = "https://demo.vercel.app/";
+
+  it("externe domeinen, mailto/tel, API, downloads en uitloggen vallen af", () => {
+    const menu = [
+      { href: "https://www.instagram.com/demo", tekst: "Instagram" },
+      { href: "https://dogware.nl/", tekst: "DogWare" },
+      { href: "https://oud-domein.nl/diensten", tekst: "Oud" },
+      { href: "//evil.example/pad", tekst: "Protocol-relatief" },
+      { href: "mailto:info@demo.nl", tekst: "Mail" },
+      { href: "tel:0612345678", tekst: "Bel" },
+      { href: "javascript:void(0)", tekst: "Niets" },
+      { href: "/api/aanvraag", tekst: "API" },
+      { href: "/brochure.pdf", tekst: "Brochure" },
+      { href: "/prijzen.zip", tekst: "Download" },
+      { href: "/uitloggen", tekst: "Uitloggen" },
+      { href: "/_next/static/x", tekst: "Next" },
+      { href: "/algemene-voorwaarden", tekst: "Voorwaarden" },
+      { href: "/diensten", tekst: "Diensten" },
+    ];
+    const paden = kiesDemoRoutes({ basisUrl, menu, inhoud: [] }).map((r) => r.pad);
+    assert.deepEqual(paden, ["/", "/diensten"]);
+  });
+
+  it("queryvarianten, ankers en slashes tellen als één pagina", () => {
+    const menu = [
+      { href: "/diensten", tekst: "Diensten" },
+      { href: "/diensten?utm_source=x", tekst: "Diensten" },
+      { href: "/diensten#prijzen", tekst: "Diensten" },
+      { href: "/diensten/", tekst: "Diensten" },
+      { href: "https://demo.vercel.app/diensten", tekst: "Diensten" },
+      { href: "#boven", tekst: "Naar boven" },
+    ];
+    const paden = kiesDemoRoutes({ basisUrl, menu, inhoud: [] }).map((r) => r.pad);
+    assert.deepEqual(paden, ["/", "/diensten"]);
+  });
+
+  it("duizenden interne links: nooit meer dan het maximum, en geen diep geneste items", () => {
+    const menu = Array.from({ length: 50 }, (_, i) => ({ href: `/pagina-${i}`, tekst: `Pagina ${i}` }));
+    const inhoud = Array.from({ length: 5000 }, (_, i) => ({ href: `/blog/2026/09/post-${i}`, tekst: "Lees meer" }));
+    const routes = kiesDemoRoutes({ basisUrl, menu, inhoud, portaalUrl: "https://demo.vercel.app/login" });
+    assert.equal(routes.length, MAX_ROUTES);
+    assert.equal(routes.at(-1)?.soort, "portaal");
+    assert.ok(!routes.some((r) => r.pad.startsWith("/blog/2026")));
+    assert.equal(new Set(routes.map((r) => r.pad)).size, routes.length);
+  });
+
+  it("een portaal-URL op een ander domein komt er niet in", () => {
+    const routes = kiesDemoRoutes({ basisUrl, menu: [], inhoud: [], portaalUrl: "https://ander-domein.nl/login" });
+    assert.deepEqual(routes.map((r) => r.pad), ["/"]);
+  });
+});
+
+describe("wat de browser niet ophaalt", () => {
+  const origin = "https://demo.vercel.app";
+  const v = (url: string, soort = "script", hoofdnavigatie = false) => beoordeelVerzoek({ url, soort, hoofdnavigatie }, origin);
+
+  it("navigatie of redirect naar een ander domein: geblokkeerd", () => {
+    assert.deepEqual(v("https://www.instagram.com/demo", "document", true), { blokkeer: true, reden: "extern" });
+    assert.deepEqual(v("https://demo.vercel.app/contact", "document", true), { blokkeer: false });
+  });
+
+  it("analytics, tracking en Vercel Insights: geblokkeerd", () => {
+    for (const url of [
+      "https://www.googletagmanager.com/gtag/js?id=G-1",
+      "https://www.google-analytics.com/g/collect",
+      "https://connect.facebook.net/en_US/fbevents.js",
+      "https://static.hotjar.com/c/hotjar-1.js",
+      "https://www.clarity.ms/tag/abc",
+      "https://demo.vercel.app/_vercel/insights/script.js",
+      "https://demo.vercel.app/_vercel/speed-insights/script.js",
+      "https://vercel.live/_next-live/feedback/feedback.js",
+    ]) {
+      assert.equal(v(url).blokkeer, true, url);
+    }
+  });
+
+  it("video, audio, websockets, event streams en Next.js-prefetches: geblokkeerd", () => {
+    assert.equal(v("https://demo.vercel.app/film.mp4", "media").blokkeer, true);
+    assert.equal(v("wss://demo.vercel.app/live", "websocket").blokkeer, true);
+    assert.equal(v("https://demo.vercel.app/stream", "eventsource").blokkeer, true);
+    assert.equal(v("https://demo.vercel.app/tarieven?_rsc=abc", "fetch").blokkeer, true);
+  });
+
+  it("stylesheets, fonts, afbeeldingen en scripts van de demo zelf komen gewoon binnen", () => {
+    assert.equal(v("https://demo.vercel.app/_next/static/css/app.css", "stylesheet").blokkeer, false);
+    assert.equal(v("https://fonts.gstatic.com/s/inter.woff2", "font").blokkeer, false);
+    assert.equal(v("https://bc3mgvdgdk.ufs.sh/f/foto.webp", "image").blokkeer, false);
+    assert.equal(v("https://images.unsplash.com/photo-1?w=700", "image").blokkeer, false);
+    assert.equal(v("https://demo.vercel.app/_next/static/chunks/main.js", "script").blokkeer, false);
+    assert.equal(v("data:image/png;base64,AAAA", "image").blokkeer, false);
+  });
+});
+
+describe("tijdslimieten", () => {
+  it("de hele generator stopt ruim vóór de 300 s van Vercel, met ruimte voor de PDF", () => {
+    assert.ok(LIMIETEN.totaal <= 210_000);
+    assert.ok(LIMIETEN.totaal + LIMIETEN.sluiten + 30_000 < 300_000);
+    assert.ok(LIMIETEN.rapportReserve >= LIMIETEN.rapportOpbouw);
+    for (const [naam, ms] of Object.entries(LIMIETEN)) assert.ok(ms > 0 && ms <= LIMIETEN.totaal, naam);
+  });
+
+  it("binnen(): een belofte die nooit klaar is, faalt na de limiet", async () => {
+    const t = Date.now();
+    await assert.rejects(binnen(new Promise(() => {}), 50, "test"), /test: langer dan 50 ms/);
+    assert.ok(Date.now() - t < 1000);
   });
 });

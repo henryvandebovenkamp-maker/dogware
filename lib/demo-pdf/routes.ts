@@ -11,8 +11,10 @@
  *      de aanvraag), zodat de functionaliteit in beeld komt;
  *   4. de login van het klantportaal, als de demo er een heeft.
  *
- * Juridische pagina's, bestanden en externe links vallen af. Puur: de browser
- * levert de links aan, deze functie kiest.
+ * Juridische pagina's, inloggen/uitloggen, bestanden, API-routes, mailto/tel
+ * en externe links vallen af; queryvarianten en #ankers tellen als dezelfde
+ * pagina. Hoeveel links een pagina ook heeft: er komen er nooit meer dan
+ * MAX_ROUTES uit. Puur: de browser levert de links aan, deze functie kiest.
  */
 
 export type DemoLink = { href: string; tekst: string };
@@ -25,18 +27,24 @@ export type DemoRoute = {
   soort: "home" | "menu" | "functie" | "portaal";
 };
 
+/** Desktoppagina's in de PDF, homepage en klantportaal inbegrepen. De mobiele homepage komt daar nog bij. */
 export const MAX_ROUTES = 7;
+/** Zoveel links bekijken we hooguit; een pagina met duizenden links maakt de keuze niet trager. */
+const MAX_LINKS = 400;
 
 const UITGESLOTEN = [
-  /^\/(login|inloggen|account|admin|dashboard|portaal)(\/|$)/i,
+  /^\/(login|inloggen|logout|uitloggen|registreren|account|admin|dashboard|portaal|wachtwoord)(\/|$)/i,
   /(privacy|cookie|voorwaarden|disclaimer|sitemap|manifest|robots)/i,
-  /^\/api\//i,
-  /\.(png|jpe?g|svg|webp|gif|pdf|xml|json|txt|ico|webmanifest)$/i,
+  /^\/(api|_next|_vercel)(\/|$)/i,
+  /\.(png|jpe?g|svg|webp|avif|gif|pdf|xml|json|txt|ico|webmanifest|zip|docx?|xlsx?|csv|ics|mp4|webm|mp3|css|js)$/i,
+  // Diep geneste paden zijn vrijwel altijd losse items (blogposts, producten), geen hoofdpagina's.
+  /^(\/[^/]+){4,}$/,
 ];
 
 function normaliseer(href: string, basis: URL): string | null {
   try {
     const url = new URL(href, basis);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return null;
     if (url.origin !== basis.origin) return null;
     const pad = url.pathname.replace(/\/+$/, "") || "/";
     return pad;
@@ -71,7 +79,7 @@ export function kiesDemoRoutes(input: {
   const al = new Set(["/"]);
   const toegestaan = (pad: string) => !UITGESLOTEN.some((r) => r.test(pad));
 
-  for (const link of input.menu) {
+  for (const link of input.menu.slice(0, MAX_LINKS)) {
     const pad = normaliseer(link.href, basis);
     if (!pad || al.has(pad) || !toegestaan(pad)) continue;
     al.add(pad);
@@ -80,7 +88,7 @@ export function kiesDemoRoutes(input: {
 
   // De homepage verwijst het vaakst naar wat ertoe doet: de dienst en de aanvraag.
   const telling = new Map<string, { n: number; tekst: string }>();
-  for (const link of input.inhoud) {
+  for (const link of input.inhoud.slice(0, MAX_LINKS)) {
     const pad = normaliseer(link.href, basis);
     if (!pad || al.has(pad) || !toegestaan(pad)) continue;
     const t = telling.get(pad);

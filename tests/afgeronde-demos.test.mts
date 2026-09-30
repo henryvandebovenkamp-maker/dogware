@@ -40,7 +40,7 @@ after(() => {
 });
 
 const PDF = Buffer.from("%PDF-1.7\n%%EOF");
-const maak = async () => ({ pdf: PDF, paginas: 13, schermen: 10, routes: [] });
+const maak = async () => ({ pdf: PDF, paginas: 13, schermen: 10, routes: [], overgeslagen: [], duurMs: 1 });
 const dagenGeleden = (n: number) => new Date(Date.now() - n * 86_400_000);
 
 async function aanvraag(naam: string, over: Partial<typeof schema.leads.$inferInsert> = {}) {

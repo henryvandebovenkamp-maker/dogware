@@ -33,7 +33,7 @@ const zetMailFaalt = (v: boolean) => ((globalThis as Record<string, unknown>).__
 const NU = new Date("2026-09-30T08:00:00Z");
 const dagenGeleden = (n: number) => new Date(NU.getTime() - n * 86_400_000);
 const PDF = Buffer.from("%PDF-1.7\n% nep-pdf voor de test\n%%EOF");
-const goedeMaak = async () => ({ pdf: PDF, paginas: 13, schermen: 10, routes: [{ pad: "/", titel: "Home", soort: "home" as const }] });
+const goedeMaak = async () => ({ pdf: PDF, paginas: 13, schermen: 10, routes: [{ pad: "/", titel: "Home", soort: "home" as const }], overgeslagen: [], duurMs: 1 });
 
 const ADMIN_TOKEN = randomBytes(24).toString("base64url");
 const [admin] = await db
@@ -251,7 +251,7 @@ describe("wat misgaat, laat de aanvraag zoals hij was", async () => {
       },
     });
     assert.equal(res.ok, false);
-    if (!res.ok) assert.match(res.reden, /niet bereikbaar/);
+    if (!res.ok) assert.match(res.reden, /demo kon niet worden geopend.*niets verstuurd/);
     assert.equal((await demoDocs(lead.id)).length, 0);
     assert.equal((await leesLead(lead.id)).status, "demo verstuurd");
     assert.ok((await events(lead.id)).some((e) => e.kind === "demo_pdf_mislukt" && e.internal));
@@ -303,5 +303,122 @@ describe("autorisatie", async () => {
     const res = await acties.verstuurAfsluitmail({ status: "idle" }, fd);
     assert.equal(res.status, "error", "met beheerder komt hij wel door de poort (en faalt op de onbekende PDF)");
     assert.match(res.message ?? "", /PDF/);
+  });
+});
+
+/* ------------------------------------------------ de PDF-generator faalt -- */
+
+describe("PDF-fouten en gelijktijdigheid: niets verstuurd, niets afgerond", async () => {
+  const faalt = (code: ConstructorParameters<typeof DemoPdfFout>[0]) => async () => {
+    throw new DemoPdfFout(code, "technisch detail dat niet in de UI hoort");
+  };
+
+  it("deadline gehaald (TIJD): menselijke melding, geen document, geen status, geen mail", async () => {
+    const lead = await demoAanvraag();
+    const voor = mails().length;
+    const res = await afronding.bereidDemoAfrondingVoor({ leadId: lead.id, actorId: admin.id, nu: NU, maak: faalt("TIJD") });
+    assert.equal(res.ok, false);
+    if (!res.ok) {
+      assert.equal(res.reden, afronding.PDF_MELDING.TIJD);
+      assert.match(res.reden, /niet op tijd worden vastgelegd.*niets verstuurd.*niet afgerond/);
+      assert.doesNotMatch(res.reden, /verbinding|technisch detail/);
+    }
+    assert.equal((await demoDocs(lead.id)).length, 0);
+    assert.equal((await leesLead(lead.id)).status, "demo verstuurd");
+    assert.equal(mails().length, voor);
+  });
+
+  it("elke foutsoort heeft een eigen, menselijke melding zonder techniek", async () => {
+    for (const code of ["ONBEREIKBAAR", "BROWSER", "LEEG", "TE_GROOT", "AFGEBROKEN"] as const) {
+      const lead = await demoAanvraag();
+      const res = await afronding.bereidDemoAfrondingVoor({ leadId: lead.id, actorId: admin.id, nu: NU, maak: faalt(code) });
+      assert.equal(res.ok, false);
+      if (!res.ok) {
+        assert.equal(res.reden, afronding.PDF_MELDING[code]);
+        assert.doesNotMatch(res.reden, /technisch detail|verbinding/);
+      }
+      assert.equal((await demoDocs(lead.id)).length, 0);
+    }
+  });
+
+  it("na een mislukte poging kan het meteen opnieuw", async () => {
+    const lead = await demoAanvraag();
+    await afronding.bereidDemoAfrondingVoor({ leadId: lead.id, actorId: admin.id, nu: NU, maak: faalt("TIJD") });
+    const res = await afronding.bereidDemoAfrondingVoor({ leadId: lead.id, actorId: admin.id, nu: NU, maak: goedeMaak });
+    assert.equal(res.ok, true);
+  });
+
+  it("dubbele klik (gelijktijdig): maar één browser, één PDF; de tweede krijgt een nette melding", async () => {
+    const lead = await demoAanvraag();
+    let aanroepen = 0;
+    const trageMaak = async () => {
+      aanroepen++;
+      await new Promise((r) => setTimeout(r, 150));
+      return goedeMaak();
+    };
+    const [a, b] = await Promise.all([
+      afronding.bereidDemoAfrondingVoor({ leadId: lead.id, actorId: admin.id, nu: NU, maak: trageMaak }),
+      afronding.bereidDemoAfrondingVoor({ leadId: lead.id, actorId: admin.id, nu: NU, maak: trageMaak }),
+    ]);
+    assert.equal(aanroepen, 1);
+    assert.equal([a, b].filter((r) => r.ok).length, 1);
+    const tweede = [a, b].find((r) => !r.ok);
+    if (tweede && !tweede.ok) assert.equal(tweede.reden, afronding.PDF_MELDING.BEZIG);
+    assert.equal((await demoDocs(lead.id)).length, 1);
+  });
+
+  it("bezig op een andere serverinstantie: geen tweede browser, maar ook geen eeuwige blokkade", async () => {
+    const lead = await demoAanvraag();
+    await db.insert(schema.journeyEvents).values({ leadId: lead.id, kind: "demo_pdf_gestart", label: "x", actor: "admin", internal: true });
+    const bezig = await afronding.bereidDemoAfrondingVoor({ leadId: lead.id, actorId: admin.id, nu: NU, maak: goedeMaak });
+    assert.equal(bezig.ok, false);
+    if (!bezig.ok) assert.equal(bezig.reden, afronding.PDF_MELDING.BEZIG);
+
+    // Een poging van tien minuten geleden die nooit afliep (instantie gestopt), blokkeert niet meer.
+    await db.delete(schema.journeyEvents).where(eq(schema.journeyEvents.leadId, lead.id));
+    await db.insert(schema.journeyEvents).values({
+      leadId: lead.id,
+      kind: "demo_pdf_gestart",
+      label: "x",
+      actor: "admin",
+      internal: true,
+      createdAt: new Date(Date.now() - 10 * 60_000),
+    });
+    const res = await afronding.bereidDemoAfrondingVoor({ leadId: lead.id, actorId: admin.id, nu: NU, maak: goedeMaak });
+    assert.equal(res.ok, true);
+  });
+
+  it("verzoek afgebroken terwijl de PDF klaar kwam: niets bewaard", async () => {
+    const lead = await demoAanvraag();
+    const ac = new AbortController();
+    const res = await afronding.bereidDemoAfrondingVoor({
+      leadId: lead.id,
+      actorId: admin.id,
+      nu: NU,
+      signal: ac.signal,
+      maak: async (i) => {
+        assert.equal(i.signal, ac.signal, "het signaal gaat door naar de generator");
+        ac.abort();
+        return goedeMaak();
+      },
+    });
+    assert.equal(res.ok, false);
+    assert.equal((await demoDocs(lead.id)).length, 0);
+    assert.equal((await leesLead(lead.id)).status, "demo verstuurd");
+  });
+
+  it("gedeeltelijke PDF (één pagina overgeslagen): bewaard, met de overgeslagen pagina in de snapshot", async () => {
+    const lead = await demoAanvraag();
+    const res = await afronding.bereidDemoAfrondingVoor({
+      leadId: lead.id,
+      actorId: admin.id,
+      nu: NU,
+      maak: async () => ({ ...(await goedeMaak()), overgeslagen: [{ pad: "/blog", reden: "navigatie: langer dan 15000 ms" }], duurMs: 61_000 }),
+    });
+    assert.equal(res.ok, true);
+    const [doc] = await demoDocs(lead.id);
+    assert.deepEqual((doc.snapshot as { overgeslagen: unknown }).overgeslagen, [{ pad: "/blog", reden: "navigatie: langer dan 15000 ms" }]);
+    assert.equal(doc.sentAt, null);
+    assert.equal((await leesLead(lead.id)).status, "demo verstuurd");
   });
 });
