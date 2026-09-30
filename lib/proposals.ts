@@ -3,22 +3,13 @@ import { and, desc, eq, inArray, ne, sql } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import type { Commerce, Lead, Proposal } from "@/lib/db/schema";
 import {
-  computeOneOff,
   euroFromCents,
   subscriptionStartLabel,
   type CommercialConfig,
 } from "@/lib/money";
 import { newPortalToken } from "@/lib/portal-access";
-import {
-  buildRegeling,
-  datumLang,
-  momentLabel,
-  normalizePlan,
-  regelingTitel,
-  regelingZin,
-  type BetaalRegeling,
-  type PlanConfig,
-} from "@/lib/payment-plan";
+import { normalizePlan, type BetaalRegeling, type PlanConfig } from "@/lib/payment-plan";
+import { berekenAfspraak, regelingLabels } from "@/lib/betaalafspraak";
 
 /**
  * Voorstellen met versiebeheer.
@@ -102,14 +93,14 @@ export function toConfig(c: Commerce): CommercialConfig {
 /** Bouwt de momentopname uit de actuele afspraak. Server-side, altijd. */
 export function freezePricing(c: Commerce): PricingSnapshot {
   const config = toConfig(c);
-  const computed = computeOneOff(config);
+  const { computed, regeling } = berekenAfspraak(config, planConfig(c));
   return {
     config,
     subscriptionStartRule: c.subscriptionStartRule,
     subscriptionStartAt: c.subscriptionStartAt?.toISOString() ?? null,
     computed,
     frozenAt: new Date().toISOString(),
-    betaalregeling: buildRegeling(planConfig(c), computed, config.vatPercent).regeling,
+    betaalregeling: regeling,
   };
 }
 
@@ -118,9 +109,8 @@ export function freezePricing(c: Commerce): PricingSnapshot {
  * opgebouwd uit de opgeslagen afspraak — niets komt uit de browser.
  */
 export function checkRegeling(c: Commerce): { ok: true } | { ok: false; reden: string } {
-  const config = toConfig(c);
-  const r = buildRegeling(planConfig(c), computeOneOff(config), config.vatPercent);
-  return r.ok ? { ok: true } : { ok: false, reden: r.reden };
+  const { fout } = berekenAfspraak(toConfig(c), planConfig(c));
+  return fout ? { ok: false, reden: fout } : { ok: true };
 }
 
 /**
@@ -423,66 +413,4 @@ export function pricingLabels(snap: PricingSnapshot) {
   };
 }
 
-/** Eén geplande termijn, klaar om te tonen. */
-export type RegelingTermijnLabel = {
-  volgnummer: number;
-  aantal: number;
-  wanneer: string;
-  exVat: string;
-  vat: string;
-  inclVat: string;
-};
-
-/** Leesbare betaalregeling — serialiseerbaar, dus ook bruikbaar in client-componenten. */
-export type RegelingLabels = {
-  soort: BetaalRegeling["soort"];
-  /** true bij een voorstel van vóór de betaalregelingen (altijd 50/50). */
-  historisch: boolean;
-  aantal: number;
-  titel: string;
-  zin: string;
-  eersteBetaling: string;
-  termijnen: RegelingTermijnLabel[];
-};
-
-/**
- * De betaalregeling in woorden. Een voorstel zonder bevroren regeling is per
- * definitie de oude 50/50-afspraak; die tonen we met de bedragen die er al in
- * stonden, zonder iets opnieuw te berekenen.
- */
-export function regelingLabels(snap: PricingSnapshot): RegelingLabels {
-  const c = snap.computed;
-  const r = snap.betaalregeling;
-  if (!r) {
-    return {
-      soort: "50-50",
-      historisch: true,
-      aantal: 2,
-      titel: regelingTitel({ soort: "50-50", aantal: 2 }, c.depositPercent),
-      zin: regelingZin({ soort: "50-50", aantal: 2, start: "bij-akkoord", startDatum: null }),
-      eersteBetaling: "Na ondertekening",
-      termijnen: [
-        { volgnummer: 1, aantal: 2, wanneer: "Na ondertekening", exVat: "", vat: "", inclVat: euroFromCents(c.depositCents) },
-        { volgnummer: 2, aantal: 2, wanneer: "Bij oplevering", exVat: "", vat: "", inclVat: euroFromCents(c.finalCents) },
-      ],
-    };
-  }
-  const termijnen = r.termijnen.map((t) => ({
-    volgnummer: t.volgnummer,
-    aantal: t.aantal,
-    wanneer: momentLabel(t, r),
-    exVat: euroFromCents(t.exVatCents),
-    vat: euroFromCents(t.vatCents),
-    inclVat: euroFromCents(t.inclVatCents),
-  }));
-  return {
-    soort: r.soort,
-    historisch: false,
-    aantal: r.termijnen.length,
-    titel: regelingTitel(r, c.depositPercent),
-    zin: regelingZin(r),
-    eersteBetaling:
-      r.start === "datum" && r.startDatum ? datumLang(new Date(`${r.startDatum}T12:00:00Z`)) : "Na ondertekening",
-    termijnen,
-  };
-}
+export { regelingLabels, type RegelingLabels, type RegelingTermijnLabel } from "@/lib/betaalafspraak";

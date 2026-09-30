@@ -1,6 +1,6 @@
 import { Check, Clock, Receipt } from "lucide-react";
 import type { SchemaWeergave, TermijnRij } from "@/lib/payment-schedule";
-import type { RegelingLabels } from "@/lib/proposals";
+import type { RegelingLabels } from "@/lib/betaalafspraak";
 import type { TermijnStatus } from "@/lib/payment-plan";
 import { cn } from "@/lib/cn";
 
@@ -113,7 +113,7 @@ function TermijnRegel({
             {enkel ? "Eenmalige betaling" : `Termijn ${r.volgnummer} van ${r.aantal}`}
           </p>
           <p className="text-[14px] font-extrabold tabular-nums text-ink">
-            {r.exVat} <span className="text-[11.5px] font-semibold text-ink-300">excl. btw</span>
+            {r.inclVat} <span className="text-[11.5px] font-semibold text-ink-300">incl. btw</span>
           </p>
         </div>
         <div className="mt-1 flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
@@ -121,7 +121,7 @@ function TermijnRegel({
           <TermijnPil status={r.status} label={r.statusLabel} />
         </div>
         <p className="mt-0.5 text-[11.5px] tabular-nums text-ink-300">
-          {r.inclVat} incl. btw ({r.vat} btw)
+          {r.exVat} excl. btw + {r.vat} btw
         </p>
         {(r.factuur || (admin && r.mollieStatus)) && (
           <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px]">
@@ -249,9 +249,9 @@ export function RegelingVoorstel({
             </span>
             <span className="shrink-0 text-right">
               <span className="block text-[13.5px] font-extrabold tabular-nums text-ink">
-                {t.exVat} <span className="text-[11px] font-semibold text-ink-300">excl.</span>
+                {t.inclVat} <span className="text-[11px] font-semibold text-ink-300">incl. btw</span>
               </span>
-              <span className="block text-[11.5px] tabular-nums text-ink-300">{t.inclVat} incl. btw</span>
+              <span className="block text-[11.5px] tabular-nums text-ink-300">{t.exVat} excl. btw</span>
             </span>
           </li>
         ))}

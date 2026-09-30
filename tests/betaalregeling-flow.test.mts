@@ -249,6 +249,7 @@ const KLANTEN = {
   VOLLEDIG: await klantMetOpdracht({ plan: "volledig", naam: "Volledig Uitlaatservice" }),
   NIEUW5050: await klantMetOpdracht({ plan: "50-50", naam: "Nieuw Vijftig Trimsalon" }),
   HISTORISCH: await klantMetOpdracht({ plan: "50-50", naam: "Historisch Pension" }),
+  VIJF: await klantMetOpdracht({ plan: "termijnen", aantal: 5, naam: "Vijf Termijnen Kennel" }),
 };
 
 /* =========================================================================
@@ -632,6 +633,14 @@ describe("50/50 — nieuw, met schema", () => {
     assert.ok(rijen.every((r) => r.status === "BETAALD"));
     const [c] = await db.select().from(schema.commerce).where(eq(schema.commerce.id, k.commerce.id));
     assert.ok(["FULLY_PAID", "SUBSCRIPTION_SCHEDULED"].includes(c.status));
+
+    // De twee facturen samen sluiten exact op de opdracht, per kolom.
+    const facturen = await db.select().from(schema.documents).where(eq(schema.documents.commerceId, k.commerce.id));
+    const betaalFacturen = facturen.filter((f) => f.paymentId);
+    assert.equal(betaalFacturen.length, 2);
+    assert.equal(betaalFacturen.reduce((s, f) => s + f.netExVatCents, 0), 250_000, "som netto");
+    assert.equal(betaalFacturen.reduce((s, f) => s + f.vatCents, 0), 52_500, "som btw");
+    assert.equal(betaalFacturen.reduce((s, f) => s + f.totalInclVatCents, 0), 302_500, "som incl.");
   });
 });
 
@@ -685,5 +694,63 @@ describe("dagelijkse termijnronde", () => {
     );
     assert.equal(goed.status, 200);
     delete process.env.CRON_SECRET;
+  });
+});
+
+/* =========================================================================
+ * Vijf termijnen — € 2.500 excl. / € 3.025 incl. — de hele keten
+ * ========================================================================= */
+
+describe("vijf termijnen: opslaan → database → versie → tekenen → Mollie → factuur", () => {
+  const k = KLANTEN.VIJF;
+
+  it("opgeslagen en opnieuw gelezen uit de database: termijnen, 5 stuks", async () => {
+    const [c] = await db.select().from(schema.commerce).where(eq(schema.commerce.id, k.commerce.id));
+    assert.equal(c.paymentPlan, "termijnen");
+    assert.equal(c.installmentCount, 5);
+    assert.equal(c.projectCents, 250_000);
+    assert.equal(c.monthlyCents, 18_000, "het abonnement is een eigen veld");
+  });
+
+  it("de verstuurde versie bevat 5 × € 605,00 incl. btw, samen exact € 3.025,00", async () => {
+    const [p] = await db.select().from(schema.proposals).where(eq(schema.proposals.commerceId, k.commerce.id));
+    assert.equal(p.status, "SENT");
+    const r = (p.pricing as { betaalregeling: { soort: string; termijnen: { exVatCents: number; vatCents: number; inclVatCents: number }[] } })
+      .betaalregeling;
+    assert.equal(r.soort, "termijnen");
+    assert.deepEqual(r.termijnen.map((t) => t.inclVatCents), [60_500, 60_500, 60_500, 60_500, 60_500]);
+    assert.deepEqual(r.termijnen.map((t) => t.exVatCents), [50_000, 50_000, 50_000, 50_000, 50_000]);
+    assert.equal(r.termijnen.reduce((s, t) => s + t.inclVatCents, 0), 302_500);
+    const mail = mailsVan("agreement-ready").find((m) => (m as { to?: string }).to === k.lead.email);
+    assert.match(mail?.vars?.regeling ?? "", /vijf maandelijkse termijnen/);
+  });
+
+  it("tekenen → schema van 5 × € 605,00; Mollie int exact € 605,00; webhook → factuur € 500 + € 105 btw", async () => {
+    alsKlant();
+    const res = await acties.signAgreement(k.token, TEKEN);
+    assert.equal(res.status, "success", res.message);
+    const rijen = await scheduleForCommerce(k.commerce.id);
+    assert.deepEqual(rijen.map((r) => r.amountInclVatCents), [60_500, 60_500, 60_500, 60_500, 60_500]);
+    assert.equal(rijen.reduce((s, r) => s + r.amountInclVatCents, 0), 302_500);
+
+    const id = await start(k.token, "deposit");
+    assert.equal(mollieBetalingen.get(id)?.amount.value, "605.00", "Mollie krijgt exact het termijnbedrag");
+    const [p] = await betalingenVan(k.commerce.id);
+    assert.equal(p.amountCents, 60_500);
+
+    mollieZet(id, "paid");
+    await processPaymentByMollieId(id);
+    const [factuur] = await db.select().from(schema.documents).where(eq(schema.documents.paymentId, p.id));
+    assert.equal(factuur.netExVatCents, 50_000);
+    assert.equal(factuur.vatCents, 10_500);
+    assert.match(factuur.titel, /termijn 1 van 5/);
+    const [eerste] = await scheduleForCommerce(k.commerce.id);
+    assert.equal(eerste.status, "BETAALD");
+    assert.equal(eerste.documentId, factuur.id);
+    assert.equal(
+      abonnementen.filter((a) => (a as { metadata?: { commerceId?: string } }).metadata?.commerceId === k.commerce.id).length,
+      0,
+      "het abonnement start niet mee met een termijn",
+    );
   });
 });

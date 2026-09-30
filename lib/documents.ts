@@ -366,14 +366,16 @@ export async function registerInvoiceForPayment(
     : basis.toelichting;
 
   /*
-   * De regel. Is er een termijn uit het schema en klopt het ontvangen bedrag
-   * met die termijn, dan staan op de factuur exact de bevroren bedragen excl.
-   * btw en btw die de klant heeft getekend — zo tellen de facturen van alle
-   * termijnen samen precies op tot de opdracht. In elk ander geval (50/50,
-   * abonnement) wordt, zoals altijd, teruggerekend uit wat Mollie bevestigde.
+   * De regel. Is er een termijn uit het schema (ook een nieuwe 50/50) en klopt
+   * het ontvangen bedrag met die termijn, dan staan op de factuur exact de
+   * bevroren bedragen excl. btw en btw die de klant heeft getekend — zo tellen
+   * de facturen van alle termijnen samen precies op tot de opdracht, zonder
+   * dat een losse btw-afronding een cent laat weglopen. In elk ander geval
+   * (historische 50/50 zonder schema, abonnement) wordt, zoals altijd,
+   * teruggerekend uit wat Mollie bevestigde.
    */
   const regel =
-    inSchema && termijn.amountInclVatCents === payment.amountCents
+    termijn && termijn.amountInclVatCents === payment.amountCents
       ? {
           omschrijving: titel,
           toelichting,

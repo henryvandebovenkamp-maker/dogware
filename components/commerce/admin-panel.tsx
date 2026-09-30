@@ -25,7 +25,7 @@ import {
 } from "@/app/actions/commerce";
 import { isInvoiceType } from "@/lib/db/schema";
 import { cn } from "@/lib/cn";
-import type { RegelingLabels } from "@/lib/proposals";
+import type { RegelingLabels } from "@/lib/betaalafspraak";
 import type { SchemaWeergave } from "@/lib/payment-schedule";
 import { RegelingSamenvatting, TermijnLijst } from "@/components/commerce/betaalafspraak";
 
@@ -194,8 +194,8 @@ export function CommerceSecties(props: {
           <Kaart label="Eenmalig excl. btw" value={f.net} />
           <Kaart label="Regeling" value={props.regeling.titel} tint="brand" />
           <Kaart
-            label={props.regeling.termijnen.length === 1 ? "Bedrag incl. btw" : "Per termijn excl."}
-            value={props.regeling.termijnen.length === 1 ? f.total : props.regeling.termijnen[0].exVat}
+            label={props.regeling.termijnen.length === 1 ? "Bedrag incl. btw" : "Per termijn incl. btw"}
+            value={props.regeling.termijnen.length === 1 ? f.total : props.regeling.termijnen[0].inclVat}
             tint="brand"
           />
           <Kaart label="Openstaand" value={f.outstanding} />

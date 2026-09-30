@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useActionState } from "react";
 import { ArrowLeft, Check, CloudOff, Loader2 } from "lucide-react";
@@ -11,7 +11,14 @@ import {
   type CommerceState,
 } from "@/app/actions/commerce";
 import { cn } from "@/lib/cn";
-import type { RegelingLabels } from "@/lib/proposals";
+import {
+  afspraakOverzicht,
+  leesAfspraak,
+  type AfspraakInvoer,
+  type AfspraakOverzicht,
+} from "@/lib/betaalafspraak";
+import { KlantPreview } from "@/components/commerce/klant-preview";
+import type { CommercialConfig } from "@/lib/money";
 import { INSTALLMENT_PRESETS, MAX_INSTALLMENTS, MIN_INSTALLMENTS } from "@/lib/payment-plan";
 
 const IDLE: CommerceState = { status: "idle" };
@@ -50,23 +57,10 @@ export type EditorData = {
     installmentStart: string;
     installmentStartDate: string;
   };
-  computed: {
-    subtotal: string;
-    discount: string;
-    net: string;
-    vat: string;
-    total: string;
-    deposit: string;
-    final: string;
-    depositPercent: number;
-    finalPercent: number;
-    monthlyExVat: string;
-    monthlyInclVat: string;
-    /** Het termijnschema zoals de server het berekent uit de opgeslagen afspraak. */
-    regeling: RegelingLabels;
-    /** Waarom de regeling zo niet verstuurd kan worden, of null. */
-    regelingFout: string | null;
-  };
+  /** De OPGESLAGEN afspraak, server-side berekend — wat bij versturen bevroren wordt. */
+  opgeslagen: AfspraakOverzicht;
+  /** Velden die de eenmalige berekening niet raken, maar de afspraak wel compleet maken. */
+  basis: Pick<CommercialConfig, "freeMonths" | "introDiscountPercent" | "introDiscountMonths">;
   eerderVerstuurd: number;
 };
 
@@ -88,11 +82,44 @@ export function ProposalEditor({ data }: { data: EditorData }) {
 
   const [cfgState, cfgAction, cfgPending] = useActionState(saveCommerceConfig, IDLE);
   const [sendState, sendAction, sendPending] = useActionState(sendProposal, IDLE);
-  const [discountType, setDiscountType] = useState(data.config.discountType);
   const [startRule, setStartRule] = useState(data.config.startRule);
-  const [plan, setPlan] = useState(data.config.paymentPlan);
-  const [aantal, setAantal] = useState(data.config.installmentCount);
-  const [planStart, setPlanStart] = useState(data.config.installmentStart);
+
+  /*
+   * De financiële velden zijn gecontroleerd, zodat "Zo ziet de klant het" bij
+   * elke wijziging meteen meebeweegt. De preview rekent met exact dezelfde
+   * functies als de server (lib/betaalafspraak.ts) — geen tweede berekening.
+   * Opslaan en versturen rekenen daarna opnieuw, op de server.
+   */
+  const [fin, setFin] = useState<AfspraakInvoer>(() => invoerVan(data.config));
+  const zet = (k: keyof AfspraakInvoer) => (v: string) => setFin((f) => ({ ...f, [k]: v }));
+  // Na opslaan komt de afspraak vers van de server: dan toont het formulier
+  // wat er werkelijk is opgeslagen (bijv. een afgekapt aantal termijnen).
+  // Alleen bij een ÉCHTE wijziging, niet bij elke refresh door de autosave.
+  const opgeslagenSleutel = JSON.stringify(data.config);
+  const [vorigeSleutel, setVorigeSleutel] = useState(opgeslagenSleutel);
+  if (vorigeSleutel !== opgeslagenSleutel) {
+    setVorigeSleutel(opgeslagenSleutel);
+    setFin(invoerVan(data.config));
+    setStartRule(data.config.startRule);
+  }
+  const discountType = fin.discountType;
+  const plan = fin.paymentPlan;
+  const aantal = fin.installmentCount;
+  const planStart = fin.installmentStart;
+
+  const live = useMemo(() => {
+    const { config, plan: p } = leesAfspraak(fin, data.basis);
+    return afspraakOverzicht(config, p);
+  }, [fin, data.basis]);
+  // Wijkt het formulier af van wat er in de database staat? Vergeleken na
+  // normaliseren, zodat "2500" en "2500.00" gewoon hetzelfde zijn.
+  const gewijzigd = useMemo(
+    () =>
+      startRule !== data.config.startRule ||
+      JSON.stringify(leesAfspraak(fin, data.basis)) !==
+        JSON.stringify(leesAfspraak(invoerVan(data.config), data.basis)),
+    [fin, startRule, data.config, data.basis],
+  );
 
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const laatsteOpslag = useRef(JSON.stringify(data.content));
@@ -157,7 +184,7 @@ export function ProposalEditor({ data }: { data: EditorData }) {
     setContent((c) => ({ ...c, [k]: v }));
 
   const c = data.config;
-  const m = data.computed;
+  const m = live;
   const direct = Boolean(data.direct);
 
   return (
@@ -275,16 +302,16 @@ export function ProposalEditor({ data }: { data: EditorData }) {
           Eenmalige investering
         </p>
         <div className="grid gap-3 sm:grid-cols-3">
-          <Geld name="project" label="Projectbedrag (excl. btw)" def={c.project} />
-          <Geld name="setup" label="Opstartkosten (excl. btw)" def={c.setup} />
-          <Getal name="vat" label="Btw %" def={c.vat} />
+          <Geld name="project" label="Projectbedrag (excl. btw)" value={fin.project} onChange={zet("project")} />
+          <Geld name="setup" label="Opstartkosten (excl. btw)" value={fin.setup} onChange={zet("setup")} />
+          <Getal name="vat" label="Btw %" value={fin.vat} onChange={zet("vat")} />
         </div>
         <div className="mt-3 grid gap-3 sm:grid-cols-3">
           <Veld label="Korting">
             <select
               name="discountType"
               value={discountType}
-              onChange={(e) => setDiscountType(e.target.value)}
+              onChange={(e) => zet("discountType")(e.target.value)}
               className={inputKlas}
             >
               <option value="none">Geen korting</option>
@@ -293,9 +320,11 @@ export function ProposalEditor({ data }: { data: EditorData }) {
             </select>
           </Veld>
           {discountType === "percent" ? (
-            <Getal name="discountValue" label="Kortingspercentage" def={c.discountValue} />
+            <Getal name="discountValue" label="Kortingspercentage" value={fin.discountValue} onChange={zet("discountValue")} />
+          ) : discountType === "amount" ? (
+            <Geld name="discountValue" label="Kortingsbedrag" value={fin.discountValue} onChange={zet("discountValue")} />
           ) : (
-            <Geld name="discountValue" label="Kortingsbedrag" def={c.discountValue} />
+            <input type="hidden" name="discountValue" value="0" />
           )}
         </div>
 
@@ -327,7 +356,7 @@ export function ProposalEditor({ data }: { data: EditorData }) {
                   name="paymentPlan"
                   value={waarde}
                   checked={plan === waarde}
-                  onChange={() => setPlan(waarde)}
+                  onChange={() => zet("paymentPlan")(waarde)}
                   className="mt-0.5 accent-[var(--color-brand)]"
                 />
                 <span>
@@ -341,14 +370,19 @@ export function ProposalEditor({ data }: { data: EditorData }) {
 
         {plan === "50-50" ? (
           <div className="mt-3 grid gap-3 sm:grid-cols-3">
-            <Getal name="depositPercent" label="Eerste termijn %" def={c.depositPercent} />
+            <Getal
+              name="depositPercent"
+              label="Betaling bij start %"
+              value={fin.depositPercent}
+              onChange={zet("depositPercent")}
+            />
             <p className="self-end text-[12px] text-ink-300 sm:col-span-2">
-              De tweede termijn is altijd het restant — die hoef je niet apart in te vullen.
+              De betaling bij oplevering is altijd het restant — die hoef je niet apart in te vullen.
             </p>
           </div>
         ) : (
           // Niet zichtbaar, wel bewaard: terug naar 50/50 geeft het eerdere percentage terug.
-          <input type="hidden" name="depositPercent" value={c.depositPercent} />
+          <input type="hidden" name="depositPercent" value={fin.depositPercent} />
         )}
 
         {plan === "termijnen" && (
@@ -360,7 +394,7 @@ export function ProposalEditor({ data }: { data: EditorData }) {
                   <button
                     key={n}
                     type="button"
-                    onClick={() => setAantal(String(n))}
+                    onClick={() => zet("installmentCount")(String(n))}
                     className={cn(
                       "min-w-[44px] rounded-full px-3 py-1.5 text-[13px] font-bold transition",
                       aantal === String(n)
@@ -380,7 +414,7 @@ export function ProposalEditor({ data }: { data: EditorData }) {
                     max={MAX_INSTALLMENTS}
                     step={1}
                     value={aantal}
-                    onChange={(e) => setAantal(e.target.value)}
+                    onChange={(e) => zet("installmentCount")(e.target.value)}
                     className="w-20 rounded-lg border border-cream-200 bg-white px-2.5 py-1.5 text-[13px] text-ink outline-none focus:border-brand"
                     aria-label="Aangepast aantal termijnen"
                   />
@@ -396,7 +430,7 @@ export function ProposalEditor({ data }: { data: EditorData }) {
                     name="installmentStart"
                     value="bij-akkoord"
                     checked={planStart !== "datum"}
-                    onChange={() => setPlanStart("bij-akkoord")}
+                    onChange={() => zet("installmentStart")("bij-akkoord")}
                     className="mt-0.5 accent-[var(--color-brand)]"
                   />
                   Eerste termijn bij ondertekening, daarna elke kalendermaand
@@ -407,7 +441,7 @@ export function ProposalEditor({ data }: { data: EditorData }) {
                     name="installmentStart"
                     value="datum"
                     checked={planStart === "datum"}
-                    onChange={() => setPlanStart("datum")}
+                    onChange={() => zet("installmentStart")("datum")}
                     className="accent-[var(--color-brand)]"
                   />
                   Vaste startdatum
@@ -415,16 +449,19 @@ export function ProposalEditor({ data }: { data: EditorData }) {
                     <input
                       type="date"
                       name="installmentStartDate"
-                      defaultValue={c.installmentStartDate}
+                      value={fin.installmentStartDate}
+                      onChange={(e) => zet("installmentStartDate")(e.target.value)}
                       required
                       className="rounded-lg border border-cream-200 bg-white px-2.5 py-1 text-[13px] text-ink outline-none focus:border-brand"
                     />
                   )}
                 </label>
               </div>
-              <p className="mt-1.5 text-[11.5px] leading-relaxed text-ink-300">
-                Een termijn kan betaald worden vanaf 14 dagen vóór de vervaldatum en heet &quot;te
-                laat&quot; een week erna. De bouw start na de eerste termijn.
+              <p className="mt-1.5 text-[12px] leading-relaxed text-ink-500">
+                {planStart === "datum"
+                  ? "Eerste termijn op de gekozen datum, daarna iedere maand."
+                  : "Eerste termijn bij ondertekening, daarna iedere maand."}{" "}
+                De bouw start zodra de eerste termijn is betaald.
               </p>
             </div>
           </div>
@@ -434,7 +471,7 @@ export function ProposalEditor({ data }: { data: EditorData }) {
           {direct ? "DogWare maandabonnement" : "Maandabonnement"}
         </p>
         <div className="grid gap-3 sm:grid-cols-3">
-          <Geld name="monthly" label="Maandbedrag (excl. btw)" def={c.monthly} />
+          <Geld name="monthly" label="Maandbedrag (excl. btw)" value={fin.monthly} onChange={zet("monthly")} />
           <Getal name="freeMonths" label="Gratis maanden" def={c.freeMonths} />
           <Veld label={direct ? "Startmoment abonnement" : "Abonnement start"}>
             <select
@@ -471,7 +508,10 @@ export function ProposalEditor({ data }: { data: EditorData }) {
           >
             {cfgPending ? "Opslaan…" : "Bedragen opslaan"}
           </button>
-          {cfgState.message && (
+          {gewijzigd && !cfgPending && (
+            <span className="text-[12px] font-semibold text-brand-600">Nog niet opgeslagen</span>
+          )}
+          {cfgState.message && !gewijzigd && (
             <span
               className={cn(
                 "text-[12px] font-semibold",
@@ -486,73 +526,15 @@ export function ProposalEditor({ data }: { data: EditorData }) {
 
       {/* --------------------------------------------------------- overzicht */}
       <section className="mt-6 rounded-2xl bg-cream-100/60 p-5 ring-1 ring-ink/5 sm:p-6">
-        <SectieKop titel="Zo ziet de klant het" uitleg="Server-berekend, op basis van de opgeslagen bedragen." />
-        <dl className="mt-4 space-y-1.5 text-[14px]">
-          <Regel label="Subtotaal" value={m.subtotal} />
-          {m.discount !== "€ 0,00" && <Regel label="Korting" value={`− ${m.discount}`} />}
-          <Regel label="Netto excl. btw" value={m.net} sterk />
-          <Regel label={`Btw ${c.vat}%`} value={m.vat} />
-          <Regel label="Totaal incl. btw" value={m.total} sterk />
-        </dl>
-        {m.regelingFout && (
-          <p className="mt-3 rounded-lg bg-brand-50 px-3 py-2 text-[12.5px] font-semibold text-brand-600">
-            {m.regelingFout}
-          </p>
-        )}
-        {m.regeling.soort !== "50-50" ? (
-          <div className="mt-4 space-y-2.5">
-            <div className="rounded-xl bg-white p-3.5 ring-1 ring-ink/5">
-              <p className="text-[10.5px] font-bold uppercase tracking-wide text-ink-300">
-                Betaalafspraak · {m.regeling.titel}
-              </p>
-              <p className="mt-1 text-[12.5px] leading-relaxed text-ink-500">{m.regeling.zin}</p>
-              <ol className="mt-2 divide-y divide-cream-100">
-                {m.regeling.termijnen.map((t) => (
-                  <li
-                    key={t.volgnummer}
-                    className="flex flex-wrap items-baseline justify-between gap-x-3 py-1.5 text-[12.5px]"
-                  >
-                    <span className="text-ink-700">
-                      {m.regeling.termijnen.length === 1 ? "Eenmalig" : `Termijn ${t.volgnummer}`}{" "}
-                      <span className="text-ink-300">· {t.wanneer}</span>
-                    </span>
-                    <span className="tabular-nums">
-                      <span className="font-extrabold text-brand">{t.exVat}</span>{" "}
-                      <span className="text-ink-300">excl. · {t.inclVat} incl.</span>
-                    </span>
-                  </li>
-                ))}
-              </ol>
-            </div>
-            <Bedrag
-              label={direct ? "DogWare maandabonnement (los van de termijnen)" : "DogWare abonnement (los van de termijnen)"}
-              value={`${m.monthlyExVat} p/m`}
-              sub="excl. btw"
-              tint="sage"
-            />
-          </div>
-        ) : (
-        <div className="mt-4 grid gap-2.5 sm:grid-cols-3">
-          <Bedrag
-            label={direct ? `Eerste termijn: ${m.depositPercent}%` : `Betaling bij start (${m.depositPercent}%)`}
-            value={m.deposit}
-            sub={direct ? "incl. btw, na ondertekening" : undefined}
-            tint="brand"
-          />
-          <Bedrag
-            label={direct ? `Tweede termijn: ${m.finalPercent}%` : `Betaling bij oplevering (${m.finalPercent}%)`}
-            value={m.final}
-            sub={direct ? "incl. btw, bij oplevering" : undefined}
-            tint="brand"
-          />
-          <Bedrag
-            label={direct ? "DogWare maandabonnement" : "DogWare abonnement"}
-            value={`${m.monthlyExVat} p/m`}
-            sub="excl. btw"
-            tint="sage"
-          />
-        </div>
-        )}
+        <SectieKop
+          titel="Zo ziet de klant het"
+          uitleg={
+            gewijzigd
+              ? "Voorbeeld van je wijzigingen — nog niet opgeslagen. De klant krijgt pas deze afspraak na 'Bedragen opslaan'."
+              : "De opgeslagen afspraak, precies zoals hij verstuurd wordt."
+          }
+        />
+        <KlantPreview m={m} startRule={startRule} direct={direct} />
       </section>
 
       {/* ----------------------------------------------------------- versturen */}
@@ -569,10 +551,16 @@ export function ProposalEditor({ data }: { data: EditorData }) {
               : "Na versturen staat deze versie vast. Wijzig je later iets, dan ontstaat er automatisch een nieuwe versie."
           }
         />
+        {gewijzigd && (
+          <p className="mt-4 rounded-lg bg-brand-50 px-3 py-2 text-[12.5px] font-semibold text-brand-600">
+            Je hebt de bedragen of de betaalregeling gewijzigd maar nog niet opgeslagen. Sla ze eerst
+            op — anders gaat de vorige afspraak de deur uit.
+          </p>
+        )}
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <button
             type="submit"
-            disabled={sendPending}
+            disabled={sendPending || gewijzigd}
             className="rounded-full bg-brand px-5 py-2.5 text-[13px] font-bold text-white transition hover:-translate-y-px hover:bg-brand-600 disabled:opacity-60"
           >
             {sendPending
@@ -595,6 +583,23 @@ export function ProposalEditor({ data }: { data: EditorData }) {
       </form>
     </div>
   );
+}
+
+/** De opgeslagen afspraak als formulierinvoer. */
+function invoerVan(c: EditorData["config"]): AfspraakInvoer {
+  return {
+    project: c.project,
+    setup: c.setup,
+    discountType: c.discountType,
+    discountValue: c.discountValue,
+    vat: c.vat,
+    depositPercent: c.depositPercent,
+    monthly: c.monthly,
+    paymentPlan: c.paymentPlan,
+    installmentCount: c.installmentCount,
+    installmentStart: c.installmentStart,
+    installmentStartDate: c.installmentStartDate,
+  };
 }
 
 /* ------------------------------------------------------------- bouwstenen -- */
@@ -629,60 +634,45 @@ function Veld({
   );
 }
 
-function Geld({ name, label, def }: { name: string; label: string; def: string }) {
+type Invoer = { name: string; label: string } & (
+  | { def: string; value?: never; onChange?: never }
+  | { def?: never; value: string; onChange: (v: string) => void }
+);
+
+function Geld({ name, label, def, value, onChange }: Invoer) {
   return (
     <Veld label={label}>
       <div className="flex items-center gap-1.5">
         <span className="text-ink-300">€</span>
-        <input name={name} type="number" min={0} step="0.01" defaultValue={def} className={inputKlas} />
+        <input
+          name={name}
+          type="number"
+          min={0}
+          step="0.01"
+          {...(onChange ? { value, onChange: (e) => onChange(e.target.value) } : { defaultValue: def })}
+          className={inputKlas}
+        />
       </div>
     </Veld>
   );
 }
 
-function Getal({ name, label, def }: { name: string; label: string; def: string }) {
+function Getal({ name, label, def, value, onChange }: Invoer) {
   return (
     <Veld label={label}>
-      <input name={name} type="number" min={0} step={1} defaultValue={def} className={inputKlas} />
+      <input
+        name={name}
+        type="number"
+        min={0}
+        step={1}
+        {...(onChange ? { value, onChange: (e) => onChange(e.target.value) } : { defaultValue: def })}
+        className={inputKlas}
+      />
     </Veld>
   );
 }
 
-function Regel({ label, value, sterk }: { label: string; value: string; sterk?: boolean }) {
-  return (
-    <div className="flex items-baseline justify-between gap-4">
-      <dt className={cn("text-ink-500", sterk && "font-bold text-ink")}>{label}</dt>
-      <dd className={cn("tabular-nums text-ink-700", sterk && "font-extrabold text-ink")}>{value}</dd>
-    </div>
-  );
-}
 
-function Bedrag({
-  label,
-  value,
-  sub,
-  tint,
-}: {
-  label: string;
-  value: string;
-  sub?: string;
-  tint: "brand" | "sage";
-}) {
-  return (
-    <div className="rounded-xl bg-white p-3.5 ring-1 ring-ink/5">
-      <p className="text-[10.5px] font-bold uppercase tracking-wide text-ink-300">{label}</p>
-      <p
-        className={cn(
-          "mt-1 text-[17px] font-extrabold tabular-nums",
-          tint === "brand" ? "text-brand" : "text-sage-600",
-        )}
-      >
-        {value}
-      </p>
-      {sub && <p className="text-[11px] text-ink-300">{sub}</p>}
-    </div>
-  );
-}
 
 function SaveIndicator({ state, message }: { state: SaveState; message: string | null }) {
   if (state === "error") {

@@ -8,7 +8,7 @@ import { JourneyBar } from "@/components/commerce/journey-bar";
 import { BrandMark } from "@/components/brand";
 import { legalFooterLine } from "@/lib/legal-entity";
 import { cn } from "@/lib/cn";
-import type { RegelingLabels } from "@/lib/proposals";
+import type { RegelingLabels } from "@/lib/betaalafspraak";
 import type { SchemaWeergave } from "@/lib/payment-schedule";
 import { RegelingVoorstel, TermijnLijst, TermijnPil, Voortgangsbalk } from "@/components/commerce/betaalafspraak";
 
@@ -758,11 +758,11 @@ function BetaalAfspraakKaart({
                 />
               </div>
               <p className="mt-1 text-[20px] font-extrabold tabular-nums leading-none text-ink">
-                {volgende.exVat}{" "}
-                <span className="text-[12px] font-semibold text-ink-500">excl. btw</span>
+                {volgende.inclVat}{" "}
+                <span className="text-[12px] font-semibold text-ink-500">incl. btw</span>
               </p>
               <p className="mt-1 text-[12.5px] text-ink-500">
-                {volgende.inclVat} incl. btw ·{" "}
+                {volgende.exVat} excl. btw ·{" "}
                 {volgende.betaalbaar ? `vervaldatum ${volgende.wanneer}` : `te betalen rond ${volgende.wanneer}`}
               </p>
             </div>

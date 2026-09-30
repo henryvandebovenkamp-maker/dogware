@@ -4,16 +4,14 @@ import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth/session";
 import {
-  checkRegeling,
   createOrGetDraft,
   ensureCommerce,
-  freezePricing,
   getDraftProposal,
   listProposals,
-  regelingLabels,
+  planConfig,
   toConfig,
 } from "@/lib/proposals";
-import { computeOneOff, euroFromCents } from "@/lib/money";
+import { afspraakOverzicht } from "@/lib/betaalafspraak";
 import { ProposalEditor, type EditorData } from "@/components/commerce/proposal-editor";
 import { isDirectJourney } from "@/lib/journey-variant";
 
@@ -56,10 +54,6 @@ export default async function VoorstelEditorPage({
   const eerderVerstuurd = alle.filter((p) => p.status !== "DRAFT").length;
 
   const cfg = toConfig(commerce);
-  const berekend = computeOneOff(cfg);
-  // De regeling zoals hij bij versturen bevroren zou worden — server-side berekend.
-  const snapshot = freezePricing(commerce);
-  const regelingCheck = checkRegeling(commerce);
 
   const data: EditorData = {
     leadId: id,
@@ -103,21 +97,13 @@ export default async function VoorstelEditorPage({
       installmentStart: commerce.installmentStart,
       installmentStartDate: commerce.installmentStartDate ?? "",
     },
-    computed: {
-      subtotal: euroFromCents(berekend.subtotalCents),
-      discount: euroFromCents(berekend.discountCents),
-      net: euroFromCents(berekend.netExVatCents),
-      vat: euroFromCents(berekend.vatCents),
-      total: euroFromCents(berekend.totalInclVatCents),
-      deposit: euroFromCents(berekend.depositCents),
-      final: euroFromCents(berekend.finalCents),
-      depositPercent: berekend.depositPercent,
-      finalPercent: berekend.finalPercent,
-      monthlyExVat: euroFromCents(berekend.monthlyExVatCents),
-      monthlyInclVat: euroFromCents(berekend.monthlyInclVatCents),
-      regeling: regelingLabels(snapshot),
-      regelingFout:
-        !regelingCheck.ok && cfg.projectCents + cfg.setupCents > 0 ? regelingCheck.reden : null,
+    // De OPGESLAGEN afspraak, server-side berekend — precies wat bij versturen
+    // bevroren wordt. De editor rekent live vooruit met dezelfde functie.
+    opgeslagen: afspraakOverzicht(cfg, planConfig(commerce)),
+    basis: {
+      freeMonths: cfg.freeMonths,
+      introDiscountPercent: cfg.introDiscountPercent,
+      introDiscountMonths: cfg.introDiscountMonths,
     },
     eerderVerstuurd,
   };

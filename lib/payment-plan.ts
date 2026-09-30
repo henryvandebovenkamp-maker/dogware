@@ -208,22 +208,23 @@ export function buildRegeling(
     ];
   } else {
     /*
-     * De afspraak is in bedragen excl. btw ("€ 2.500 in 6 termijnen"), dus daar
-     * wordt verdeeld. De btw per termijn is afgerond over die termijn; de
-     * laatste termijn krijgt wat er van de totale btw overblijft, zodat de
-     * btw-kolom exact aansluit op de btw van de opdracht.
+     * Wat de klant werkelijk betaalt (via Mollie) is incl. btw, dus DAT bedrag
+     * wordt verdeeld: het totaal incl. btw in centen over het aantal
+     * termijnen, het afrondingsverschil in de laatste termijn. Het deel excl.
+     * btw wordt op dezelfde manier over het netto bedrag verdeeld; de btw per
+     * termijn is het verschil. Zo sluiten alle drie de kolommen exact op het
+     * totaal van de opdracht — € 3.025 over 5 is vijf keer € 605,00.
      */
+    const inclDelen = splitEvenly(incl, p.aantal);
     const exDelen = splitEvenly(net, p.aantal);
-    const vatDelen = exDelen.map((ex) => Math.round((ex * pct) / 100));
-    vatDelen[vatDelen.length - 1] = vat - vatDelen.slice(0, -1).reduce((s, v) => s + v, 0);
-    termijnen = exDelen.map((ex, i) => ({
+    termijnen = inclDelen.map((inclDeel, i) => ({
       volgnummer: i + 1,
       aantal: p.aantal,
       moment: i === 0 ? "akkoord" : "maandelijks",
       maandenNaStart: i,
-      exVatCents: ex,
-      vatCents: vatDelen[i],
-      inclVatCents: ex + vatDelen[i],
+      exVatCents: exDelen[i],
+      vatCents: inclDeel - exDelen[i],
+      inclVatCents: inclDeel,
     }));
   }
 

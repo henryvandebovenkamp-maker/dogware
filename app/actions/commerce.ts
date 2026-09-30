@@ -33,6 +33,7 @@ import {
   regelingTitel,
   regelingZin,
 } from "@/lib/payment-plan";
+import { leesAfspraak } from "@/lib/betaalafspraak";
 import {
   checkRegeling,
   createOrGetDraft,
@@ -98,8 +99,6 @@ function refresh(leadId: string) {
   revalidatePath(`/admin/leads/${leadId}/voorstel`);
 }
 
-const euroToCents = (v: FormDataEntryValue | null) =>
-  Math.max(0, Math.round(Number(String(v ?? "0").replace(",", ".")) * 100)) || 0;
 const intVal = (v: FormDataEntryValue | null) => Math.max(0, Math.round(Number(v ?? 0))) || 0;
 const pctVal = (v: FormDataEntryValue | null) => Math.min(100, intVal(v));
 
@@ -149,21 +148,40 @@ export async function saveCommerceConfig(
   if (!ctx) return FOUT("Geen toegang.");
   const db = getDb()!;
 
-  const dt = String(formData.get("discountType") ?? "none");
   const startRule = normalizeStartRule(String(formData.get("startRule") ?? ""));
   const startAtRaw = String(formData.get("startAt") ?? "").trim();
+  const veld = (k: string, anders = "") => {
+    const v = formData.get(k);
+    return v === null ? anders : String(v);
+  };
 
   /*
-   * De betaalregeling. Alleen de KEUZE komt uit het formulier — soort, aantal
-   * en startmoment. Bedragen per termijn worden nooit ingevoerd: die rekent de
-   * server uit bij versturen (zie freezePricing). Onbekende invoer wordt 50/50.
+   * Bedragen en betaalregeling via dezelfde lezer als de live preview in de
+   * editor (lib/betaalafspraak.ts): wat de beheerder ziet vóór opslaan is
+   * precies wat hier wordt opgeslagen. Alleen de KEUZE van de regeling komt
+   * uit het formulier; bedragen per termijn rekent de server zelf uit.
+   * Onbekende invoer wordt 50/50.
    */
-  const plan = normalizePlan({
-    soort: String(formData.get("paymentPlan") ?? ctx.commerce.paymentPlan),
-    aantal: String(formData.get("installmentCount") ?? ctx.commerce.installmentCount),
-    start: String(formData.get("installmentStart") ?? ctx.commerce.installmentStart),
-    startDatum: String(formData.get("installmentStartDate") ?? "").trim() || null,
-  });
+  const { config, plan } = leesAfspraak(
+    {
+      project: veld("project"),
+      setup: veld("setup"),
+      discountType: veld("discountType", "none"),
+      discountValue: veld("discountValue"),
+      vat: veld("vat"),
+      depositPercent: veld("depositPercent"),
+      monthly: veld("monthly"),
+      paymentPlan: veld("paymentPlan", ctx.commerce.paymentPlan),
+      installmentCount: veld("installmentCount", String(ctx.commerce.installmentCount)),
+      installmentStart: veld("installmentStart", ctx.commerce.installmentStart),
+      installmentStartDate: veld("installmentStartDate"),
+    },
+    {
+      freeMonths: intVal(formData.get("freeMonths")),
+      introDiscountPercent: pctVal(formData.get("introPercent")),
+      introDiscountMonths: intVal(formData.get("introMonths")),
+    },
+  );
   if (
     formData.get("installmentStart") === "datum" &&
     plan.soort === "termijnen" &&
@@ -175,19 +193,16 @@ export async function saveCommerceConfig(
   await db
     .update(schema.commerce)
     .set({
-      projectCents: euroToCents(formData.get("project")),
-      setupCents: euroToCents(formData.get("setup")),
-      discountType: dt === "amount" || dt === "percent" ? dt : "none",
-      discountValue:
-        dt === "percent"
-          ? pctVal(formData.get("discountValue"))
-          : euroToCents(formData.get("discountValue")),
-      vatPercent: Math.min(100, intVal(formData.get("vat")) || 21),
-      depositPercent: pctVal(formData.get("depositPercent")) || 50,
-      monthlyCents: euroToCents(formData.get("monthly")),
-      freeMonths: intVal(formData.get("freeMonths")),
-      introDiscountPercent: pctVal(formData.get("introPercent")),
-      introDiscountMonths: intVal(formData.get("introMonths")),
+      projectCents: config.projectCents,
+      setupCents: config.setupCents,
+      discountType: config.discountType,
+      discountValue: config.discountValue,
+      vatPercent: config.vatPercent,
+      depositPercent: config.depositPercent,
+      monthlyCents: config.monthlyCents,
+      freeMonths: config.freeMonths,
+      introDiscountPercent: config.introDiscountPercent,
+      introDiscountMonths: config.introDiscountMonths,
       subscriptionStartRule: startRule,
       subscriptionStartAt:
         startRule === "handmatig" && startAtRaw ? new Date(`${startAtRaw}T00:00:00`) : null,
