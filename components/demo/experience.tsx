@@ -20,6 +20,7 @@ import {
 } from "@/lib/demo-flow";
 import { EMPTY_INTAKE, isTelefoonGeldig } from "@/lib/intake";
 import { demoLevertijd } from "@/lib/branding";
+import { PRIJS_KORT } from "@/lib/tarieven";
 import {
   IlluBehavior,
   IlluDaycare,
@@ -659,6 +660,18 @@ export function DemoExperience({
                       onEnter={submit}
                     />
                   </div>
+                  {/* Wie zijn gegevens achterlaat, mag weten waar hij later aan toe is. */}
+                  <p className="mt-10 max-w-lg text-pretty text-[13.5px] leading-relaxed text-ink-500">
+                    <span className="font-bold text-ink">Goed om te weten:</span> {PRIJS_KORT}{" "}
+                    <a
+                      href="/tarieven"
+                      target="_blank"
+                      rel="noopener"
+                      className="font-bold text-brand underline-offset-4 hover:underline"
+                    >
+                      Bekijk de tarieven
+                    </a>
+                  </p>
                 </div>
               )}
             </motion.div>

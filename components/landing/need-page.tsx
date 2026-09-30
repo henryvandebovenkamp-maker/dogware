@@ -9,6 +9,7 @@ import { Difference } from "@/components/sections/difference";
 import { Testimonials } from "@/components/sections/testimonials";
 import { FinalCta } from "@/components/sections/final-cta";
 import { CrossLinks } from "@/components/landing/cross-links";
+import { PrijsKort } from "@/components/sections/pricing";
 import { Faq } from "@/components/landing/faq";
 import { BRANCHE_BY_SLUG } from "@/lib/branches";
 import type { Need } from "@/lib/needs";
@@ -221,6 +222,11 @@ export function NeedPage({ need }: { need: Need }) {
 
         <Difference />
         <Testimonials />
+        <section className="pt-4">
+          <Container>
+            <PrijsKort className="mx-auto max-w-3xl" />
+          </Container>
+        </section>
         <Faq items={need.faq} titel={`Vragen over ${need.titel.toLowerCase()}`} />
         <FinalCta />
         <CrossLinks needsFirst={[need.slug]} exclude={need.slug} />

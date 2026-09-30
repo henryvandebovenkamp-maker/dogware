@@ -206,7 +206,7 @@ export function HeaderBar({
     <header className="fixed inset-x-0 top-0 z-50">
       <div
         className={cn(
-          "mx-auto mt-3 flex max-w-6xl items-center justify-between gap-4 rounded-full px-4 py-2.5 transition-all duration-300 sm:px-5",
+          "mx-auto mt-3 flex max-w-6xl items-center justify-between gap-4 rounded-full px-4 py-2.5 transition-all duration-300 sm:px-5 xl:max-w-7xl",
           scrolled
             ? "mx-3 bg-cream/85 shadow-lift ring-1 ring-ink/5 backdrop-blur-xl sm:mx-auto"
             : "bg-transparent",
@@ -216,16 +216,17 @@ export function HeaderBar({
           <Logo />
         </Link>
 
-        {/* Het breekpunt is opgemeten en niet gegokt: vijf items plus
-            "Inloggen" en de demoknop vragen ~1057px en passen daarmee pas
-            vanaf ongeveer 1100px viewport. Daaronder neemt de hamburger het
-            over — de demoknop blijft daar wél gewoon staan, zodat de
-            conversieroute nergens verdwijnt. Tussen 1100 en 1280 staan de
-            items wat krapper; vanaf xl krijgen ze lucht. */}
+        {/* Het breekpunt is opgemeten en niet gegokt: zes items (sinds
+            "Tarieven") plus logo, "Inloggen" en de demoknop vragen 1145px
+            in de balk van 1152px en passen daarmee vanaf 1240px viewport.
+            Vanaf xl wordt de tekst groter (1216px nodig) en groeit de balk
+            mee naar 1280px. Daaronder neemt de hamburger het over — de
+            demoknop blijft daar wél gewoon staan, zodat de conversieroute
+            nergens verdwijnt. */}
         <nav
           ref={navRef}
           aria-label="Hoofdnavigatie"
-          className="hidden items-center gap-0 min-[1100px]:flex xl:gap-0.5"
+          className="hidden items-center gap-0 min-[1240px]:flex xl:gap-0.5"
         >
           {HOOFDNAV.map((groep) => (
             <NavGroepItem
@@ -313,7 +314,7 @@ export function HeaderBar({
           type="button"
           onClick={() => setOpen((v) => !v)}
           aria-label={open ? "Menu sluiten" : "Menu openen"}
-          className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/70 text-ink ring-1 ring-ink/10 min-[1100px]:hidden"
+          className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/70 text-ink ring-1 ring-ink/10 min-[1240px]:hidden"
         >
           {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
         </button>
@@ -321,7 +322,7 @@ export function HeaderBar({
 
       {/* Mobiel menu */}
       {open && (
-        <div className="fixed inset-0 top-0 z-40 overflow-y-auto bg-cream/98 px-5 pb-10 pt-24 backdrop-blur-xl min-[1100px]:hidden">
+        <div className="fixed inset-0 top-0 z-40 overflow-y-auto bg-cream/98 px-5 pb-10 pt-24 backdrop-blur-xl min-[1240px]:hidden">
           {/* Ingelogd: accountblok bovenaan */}
           {user && (
             <div className="mb-4 flex items-center gap-3 rounded-2xl bg-white p-4 shadow-soft ring-1 ring-ink/5">

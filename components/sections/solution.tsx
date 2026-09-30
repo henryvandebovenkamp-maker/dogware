@@ -4,6 +4,7 @@ import { RefreshCw } from "lucide-react";
 import { Container, SectionHeading } from "@/components/ui";
 import { Reveal, RevealStagger, RevealItem } from "@/components/reveal";
 import { useBrancheContent } from "@/components/branche/branche-context";
+import { PrijsKort } from "@/components/sections/pricing";
 
 /**
  * De complete bedrijfsflow — geen technische uitleg, maar het verhaal:
@@ -88,6 +89,11 @@ export function Solution({ branche }: { branche?: string }) {
               <span className="block text-brand">Gewoon jouw bedrijf, dat draait.</span>
             </p>
           </div>
+        </Reveal>
+
+        {/* Wie net gezien heeft hoe het werkt, wil weten wat het kost. */}
+        <Reveal delay={0.15}>
+          <PrijsKort className="mx-auto mt-12 max-w-3xl" href={branche ? "/tarieven" : "#tarieven"} />
         </Reveal>
       </Container>
     </section>

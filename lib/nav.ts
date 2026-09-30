@@ -8,7 +8,7 @@ import { NEEDS } from "@/lib/needs";
  *
  * De volgorde vertelt het verhaal dat de hero begint: eerst voor wie DogWare
  * is, dan wat het regelt, dan hoe het werkt, dan het bewijs, dan wie erachter
- * zit. Bewust géén losse productnamen meer in de bovenste rij: "Webshop" stond
+ * zit, en wat het kost. Bewust géén losse productnamen meer in de bovenste rij: "Webshop" stond
  * daar eerder als eigen item, waardoor DogWare kon overkomen als een
  * webshopproduct. Het is nu wat het is — één van de dingen die DogWare regelt.
  *
@@ -65,6 +65,12 @@ export const HOOFDNAV: NavGroep[] = [
     // DogWare.
     label: "Voorbeelden",
     href: "/#voorbeelden",
+  },
+  {
+    // Wat het kost, zonder te zoeken: het bedrag, de termijnen en hoe de
+    // maandelijkse kosten werken.
+    label: "Tarieven",
+    href: "/tarieven",
   },
   {
     label: "Over DogWare",

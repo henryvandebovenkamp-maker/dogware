@@ -22,6 +22,7 @@ import { TeamPortal } from "@/components/sections/team-portal";
 import { Difference } from "@/components/sections/difference";
 import { Showcase } from "@/components/sections/showcase";
 import { PromiseSection } from "@/components/sections/promise";
+import { Pricing } from "@/components/sections/pricing";
 import { Results } from "@/components/sections/results";
 import { Testimonials } from "@/components/sections/testimonials";
 import { FinalCta } from "@/components/sections/final-cta";
@@ -42,6 +43,11 @@ import { FinalCta } from "@/components/sections/final-cta";
  * administratie") via het oplossingenblok. Een keuze in de branchekiezer laat
  * de secties eronder meebewegen, zonder de pagina te herladen — de hero niet,
  * die blijft altijd voor het hele vak spreken.
+ *
+ * De prijs (`#tarieven`) staat direct na de belofte "één keer goed geregeld,
+ * daarna onderhouden": dat is precies wat de eenmalige investering en de
+ * maandelijkse kosten zijn. Een compacte prijsregel onder "Zo werkt het" en
+ * het menu-item Tarieven zorgen dat niemand er ver voor hoeft te scrollen.
  *
  * Het verhaal van Henry (`#verhaal`) staat bewust helemaal onderaan, vlak voor
  * de demo-aanvraag: wie tot daar is gekomen, wil weten wie er achter dit ding
@@ -74,6 +80,7 @@ export default function Home() {
         <Difference />
         <Showcase />
         <PromiseSection />
+        <Pricing />
         <Results />
         <Testimonials />
         <Story />
