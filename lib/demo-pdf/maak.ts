@@ -190,11 +190,12 @@ async function scrolDoor(page: Page) {
     const pauze = (ms: number) => new Promise((r) => setTimeout(r, ms));
     const hoogte = Math.min(document.documentElement.scrollHeight, 30_000);
     const stap = Math.max(300, Math.floor(window.innerHeight * 0.6), Math.ceil(hoogte / 40));
+    // Direct, niet "smooth": anders loopt de scroll achter op de pauzes.
     for (let y = 0; y < hoogte; y += stap) {
-      window.scrollTo(0, y);
+      window.scrollTo({ top: y, behavior: "instant" });
       await pauze(140);
     }
-    window.scrollTo(0, 0);
+    window.scrollTo({ top: 0, behavior: "instant" });
     const laden = [...document.images]
       .filter((img) => !img.complete)
       .map(
@@ -334,9 +335,23 @@ async function legVast(
     const fotoStart = Date.now();
     const fotos: string[] = [];
     for (const y of fotoHoogtes(hoogte, o.venster.height, o.maxFotos)) {
-      await stap(page.evaluate((top) => window.scrollTo(0, top), y), L.tabblad, "scrollen naar foto");
-      // Even wachten tot vaste headers en overgangen bij deze scrollpositie klaar zijn.
-      await wacht(700);
+      // Direct scrollen (demo's gebruiken scroll-behavior: smooth, voor een foto willen
+      // we geen animatie) en daarna 1,2 s frames laten tekenen: zonder GPU maakt
+      // headless Chromium alleen frames op verzoek, en zonder frames reageert de site
+      // niet op de scroll en lopen overgangen niet door (bijv. een header die boven
+      // weer transparant wordt).
+      await stap(
+        page.evaluate(async (top: number) => {
+          window.scrollTo({ top, behavior: "instant" });
+          const tot = performance.now() + 1_200;
+          await new Promise<void>((klaar) => {
+            const frame = () => (performance.now() < tot ? requestAnimationFrame(frame) : klaar());
+            requestAnimationFrame(frame);
+          });
+        }, y),
+        L.tabblad,
+        "scrollen naar foto",
+      );
       const b64 = await stap(
         page.screenshot({ type: "jpeg", quality: o.kwaliteit, encoding: "base64", optimizeForSpeed: true, captureBeyondViewport: false }),
         L.foto,

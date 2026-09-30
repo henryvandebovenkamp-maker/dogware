@@ -22,14 +22,14 @@ const zonderChrome = !existsSync(CHROME);
 
 // Korte limieten, zodat de test snel is; de verhoudingen zijn als in productie.
 const SNEL: Partial<Limieten> = {
-  totaal: 60_000,
+  totaal: 90_000,
   navigatie: 2_500,
   laden: 1_000,
   netwerkRust: 800,
   scrollen: 3_000,
   foto: 4_000,
-  route: 8_000,
-  mobiel: 10_000,
+  route: 15_000,
+  mobiel: 12_000,
   rapportReserve: 12_000,
 };
 
@@ -169,7 +169,7 @@ describe("de generator tegen een lastige demo", { skip: zonderChrome && "geen lo
     assert.equal(new Set(paden).size, paden.length);
     assert.ok(paden.length + res.overgeslagen.length <= 7);
     // Een pagina die nooit "network idle" wordt en een afbeelding die nooit komt, houden niets op.
-    assert.ok(duur < 45_000, `duurde ${duur} ms`);
+    assert.ok(duur < 60_000, `duurde ${duur} ms`);
   });
 
   it("de homepage mislukt: geen PDF, een duidelijke fout, browser dicht", async () => {
@@ -198,7 +198,7 @@ describe("de generator tegen een lastige demo", { skip: zonderChrome && "geen lo
     await assert.rejects(
       maak({
         // Printen hangt voor altijd; alleen de globale deadline kan dit nog stoppen.
-        limieten: { ...SNEL, totaal: 12_000, printen: 120_000, rapportReserve: 3_000, mobiel: 0 },
+        limieten: { ...SNEL, totaal: 20_000, printen: 120_000, rapportReserve: 3_000, mobiel: 0 },
         startBrowser: browserMet((page) => {
           (page as unknown as { pdf: () => Promise<never> }).pdf = () => new Promise<never>(() => {});
         }),
@@ -206,7 +206,7 @@ describe("de generator tegen een lastige demo", { skip: zonderChrome && "geen lo
       (err: unknown) => err instanceof DemoPdfFout && err.code === "TIJD",
     );
     const duur = Date.now() - t;
-    assert.ok(duur < 12_000 + 6_000, `duurde ${duur} ms`);
+    assert.ok(duur < 20_000 + 6_000, `duurde ${duur} ms`);
   });
 
   it("afgebroken verzoek: stopt direct en de browser gaat dicht", async () => {
