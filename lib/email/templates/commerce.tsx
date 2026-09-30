@@ -262,15 +262,25 @@ export function CommerceEmail({
   naam,
   ctaUrl,
   vars = {},
+  proef,
 }: {
   type: CommerceMailType;
   naam: string;
   ctaUrl?: string;
   vars?: Vars;
+  /**
+   * Proefversie voor Henry. Alleen een strook bovenaan; de mail zelf is
+   * letterlijk dezelfde als die de klant krijgt.
+   */
+  proef?: { klant: string };
 }) {
   const copy = COPY[type];
   return (
-    <EmailLayout preview={copy.heading(naam)} heading={copy.heading(naam)}>
+    <EmailLayout
+      preview={proef ? `PROEF — ${copy.heading(naam)}` : copy.heading(naam)}
+      heading={copy.heading(naam)}
+      banner={proef && <ProefStrook klant={proef.klant} />}
+    >
       {copy.body(vars).map((p, i) => (
         <Text key={i} style={paragraph}>
           {p}
@@ -303,6 +313,20 @@ export function CommerceEmail({
         </Text>
       )}
     </EmailLayout>
+  );
+}
+
+function ProefStrook({ klant }: { klant: string }) {
+  return (
+    <Section style={{ backgroundColor: "#1c150f", padding: "14px 24px" }}>
+      <Text style={{ margin: 0, color: "#ffffff", fontSize: 13, fontWeight: 800, letterSpacing: 1 }}>
+        PROEFVERSIE — NIET NAAR DE KLANT VERSTUURD
+      </Text>
+      <Text style={{ margin: "4px 0 0", color: "#d8cfc4", fontSize: 12, lineHeight: "18px" }}>
+        Zo ontvangt {klant} deze mail. De knop opent een proefweergave: akkoord geven,
+        ondertekenen en betalen zijn daar uitgeschakeld.
+      </Text>
+    </Section>
   );
 }
 

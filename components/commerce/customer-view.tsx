@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { createContext, useContext, useState, useTransition } from "react";
 import { Check, FileText, Loader2 } from "lucide-react";
 import { acceptProposal, startPayment } from "@/app/actions/commerce";
 import type { JourneyStage, JourneyVariant } from "@/lib/db/schema";
@@ -35,6 +35,14 @@ export type Prijzen = {
 
 export type VoorstelData = {
   token: string;
+  /** Basis van de links op de pagina. Standaard /traject/<token>. */
+  pad?: string;
+  /**
+   * Proefweergave voor Henry: exact dezelfde pagina, maar elke klantactie
+   * (akkoord, tekenen, betalen) is uitgeschakeld. De sleutel is dan leeg, dus
+   * ook de server weigert zulke acties.
+   */
+  proef?: boolean;
   /**
    * Directe klant: geen los akkoord op een voorstel. De opdrachtbevestiging
    * wordt ondertekend als overeenkomst — dat is het enige akkoord.
@@ -124,8 +132,11 @@ export function TrajectShell({
   documenten: DocumentRij[];
   tijdlijn: TijdlijnRij[];
 }) {
+  const proef = Boolean(voorstel?.proef);
   return (
+    <ProefContext.Provider value={proef}>
     <div className="min-h-screen bg-cream">
+      {proef && <ProefStrook />}
       <header className="border-b border-cream-200 bg-white/70 backdrop-blur">
         <div className="mx-auto flex w-full max-w-2xl items-center gap-3 px-5 py-4">
           <BrandMark size={34} className="h-[34px] w-[34px]" />
@@ -190,7 +201,7 @@ export function TrajectShell({
                   <li key={d.id}>
                     {d.isFactuur && voorstel ? (
                       <a
-                        href={`/traject/${voorstel.token}/factuur/${d.nummer}`}
+                        href={`${basis(voorstel)}/factuur/${d.nummer}`}
                         className={`${klas} transition hover:-translate-y-0.5 hover:shadow-lift`}
                       >
                         {inhoud}
@@ -234,6 +245,23 @@ export function TrajectShell({
         </footer>
       </main>
     </div>
+    </ProefContext.Provider>
+  );
+}
+
+const basis = (v: VoorstelData) => v.pad ?? `/traject/${v.token}`;
+
+/** Staat de pagina in proefweergave? Dan doet geen enkele klantknop iets. */
+const ProefContext = createContext(false);
+
+function ProefStrook() {
+  return (
+    <div className="sticky top-0 z-20 bg-ink px-5 py-2.5 text-center text-cream">
+      <p className="text-[12.5px] font-extrabold uppercase tracking-[0.12em]">Proefweergave</p>
+      <p className="text-[12px] text-cream/75">
+        Zo ziet de klant het. Akkoord geven, ondertekenen en betalen zijn hier uitgeschakeld.
+      </p>
+    </div>
   );
 }
 
@@ -245,6 +273,7 @@ function VolgendeStap({ voorstel, status }: { voorstel: VoorstelData; status: St
   const [fout, setFout] = useState<string | null>(null);
 
   function accepteer() {
+    if (voorstel.proef) return;
     setFout(null);
     start(async () => {
       const res = await acceptProposal(voorstel.token, naam);
@@ -254,6 +283,7 @@ function VolgendeStap({ voorstel, status }: { voorstel: VoorstelData; status: St
   }
 
   function betaal(kind: "deposit" | "final" | "termijn") {
+    if (voorstel.proef) return;
     setFout(null);
     start(async () => {
       const res = await startPayment(voorstel.token, kind);
@@ -412,7 +442,7 @@ function VolgendeStap({ voorstel, status }: { voorstel: VoorstelData; status: St
           kunnen we starten.
         </Tekst>
         <a
-          href={`/traject/${voorstel.token}/overeenkomst`}
+          href={`${basis(voorstel)}/overeenkomst`}
           className="mt-5 inline-flex w-full items-center justify-center rounded-full bg-brand px-6 py-3.5 text-[15px] font-bold text-white shadow-glow transition hover:-translate-y-0.5 hover:bg-brand-600 sm:w-auto"
         >
           Bekijk en onderteken de opdrachtbevestiging
@@ -433,7 +463,7 @@ function VolgendeStap({ voorstel, status }: { voorstel: VoorstelData; status: St
           hem digitaal — daarna kunnen we echt beginnen.
         </Tekst>
         <a
-          href={`/traject/${voorstel.token}/overeenkomst`}
+          href={`${basis(voorstel)}/overeenkomst`}
           className="mt-5 inline-flex w-full items-center justify-center rounded-full bg-brand px-6 py-3.5 text-[15px] font-bold text-white shadow-glow transition hover:-translate-y-0.5 hover:bg-brand-600 sm:w-auto"
         >
           Bekijk en teken de overeenkomst
@@ -811,7 +841,7 @@ function BetaalAfspraakKaart({
             Alle termijnen
           </h2>
           <div className="mt-3 rounded-2xl bg-white p-5 shadow-soft ring-1 ring-ink/5">
-            <TermijnLijst weergave={schema} factuurBasis={`/traject/${voorstel.token}/factuur/`} />
+            <TermijnLijst weergave={schema} factuurBasis={`${basis(voorstel)}/factuur/`} />
           </div>
         </section>
       )}
@@ -895,16 +925,28 @@ function Primair({
   label: string;
   disabled?: boolean;
 }) {
+  const proef = useContext(ProefContext);
   return (
+    <>
     <button
       type="button"
-      onClick={onClick}
-      disabled={pending || disabled}
+      onClick={proef ? undefined : onClick}
+      disabled={pending || disabled || proef}
       className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-full bg-brand px-6 py-3.5 text-[15px] font-bold text-white shadow-glow transition hover:-translate-y-0.5 hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 sm:w-auto"
     >
       {pending && <Loader2 className="h-4 w-4 animate-spin" />}
       {pending ? "Een moment…" : label}
     </button>
+    {proef && <ProefUitgeschakeld />}
+    </>
+  );
+}
+
+function ProefUitgeschakeld() {
+  return (
+    <p className="mt-2 text-[12px] font-semibold text-ink-300">
+      Uitgeschakeld in de proefweergave — de klant kan hier wel op klikken.
+    </p>
   );
 }
 

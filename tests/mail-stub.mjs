@@ -25,6 +25,17 @@ export async function sendCommerceMail(type, to, naam, vars = {}, ctaUrl) {
   return { ok: true, id: `stub_${globalThis.__verzondenMails.length}` };
 }
 
+/**
+ * Zoals in send.tsx: GEEN ontvanger-parameter. De proef gaat altijd naar de
+ * centrale proefontvanger, dus een test ziet het echte adres.
+ */
+export async function sendCommerceProof(type, klant, vars = {}, ctaUrl) {
+  const { proefOntvanger } = await import("../lib/email/config.ts");
+  const naar = proefOntvanger();
+  globalThis.__verzondenMails.push({ type, to: naar, naam: klant.naam, vars, ctaUrl, proef: true, klant });
+  return { ok: true, id: `stub_${globalThis.__verzondenMails.length}`, naar };
+}
+
 /* De overige helpers uit send.tsx, voor het geval een pad ze aanraakt. */
 const recorder =
   (naam) =>

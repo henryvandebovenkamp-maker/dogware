@@ -4,19 +4,11 @@ import { and, eq, isNull } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { resolvePortal } from "@/lib/portal-access";
 import { getActiveProposal } from "@/lib/proposals";
-import {
-  agreementConsents,
-  agreementPricing,
-  ensureAgreement,
-  getCurrentAgreement,
-  isSigned,
-  renderAgreement,
-} from "@/lib/agreements";
-import { contractVersionDateLabel } from "@/lib/agreement";
+import { ensureAgreement, getCurrentAgreement } from "@/lib/agreements";
+import { overeenkomstVoorKlant } from "@/lib/klantweergave";
 import { AgreementView } from "@/components/commerce/agreement-view";
 import { logJourneyEvent } from "@/lib/journey";
 import { isDirectJourney, overeenkomstPoort } from "@/lib/journey-variant";
-import { regelingZin } from "@/lib/payment-plan";
 
 export const metadata: Metadata = {
   title: "Samenwerkingsovereenkomst",
@@ -73,35 +65,5 @@ export default async function OvereenkomstPage({
     }
   }
 
-  const { chapters, versionName } = renderAgreement(agreement, proposal, lead.journeyVariant);
-  const consents = agreementConsents(agreement, lead.journeyVariant);
-  const regeling = agreementPricing(agreement).betaalregeling;
-
-  return (
-    <AgreementView
-      token={token}
-      direct={direct}
-      chapters={chapters}
-      versionName={versionName}
-      versionDate={contractVersionDateLabel(agreement.voorwaardenVersie)}
-      consents={consents}
-      getekend={isSigned(agreement)}
-      getekendOp={agreement.signedAt?.toISOString() ?? null}
-      getekendDoor={agreement.signerName}
-      voorstelVersie={agreement.proposalVersion}
-      regelingZin={regeling && regeling.soort !== "50-50" ? regelingZin(regeling) : undefined}
-      klant={{
-        bedrijfsnaam: agreement.signerCompany ?? lead.bedrijfsnaam,
-        naam: agreement.signerName ?? lead.naam,
-        email: agreement.signerEmail ?? lead.email,
-        telefoon: agreement.signerPhone ?? lead.telefoon ?? "",
-        adres: agreement.signerAddress ?? "",
-        postcode: agreement.signerPostcode ?? "",
-        plaats: agreement.signerCity ?? lead.plaats,
-        kvk: agreement.signerKvk ?? "",
-        btw: agreement.signerVat ?? "",
-        functie: agreement.signerRole ?? "",
-      }}
-    />
-  );
+  return <AgreementView token={token} {...overeenkomstVoorKlant(agreement, proposal, lead)} />;
 }

@@ -1,6 +1,7 @@
 import "server-only";
 import { renderMailHtml, sendMail } from "./service";
-import type { MailResult } from "./types";
+import type { MailResult, MailType } from "./types";
+import { proefOntvanger } from "./config";
 import type { IntakeData } from "@/lib/intake";
 import { DemoConfirmationEmail } from "./templates/demo-confirmation";
 import { DemoRequestEmail, type DemoRequestData } from "./templates/demo-request";
@@ -490,6 +491,27 @@ export const COMMERCE_SUBJECTS: Record<CommerceMailType, string> = {
   "installments-complete": "Alles betaald — dank je wel!",
 };
 
+/**
+ * Bouwt een commerciële mail op — onderwerp, template en platte tekst. Eén
+ * functie voor de echte klantmail én de proef, zodat die twee nooit uit
+ * elkaar kunnen lopen.
+ */
+function commerceMail(
+  type: CommerceMailType,
+  naam: string,
+  vars: CommerceMailVars,
+  link: string,
+  proef?: { klant: string },
+) {
+  const subject = COMMERCE_SUBJECTS[type];
+  return {
+    mailType: (type === "charge-failed" || type === "installment-failed" ? "notification" : "demo-ready") as MailType,
+    subject,
+    react: <CommerceEmail type={type} naam={naam.split(" ")[0]} ctaUrl={link} vars={vars} proef={proef} />,
+    text: `${subject}${vars.amount ? ` — ${vars.amount}` : ""}. Bekijk het in je omgeving: ${link}`,
+  };
+}
+
 export async function sendCommerceMail(
   type: CommerceMailType,
   to: string,
@@ -502,16 +524,28 @@ export async function sendCommerceMail(
    */
   ctaUrl?: string,
 ): Promise<MailResult> {
-  const subjects = COMMERCE_SUBJECTS;
-  const link = ctaUrl ?? `${branding.siteUrl}/account`;
-  return sendMail(type === "charge-failed" || type === "installment-failed" ? "notification" : "demo-ready", {
-    to,
-    subject: subjects[type],
-    react: (
-      <CommerceEmail type={type} naam={naam.split(" ")[0]} ctaUrl={link} vars={vars} />
-    ),
-    text: `${subjects[type]}${vars.amount ? ` — ${vars.amount}` : ""}. Bekijk het in je omgeving: ${link}`,
-  });
+  const m = commerceMail(type, naam, vars, ctaUrl ?? `${branding.siteUrl}/account`);
+  return sendMail(m.mailType, { to, subject: m.subject, react: m.react, text: m.text });
+}
+
+/**
+ * Een proef van een klantmail, voor Henry.
+ *
+ * Bewust ZONDER ontvanger-parameter: de proef gaat altijd naar
+ * `proefOntvanger()` en kan dus nooit bij de klant belanden, wat er ook
+ * wordt meegegeven. Inhoud, onderwerp en aanhef zijn die van de echte mail;
+ * alleen een proefstrook en "[Proef]" in het onderwerp komen erbij.
+ */
+export async function sendCommerceProof(
+  type: CommerceMailType,
+  klant: { naam: string; email: string },
+  vars: CommerceMailVars,
+  ctaUrl: string,
+): Promise<MailResult & { naar: string }> {
+  const naar = proefOntvanger();
+  const m = commerceMail(type, klant.naam, vars, ctaUrl, { klant: `${klant.naam} (${klant.email})` });
+  const res = await sendMail(m.mailType, { to: naar, subject: `[Proef] ${m.subject}`, react: m.react, text: `[PROEF — niet naar de klant verstuurd] ${m.text}` });
+  return { ...res, naar };
 }
 
 /** Generieke interne notificatie. */

@@ -7,7 +7,10 @@ import type { Agreement, Commerce, Lead, PaymentInstallment, PaymentType } from 
 import { getAdminActor } from "@/lib/admin-auth";
 import { logActivity } from "@/lib/audit";
 import { isUniekeSchending } from "@/lib/db-errors";
-import { logJourneyEvent, setStage } from "@/lib/journey";
+import { logEmail, logJourneyEvent, setStage } from "@/lib/journey";
+import { conceptAlsVerstuurd, mailBijVersturen } from "@/lib/klantweergave";
+import { maakProefToken, proefUrl } from "@/lib/proef";
+import { COMMERCE_SUBJECTS, sendCommerceProof } from "@/lib/email/send";
 import {
   abonnementNaOplevering,
   activateMandateAndSubscription,
@@ -352,15 +355,8 @@ export async function sendProposal(
   const w = opdrachtWoord(lead.journeyVariant);
 
   const draft = await getDraftProposal(commerce.id);
-  if (!draft) return FOUT(`Er is geen concept om te versturen. Maak eerst ${direct ? "een opdrachtbevestiging" : "een voorstel"}.`);
-
-  const cfg = toConfig(commerce);
-  if (cfg.projectCents + cfg.setupCents <= 0) {
-    return FOUT(`Vul eerst de eenmalige investering in — ${direct ? "een opdrachtbevestiging" : "een voorstel"} van € 0,00 versturen we niet.`);
-  }
-  if (!draft.titel.trim()) return FOUT(`Geef ${w.deNaam} een titel.`);
-  const regelingCheck = checkRegeling(commerce);
-  if (!regelingCheck.ok) return FOUT(regelingCheck.reden);
+  const bezwaar = verzendBezwaar(ctx, draft);
+  if (bezwaar || !draft) return FOUT(bezwaar ?? "Er is geen concept.");
 
   /*
    * Is er al getekend, dan ligt de opdracht juridisch vast. Een nieuwe versie
@@ -418,13 +414,8 @@ export async function sendProposal(
       { actor: "admin", voorwaardenVersie: agreement.voorwaardenVersie, version: sent.version },
     );
 
-    const regeling = readPricing(sent, commerce).betaalregeling;
-    const gelukt = await mailAndLog(
-      lead,
-      "agreement-ready",
-      regeling && regeling.soort !== "50-50" ? { regeling: regelingZin(regeling) } : {},
-      link ? `${link}/overeenkomst` : undefined,
-    );
+    const mail = mailBijVersturen(lead, readPricing(sent, commerce));
+    const gelukt = await mailAndLog(lead, mail.type, mail.vars, link ? `${link}${mail.pad}` : undefined);
     await notifyPartner(leadId, "voorstel-verstuurd");
     await logActivity({
       actorUserId: ctx.actorId,
@@ -445,7 +436,8 @@ export async function sendProposal(
     version: sent.version,
   });
 
-  const gelukt = await mailAndLog(lead, "proposal-sent", {}, link);
+  const mail = mailBijVersturen(lead, readPricing(sent, commerce));
+  const gelukt = await mailAndLog(lead, mail.type, mail.vars, link ? `${link}${mail.pad}` : undefined);
 
   // Aangebracht door een partner? Die hoort te weten dat zijn aanbreng vordert.
   await notifyPartner(leadId, "voorstel-verstuurd");
@@ -461,6 +453,82 @@ export async function sendProposal(
   return gelukt
     ? OK(`Voorstel versie ${sent.version} verstuurd naar ${lead.email}.`)
     : OK(`Voorstel vastgelegd, maar de mail kon niet worden verzonden. Probeer 'herinnering sturen'.`);
+}
+
+/**
+ * Waarom dit concept (nog) niet de deur uit kan, of null. Dezelfde eisen voor
+ * definitief versturen en voor een proef: een proef die niet verstuurd zou
+ * kunnen worden, laat niets zien wat de klant ooit krijgt.
+ */
+function verzendBezwaar(
+  ctx: { lead: { journeyVariant: string | null }; commerce: Parameters<typeof checkRegeling>[0] },
+  draft: Awaited<ReturnType<typeof getDraftProposal>>,
+): string | null {
+  const direct = isDirectJourney(ctx.lead.journeyVariant);
+  const w = opdrachtWoord(ctx.lead.journeyVariant);
+  if (!draft) return `Er is geen concept om te versturen. Maak eerst ${direct ? "een opdrachtbevestiging" : "een voorstel"}.`;
+  const cfg = toConfig(ctx.commerce);
+  if (cfg.projectCents + cfg.setupCents <= 0) {
+    return `Vul eerst de eenmalige investering in — ${direct ? "een opdrachtbevestiging" : "een voorstel"} van € 0,00 versturen we niet.`;
+  }
+  if (!draft.titel.trim()) return `Geef ${w.deNaam} een titel.`;
+  const regelingCheck = checkRegeling(ctx.commerce);
+  return regelingCheck.ok ? null : regelingCheck.reden;
+}
+
+/**
+ * Een proef van het concept naar Henry: dezelfde mail die de klant bij
+ * definitief versturen krijgt, met een knop naar een tijdelijke, read-only
+ * proefweergave.
+ *
+ * Verandert NIETS aan de journey: geen status, geen versie, geen sentAt, geen
+ * overeenkomst, geen klantmail, geen partnermelding. Alleen een interne regel
+ * op de tijdlijn en in het e-maillogboek, zodat terug te zien is dat er een
+ * proef ging. De ontvanger komt uitsluitend uit de configuratie
+ * (sendCommerceProof kent geen ontvanger-parameter) — niets uit het formulier.
+ */
+export async function sendProposalProof(
+  _prev: CommerceState,
+  formData: FormData,
+): Promise<CommerceState> {
+  const leadId = String(formData.get("leadId") ?? "");
+  const ctx = await adminContext(leadId);
+  if (!ctx) return FOUT("Geen toegang.");
+  const { lead, commerce } = ctx;
+
+  const draft = await getDraftProposal(commerce.id);
+  const bezwaar = verzendBezwaar(ctx, draft);
+  if (bezwaar || !draft) return FOUT(bezwaar ?? "Er is geen concept.");
+
+  const concept = conceptAlsVerstuurd(draft, commerce);
+  const mail = mailBijVersturen(lead, readPricing(concept, commerce));
+  const { token } = maakProefToken(draft);
+  const res = await sendCommerceProof(
+    mail.type,
+    { naam: lead.naam, email: lead.email },
+    mail.vars,
+    proefUrl(token, mail.pad),
+  );
+
+  const w = opdrachtWoord(lead.journeyVariant);
+  await logEmail(leadId, {
+    soort: `${mail.type} (proef)`,
+    ontvanger: res.naar,
+    onderwerp: `[Proef] ${COMMERCE_SUBJECTS[mail.type]}`,
+    ok: res.ok,
+    providerId: res.ok ? res.id : undefined,
+    fout: res.ok ? undefined : res.error.message,
+  });
+  await logJourneyEvent(
+    leadId,
+    res.ok ? "proposal_proof_sent" : "proposal_proof_failed",
+    res.ok
+      ? `Proef van ${w.deNaam} (versie ${draft.version}) verstuurd naar ${res.naar}`
+      : `Proef van ${w.deNaam} mislukt: ${res.error.message}`,
+    { actor: "admin", internal: true, version: draft.version, proef: true },
+  );
+  refresh(leadId);
+  return res.ok ? OK(`Proef verstuurd naar ${res.naar}.`) : FOUT(`De proef kon niet worden verstuurd: ${res.error.message}`);
 }
 
 /** Eén generieke herinneringsactie — welke mail hangt af van waar we staan. */

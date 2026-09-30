@@ -8,6 +8,7 @@ import {
   saveCommerceConfig,
   saveProposalDraft,
   sendProposal,
+  sendProposalProof,
   type CommerceState,
 } from "@/app/actions/commerce";
 import { cn } from "@/lib/cn";
@@ -62,6 +63,8 @@ export type EditorData = {
   /** Velden die de eenmalige berekening niet raken, maar de afspraak wel compleet maken. */
   basis: Pick<CommercialConfig, "freeMonths" | "introDiscountPercent" | "introDiscountMonths">;
   eerderVerstuurd: number;
+  /** Waar een proef heen gaat — uit de centrale mailconfiguratie. */
+  proefNaar: string;
 };
 
 type SaveState = "idle" | "saving" | "saved" | "error";
@@ -82,6 +85,7 @@ export function ProposalEditor({ data }: { data: EditorData }) {
 
   const [cfgState, cfgAction, cfgPending] = useActionState(saveCommerceConfig, IDLE);
   const [sendState, sendAction, sendPending] = useActionState(sendProposal, IDLE);
+  const [proefState, proefAction, proefPending] = useActionState(sendProposalProof, IDLE);
   const [startRule, setStartRule] = useState(data.config.startRule);
 
   /*
@@ -186,6 +190,9 @@ export function ProposalEditor({ data }: { data: EditorData }) {
   const c = data.config;
   const m = live;
   const direct = Boolean(data.direct);
+  const voornaam = data.klant.naam.split(" ")[0] || data.klant.naam;
+  // Een proef of verzending leest het BEWAARDE concept; tijdens het bewaren wachten we even.
+  const conceptBezig = saveState === "saving";
 
   return (
     <div className="mx-auto w-full max-w-3xl pb-24">
@@ -538,49 +545,80 @@ export function ProposalEditor({ data }: { data: EditorData }) {
       </section>
 
       {/* ----------------------------------------------------------- versturen */}
-      <form
-        action={sendAction}
-        className="mt-6 rounded-2xl bg-white p-5 shadow-soft ring-1 ring-ink/5 sm:p-6"
-      >
-        <input type="hidden" name="leadId" value={data.leadId} />
-        <SectieKop
-          titel="Definitief versturen"
-          uitleg={
-            direct
-              ? "Na versturen staat deze versie vast en staat de overeenkomst voor de klant klaar om digitaal te ondertekenen. De klant geeft akkoord door te tekenen — niet eerder."
-              : "Na versturen staat deze versie vast. Wijzig je later iets, dan ontstaat er automatisch een nieuwe versie."
-          }
-        />
+      <section className="mt-6 rounded-2xl bg-white p-5 shadow-soft ring-1 ring-ink/5 sm:p-6">
         {gewijzigd && (
-          <p className="mt-4 rounded-lg bg-brand-50 px-3 py-2 text-[12.5px] font-semibold text-brand-600">
+          <p className="mb-4 rounded-lg bg-brand-50 px-3 py-2 text-[12.5px] font-semibold text-brand-600">
             Je hebt de bedragen of de betaalregeling gewijzigd maar nog niet opgeslagen. Sla ze eerst
-            op — anders gaat de vorige afspraak de deur uit.
+            op — een proef en de definitieve versie tonen altijd wat er is opgeslagen.
           </p>
         )}
-        <div className="mt-4 flex flex-wrap items-center gap-3">
-          <button
-            type="submit"
-            disabled={sendPending || gewijzigd}
-            className="rounded-full bg-brand px-5 py-2.5 text-[13px] font-bold text-white transition hover:-translate-y-px hover:bg-brand-600 disabled:opacity-60"
-          >
-            {sendPending
-              ? "Versturen…"
-              : direct
-                ? "Opdrachtbevestiging en overeenkomst versturen"
-                : `Voorstel versturen naar ${data.klant.email}`}
-          </button>
-          {sendState.message && (
-            <span
-              className={cn(
-                "text-[12px] font-semibold",
-                sendState.status === "error" ? "text-brand-600" : "text-sage-600",
-              )}
+
+        {/* Eerst controleren: een proef naar Henry, niets naar de klant. */}
+        <form action={proefAction} className="rounded-xl bg-cream-100/70 p-4 ring-1 ring-ink/5">
+          <input type="hidden" name="leadId" value={data.leadId} />
+          <SectieKop
+            titel="Eerst controleren"
+            uitleg={`Stuur een proef naar jezelf om de e-mail en ${direct ? "de opdrachtbevestiging" : "het voorstel"} te bekijken zoals ${voornaam} ze straks ontvangt. Er gaat niets naar de klant en er verandert niets aan de aanvraag.`}
+          />
+          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+            <button
+              type="submit"
+              disabled={proefPending || gewijzigd || conceptBezig}
+              className="w-full rounded-full bg-white px-4 py-2 text-[12.5px] font-bold text-ink ring-1 ring-ink/15 transition hover:bg-cream disabled:opacity-60 sm:w-auto"
             >
-              {sendState.message}
+              {proefPending ? "Proef wordt verstuurd…" : "Stuur proef naar mezelf"}
+            </button>
+            <span className="text-[12px] text-ink-500">
+              {proefState.status === "success" && !proefPending ? (
+                <span className="font-semibold text-sage-600">{proefState.message}</span>
+              ) : proefState.status === "error" && !proefPending ? (
+                <span className="font-semibold text-brand-600">{proefState.message}</span>
+              ) : (
+                <>
+                  Proef wordt verstuurd naar <strong className="font-bold text-ink">{data.proefNaar}</strong>
+                </>
+              )}
             </span>
+          </div>
+          {conceptBezig && (
+            <p className="mt-2 text-[11.5px] text-ink-300">Even wachten tot het concept bewaard is…</p>
           )}
-        </div>
-      </form>
+        </form>
+
+        <form action={sendAction} className="mt-5">
+          <input type="hidden" name="leadId" value={data.leadId} />
+          <SectieKop
+            titel="Definitief versturen"
+            uitleg={
+              direct
+                ? "Na versturen staat deze versie vast en staat de overeenkomst voor de klant klaar om digitaal te ondertekenen. De klant geeft akkoord door te tekenen — niet eerder."
+                : "Na versturen staat deze versie vast. Wijzig je later iets, dan ontstaat er automatisch een nieuwe versie."
+            }
+          />
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <button
+              type="submit"
+              disabled={sendPending || gewijzigd || conceptBezig}
+              className="w-full rounded-full bg-brand px-5 py-2.5 text-[13px] font-bold text-white transition hover:-translate-y-px hover:bg-brand-600 disabled:opacity-60 sm:w-auto"
+            >
+              {sendPending ? "Versturen…" : `Definitief naar ${voornaam} versturen`}
+            </button>
+            {sendState.message && (
+              <span
+                className={cn(
+                  "text-[12px] font-semibold",
+                  sendState.status === "error" ? "text-brand-600" : "text-sage-600",
+                )}
+              >
+                {sendState.message}
+              </span>
+            )}
+          </div>
+          <p className="mt-2 text-[11.5px] text-ink-300">
+            Gaat naar {data.klant.naam} · {data.klant.email}
+          </p>
+        </form>
+      </section>
     </div>
   );
 }

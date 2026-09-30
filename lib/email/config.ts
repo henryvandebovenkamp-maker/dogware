@@ -108,3 +108,13 @@ export function isSandboxSender(from: string): boolean {
 export function defaultReplyTo(): string {
   return branding.replyToEmail;
 }
+
+/**
+ * Waar een proefmail heen gaat: de mailbox van Henry — dezelfde als het
+ * antwoordadres. Eén plek. De proefroute (`sendCommerceProof`) kent bewust
+ * geen ontvanger-parameter en leest alleen deze waarde, zodat een proef nooit
+ * bij een klant kan belanden.
+ */
+export function proefOntvanger(): string {
+  return branding.replyToEmail;
+}

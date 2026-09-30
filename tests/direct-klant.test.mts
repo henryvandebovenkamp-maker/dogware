@@ -300,12 +300,15 @@ describe("4. versturen: de overeenkomst staat meteen klaar", () => {
   });
 
   it("stuurt de agreement-ready mail met een link naar de overeenkomst, en géén proposal-sent", () => {
-    assert.match(
-      directTak,
-      /mailAndLog\(\s*lead,\s*"agreement-ready",[\s\S]*?link \? `\$\{link\}\/overeenkomst`/,
-    );
+    // De keuze van de mail staat op één plek (gedeeld met de proefmail).
+    assert.match(directTak, /mailBijVersturen\(lead, readPricing\(sent, commerce\)\)/);
+    assert.match(directTak, /mailAndLog\(lead, mail\.type, mail\.vars, link \? `\$\{link\}\$\{mail\.pad\}`/);
+    const weergave = bron("lib/klantweergave.ts");
+    const keuze = weergave.slice(weergave.indexOf("export function mailBijVersturen"), weergave.indexOf("export function voorstelVoorKlant"));
+    assert.ok(keuze.length > 0, "mailBijVersturen bestaat niet meer");
+    assert.match(keuze, /isDirectJourney[\s\S]*type: "agreement-ready"[\s\S]*pad: "\/overeenkomst"/);
     // Bij 50/50 blijft de mail letterlijk gelijk: de regelingzin gaat alleen mee bij een andere regeling.
-    assert.match(directTak, /regeling && regeling\.soort !== "50-50" \? \{ regeling: regelingZin\(regeling\) \} : \{\}/);
+    assert.match(keuze, /r && r\.soort !== "50-50" \? \{ regeling: regelingZin\(r\) \} : \{\}/);
     assert.doesNotMatch(directTak, /proposal-sent/);
     assert.ok(directTak.includes("return gelukt"), "de directe tak moet eindigen vóór de demo-mail");
   });
@@ -376,7 +379,8 @@ describe("5. openen en ondertekenen zonder apart voorstelakkoord", () => {
     const kaart = klantView.slice(directKaart, klantView.indexOf("/* Geaccepteerd → overeenkomst tekenen */"));
     assert.match(kaart, /Je opdrachtbevestiging staat klaar/);
     assert.match(kaart, /Bekijk en onderteken de opdrachtbevestiging/);
-    assert.match(kaart, /\/traject\/\$\{voorstel\.token\}\/overeenkomst/);
+    assert.match(kaart, /\$\{basis\(voorstel\)\}\/overeenkomst/);
+    assert.match(klantView, /const basis = \(v: VoorstelData\) => v\.pad \?\? `\/traject\/\$\{v\.token\}`/);
     assert.doesNotMatch(kaart, /acceptProposal|setNaam/);
   });
 });

@@ -80,24 +80,57 @@ export async function ensureAgreement(
       .where(eq(schema.agreements.id, bestaand.id));
   }
 
-  const snapshot = readPricing(proposal, commerce);
   const [created] = await db
     .insert(schema.agreements)
-    .values({
-      commerceId: commerce.id,
-      leadId: lead.id,
-      proposalId: proposal.id,
-      proposalVersion: proposal.version,
-      status: "SENT",
-      voorwaardenVersie: ACTIVE_CONTRACT_VERSION,
-      pricing: snapshot as unknown as Record<string, unknown>,
-      signerCompany: lead.bedrijfsnaam,
-      signerName: lead.naam,
-      signerEmail: lead.email,
-      signerPhone: lead.telefoon,
-    })
+    .values(nieuweOvereenkomst(commerce, lead, proposal))
     .returning();
   return created ?? null;
+}
+
+/** De waarden van een nieuwe overeenkomst bij deze voorstelversie. */
+function nieuweOvereenkomst(commerce: Commerce, lead: Lead, proposal: Proposal) {
+  return {
+    commerceId: commerce.id,
+    leadId: lead.id,
+    proposalId: proposal.id,
+    proposalVersion: proposal.version,
+    status: "SENT" as const,
+    voorwaardenVersie: ACTIVE_CONTRACT_VERSION,
+    pricing: readPricing(proposal, commerce) as unknown as Record<string, unknown>,
+    signerCompany: lead.bedrijfsnaam,
+    signerName: lead.naam,
+    signerEmail: lead.email,
+    signerPhone: lead.telefoon,
+  };
+}
+
+/**
+ * De overeenkomst zoals `ensureAgreement` hem bij definitief versturen zou
+ * aanmaken — alleen in het geheugen, voor de proefweergave. Wordt nooit
+ * opgeslagen; dezelfde waarden, dus dezelfde contracttekst.
+ */
+export function conceptOvereenkomst(commerce: Commerce, lead: Lead, proposal: Proposal): Agreement {
+  return {
+    id: "proef",
+    viewedAt: null,
+    signedAt: null,
+    signerRole: null,
+    signerAddress: null,
+    signerPostcode: null,
+    signerCity: null,
+    signerKvk: null,
+    signerVat: null,
+    agreesOpdracht: false,
+    agreesInvestering: false,
+    agreesTermijnen: false,
+    agreesMaandbedrag: false,
+    agreesVoorwaarden: false,
+    agreesBevoegd: false,
+    signedIpHash: null,
+    signedUserAgent: null,
+    createdAt: new Date(),
+    ...nieuweOvereenkomst(commerce, lead, proposal),
+  };
 }
 
 /** De bevroren prijzen van een overeenkomst. */

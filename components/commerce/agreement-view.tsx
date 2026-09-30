@@ -42,8 +42,17 @@ export function AgreementView({
   voorstelVersie,
   klant,
   regelingZin,
+  pad,
+  proef = false,
 }: {
   token: string;
+  /** Basis van de terug-link. Standaard /traject/<token>. */
+  pad?: string;
+  /**
+   * Proefweergave voor Henry: dezelfde overeenkomst, maar ondertekenen is
+   * uitgeschakeld. De sleutel is dan leeg, dus ook de server weigert.
+   */
+  proef?: boolean;
   /** Directe klant: deze overeenkomst ís de opdrachtbevestiging die hij tekent. */
   direct?: boolean;
   chapters: Chapter[];
@@ -68,7 +77,10 @@ export function AgreementView({
   const alleVinkjes = CONSENT_KEYS.every((k) => vinkjes[k]);
   const set = (k: keyof Klant) => (v: string) => setForm((f) => ({ ...f, [k]: v }));
 
+  const terug = pad ?? `/traject/${token}`;
+
   function teken() {
+    if (proef) return;
     setFout(null);
     const input: SignInput = {
       naam: form.naam,
@@ -91,12 +103,20 @@ export function AgreementView({
     start(async () => {
       const res = await signAgreement(token, input);
       if (res.status === "error") setFout(res.message ?? "Ondertekenen lukte niet.");
-      else window.location.href = `/traject/${token}`;
+      else window.location.href = terug;
     });
   }
 
   return (
     <div className="min-h-screen bg-cream">
+      {proef && (
+        <div className="sticky top-0 z-20 bg-ink px-5 py-2.5 text-center text-cream">
+          <p className="text-[12.5px] font-extrabold uppercase tracking-[0.12em]">Proefweergave</p>
+          <p className="text-[12px] text-cream/75">
+            Zo ziet de klant de overeenkomst. Ondertekenen is hier uitgeschakeld.
+          </p>
+        </div>
+      )}
       <header className="border-b border-cream-200 bg-white/70 backdrop-blur">
         <div className="mx-auto flex w-full max-w-2xl items-center gap-3 px-5 py-4">
           <BrandMark size={34} className="h-[34px] w-[34px]" />
@@ -106,7 +126,7 @@ export function AgreementView({
 
       <main className="mx-auto w-full max-w-2xl px-5 pb-20 pt-6">
         <a
-          href={`/traject/${token}`}
+          href={terug}
           className="inline-flex items-center gap-2 text-[13px] font-semibold text-ink-300 transition hover:text-ink-500"
         >
           <ArrowLeft className="h-4 w-4" /> Terug naar je overzicht
@@ -275,13 +295,18 @@ export function AgreementView({
 
               <button
                 type="button"
-                onClick={teken}
-                disabled={pending || !alleVinkjes}
+                onClick={proef ? undefined : teken}
+                disabled={pending || !alleVinkjes || proef}
                 className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-full bg-brand px-6 py-3.5 text-[15px] font-bold text-white shadow-glow transition hover:-translate-y-0.5 hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 sm:w-auto"
               >
                 {pending && <Loader2 className="h-4 w-4 animate-spin" />}
                 {pending ? "Een moment…" : "Onderteken de overeenkomst"}
               </button>
+              {proef && (
+                <p className="mt-2 text-[12px] font-semibold text-ink-300">
+                  Uitgeschakeld in de proefweergave — de klant kan hier wel ondertekenen.
+                </p>
+              )}
               {!alleVinkjes && (
                 <p className="mt-2 text-[12.5px] text-ink-300">
                   Vink alle punten aan om te kunnen tekenen.

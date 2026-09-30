@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { getActiveProposal, isExpired, pricingLabels, readPricing } from "@/lib/proposals";
+import { getActiveProposal, readPricing } from "@/lib/proposals";
+import { voorstelVoorKlant } from "@/lib/klantweergave";
 import { getCurrentAgreement, isSigned } from "@/lib/agreements";
 import { paidTotal } from "@/lib/commerce";
 import { listDocuments } from "@/lib/documents";
@@ -45,7 +46,6 @@ export default async function TrajectPage({
   const betaald = await paidTotal(commerce.id);
 
   const snap = proposal ? readPricing(proposal, commerce) : null;
-  const L = snap ? pricingLabels(snap) : null;
   const openstaand = snap ? computeOutstanding(snap.config, betaald) : 0;
 
   const documenten = await listDocuments(commerce.id, "klant");
@@ -96,24 +96,12 @@ export default async function TrajectPage({
         isFactuur: isInvoiceType(d.type),
       }))}
       tijdlijn={tijdlijn.map(naarRij)}
-      voorstel={{
-        token,
+      voorstel={voorstelVoorKlant(proposal, snap!, {
         direct,
-        version: proposal.version,
-        titel: proposal.titel,
-        intro: proposal.intro,
-        omschrijving: proposal.omschrijving,
-        werkzaamheden: proposal.werkzaamheden ?? [],
-        modules: proposal.modules ?? [],
-        bijzonderheden: proposal.bijzonderheden,
-        geldigTot: proposal.geldigTot?.toISOString() ?? null,
-        verlopen: isExpired(proposal),
-        geaccepteerd: Boolean(proposal.acceptedAt),
-        geaccepteerdOp: proposal.acceptedAt?.toISOString() ?? null,
-        geaccepteerdDoor: proposal.acceptedName,
-        prijzen: L!,
+        token,
+        pad: `/traject/${token}`,
         schema: schemaWeergave,
-      }}
+      })}
       status={{
         getekend,
         getekendOp: agreement?.signedAt?.toISOString() ?? null,

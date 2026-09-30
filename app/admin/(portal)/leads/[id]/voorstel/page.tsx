@@ -12,6 +12,7 @@ import {
   toConfig,
 } from "@/lib/proposals";
 import { afspraakOverzicht } from "@/lib/betaalafspraak";
+import { proefOntvanger } from "@/lib/email/config";
 import { ProposalEditor, type EditorData } from "@/components/commerce/proposal-editor";
 import { isDirectJourney } from "@/lib/journey-variant";
 
@@ -106,6 +107,7 @@ export default async function VoorstelEditorPage({
       introDiscountMonths: cfg.introDiscountMonths,
     },
     eerderVerstuurd,
+    proefNaar: proefOntvanger(),
   };
 
   return <ProposalEditor data={data} />;

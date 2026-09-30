@@ -33,10 +33,13 @@ export const emailColors = {
 export function EmailLayout({
   preview,
   heading,
+  banner,
   children,
 }: {
   preview: string;
   heading: string;
+  /** Optionele strook boven de mail, bijv. "Proefversie". */
+  banner?: ReactNode;
   children: ReactNode;
 }) {
   // Standaard e-maillogo. Een Super Admin-override wordt in service.ts in de
@@ -65,6 +68,7 @@ export function EmailLayout({
             boxShadow: "0 10px 40px -12px rgba(28,21,15,0.12)",
           }}
         >
+          {banner}
           {/* Warme accentrand bovenaan */}
           <Section
             style={{
