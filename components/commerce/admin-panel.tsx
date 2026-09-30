@@ -493,7 +493,17 @@ export function CommerceSecties(props: {
               );
               return (
                 <li key={d.id} className="text-[13px]">
-                  {isFactuur ? (
+                  {d.type === "DEMO_PDF" ? (
+                    // Het bestand zelf, via de beveiligde beheerroute.
+                    <a
+                      href={`/api/admin/documenten/${d.id}/bestand`}
+                      target="_blank"
+                      rel="noopener"
+                      className="-mx-2 flex flex-wrap items-baseline justify-between gap-2 rounded-lg px-2 py-1 transition hover:bg-cream-100/70"
+                    >
+                      {regel}
+                    </a>
+                  ) : isFactuur ? (
                     <Link
                       href={`/admin/facturen/${encodeURIComponent(d.nummer)}`}
                       className="-mx-2 flex flex-wrap items-baseline justify-between gap-2 rounded-lg px-2 py-1 transition hover:bg-cream-100/70"

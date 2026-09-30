@@ -125,6 +125,15 @@ const STATUS_VOOR_STAGE: Record<JourneyStage, LeadStatus> = {
 };
 
 /**
+ * De status die normaal bij een stage hoort, zonder grendels. Voor het
+ * heropenen van een afgevallen aanvraag: die krijgt de status terug die past
+ * bij waar hij in de journey stond.
+ */
+export function statusBijStage(stage: JourneyStage): LeadStatus {
+  return STATUS_VOOR_STAGE[stage];
+}
+
+/**
  * De status die bij deze stage hoort, of `null` als er niets te wijzigen valt.
  *
  * Twee grendels. "afgevallen" is een menselijk oordeel en wordt nooit

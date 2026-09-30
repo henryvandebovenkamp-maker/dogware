@@ -48,6 +48,7 @@ const SENDER_BY_TYPE: Record<MailType, SenderKind> = {
   welcome: "transactional",
   notification: "transactional",
   "groei-bericht": "transactional",
+  "demo-afsluiting": "transactional",
   test: "transactional",
 };
 

@@ -30,6 +30,7 @@ import {
   type DemoReadyContent,
 } from "./templates/demo-ready";
 import { CommerceEmail, type CommerceMailType, type CommerceMailVars } from "./templates/commerce";
+import { DemoAfsluitingEmail } from "./templates/demo-afsluiting";
 import { branding, demoLevertijd } from "@/lib/branding";
 import { WelcomeEmail } from "./templates/welcome";
 
@@ -545,6 +546,51 @@ export async function sendCommerceProof(
   const naar = proefOntvanger();
   const m = commerceMail(type, klant.naam, vars, ctaUrl, { klant: `${klant.naam} (${klant.email})` });
   const res = await sendMail(m.mailType, { to: naar, subject: `[Proef] ${m.subject}`, react: m.react, text: `[PROEF — niet naar de klant verstuurd] ${m.text}` });
+  return { ...res, naar };
+}
+
+/**
+ * De afsluitmail van een demo, met de PDF van de voorbeeldwebsite als echte
+ * bijlage (geen downloadlink). Eén opbouw voor de echte mail en de proef.
+ */
+function demoAfsluitingMail(input: {
+  onderwerp: string;
+  alineas: string[];
+  bijlage: { bestandsnaam: string; inhoud: Buffer };
+  proef?: { klant: string };
+}) {
+  return {
+    subject: input.onderwerp,
+    react: (
+      <DemoAfsluitingEmail alineas={input.alineas} bijlage={input.bijlage.bestandsnaam} proef={input.proef} />
+    ),
+    text: `${input.alineas.join("\n\n")}\n\nBijlage: ${input.bijlage.bestandsnaam}\n\nGroet,\nHenry van de Bovenkamp\nDogWare`,
+    attachments: [{ filename: input.bijlage.bestandsnaam, content: input.bijlage.inhoud }],
+  };
+}
+
+export async function sendDemoAfsluiting(input: {
+  to: string;
+  onderwerp: string;
+  alineas: string[];
+  bijlage: { bestandsnaam: string; inhoud: Buffer };
+}): Promise<MailResult> {
+  return sendMail("demo-afsluiting", { to: input.to, ...demoAfsluitingMail(input) });
+}
+
+/**
+ * Proef van de afsluitmail voor Henry. Bewust ZONDER ontvanger-parameter: de
+ * proef gaat altijd naar `proefOntvanger()`.
+ */
+export async function sendDemoAfsluitingProef(input: {
+  klant: { naam: string; email: string };
+  onderwerp: string;
+  alineas: string[];
+  bijlage: { bestandsnaam: string; inhoud: Buffer };
+}): Promise<MailResult & { naar: string }> {
+  const naar = proefOntvanger();
+  const m = demoAfsluitingMail({ ...input, proef: { klant: `${input.klant.naam} (${input.klant.email})` } });
+  const res = await sendMail("demo-afsluiting", { ...m, to: naar, subject: `[Proef] ${m.subject}` });
   return { ...res, naar };
 }
 

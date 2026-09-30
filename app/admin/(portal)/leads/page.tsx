@@ -189,6 +189,7 @@ export default async function AanvragenPage({
  */
 function knopLabel(a: Aanvraag): string {
   if (a.afleiding.bakje === "opvolgen") return "Opvolgen";
+  if (a.afleiding.bakje === "afgerond") return "Openen";
   return a.afleiding.actie.cta?.label ?? "Openen";
 }
 

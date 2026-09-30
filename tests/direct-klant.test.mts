@@ -563,7 +563,8 @@ describe("9. nieuwe klant toevoegen", () => {
   });
 
   it("de detailpagina toont een directe klant geen demosectie", () => {
-    const tak = detailPagina.slice(detailPagina.indexOf("{direct ? ("), detailPagina.indexOf(") : ("));
+    const start = detailPagina.indexOf("{direct ? (");
+    const tak = detailPagina.slice(start, detailPagina.indexOf(") : (", start));
     assert.match(tak, /Directe klant/);
     assert.match(tak, /BouwpromptKnop/);
     assert.doesNotMatch(tak, /DemoPanel|demoDomain|demoPortalUrl|Demo versturen/);

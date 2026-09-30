@@ -40,6 +40,14 @@ import { ReassignForm } from "./reassign-form";
 import { StageControl, DemoPanel } from "./journey-controls";
 import { PartnerActivatePanel } from "./partner-activate";
 import { BouwpromptKnop } from "./bouwprompt-knop";
+import { AfgerondPanel, DemoAfronden, type VoorbereideAfronding } from "@/components/commerce/demo-afronden";
+import { demoPdfsVan } from "@/lib/demo-afronding";
+import {
+  AFRONDEN_ADVIES_NA_DAGEN,
+  magDemoAfronden,
+  standaardAfsluitmail,
+  voornaamVan,
+} from "@/lib/demo-afronding-tekst";
 
 export const metadata: Metadata = {
   title: "Aanvraag",
@@ -227,6 +235,52 @@ export default async function LeadDetailPage({
     new Date(),
   );
 
+  /*
+   * Demo afronden. De laatste afronding telt pas als er daarna niet heropend
+   * is; een eerder voorbereide maar niet verstuurde PDF pakken we weer op.
+   */
+  const demoPdfs = direct ? [] : await demoPdfsVan(lead.id);
+  const laatsteHeropend = [...events].reverse().find((e) => e.kind === "aanvraag_heropend");
+  const laatsteAfgerond = [...events].reverse().find((e) => e.kind === "demo_afgerond");
+  const afgerondEvent =
+    laatsteAfgerond && (!laatsteHeropend || laatsteAfgerond.createdAt > laatsteHeropend.createdAt)
+      ? laatsteAfgerond
+      : null;
+  const afgerondPdf = afgerondEvent
+    ? demoPdfs.find((d) => d.id === (afgerondEvent.meta as { documentId?: string } | null)?.documentId) ?? null
+    : null;
+  const openPdf = demoPdfs.find((d) => !d.sentAt) ?? null;
+  const afrondbaar = magDemoAfronden(lead).ok;
+  const voorbereid: VoorbereideAfronding | null = openPdf
+    ? (() => {
+        const snap = openPdf.snapshot as { bestandsnaam?: string; paginas?: number; grootte?: number };
+        const mail = standaardAfsluitmail({
+          naam: lead.naam,
+          bedrijfsnaam: lead.bedrijfsnaam,
+          demoSentAt: lead.demoSentAt,
+          nu: new Date(),
+        });
+        return {
+          documentId: openPdf.id,
+          bestandsnaam: snap.bestandsnaam ?? "demo.pdf",
+          paginas: snap.paginas ?? 0,
+          grootte: snap.grootte ?? 0,
+          onderwerp: mail.onderwerp,
+          tekst: mail.tekst,
+        };
+      })()
+    : null;
+  const afrondKlant = {
+    naam: lead.naam,
+    voornaam: voornaamVan(lead.naam, lead.bedrijfsnaam),
+    email: lead.email,
+    bedrijfsnaam: lead.bedrijfsnaam,
+  };
+  const afrondAdvies =
+    afrondbaar &&
+    afleiding.bakje === "opvolgen" &&
+    (afleiding.dagenSindsDemo ?? 0) >= AFRONDEN_ADVIES_NA_DAGEN;
+
   const persoon = await findUserByEmail(lead.email);
   const eigenPartner = persoon ? await findPartnerByUserId(persoon.id) : null;
   const klantLink = commerce.portalToken ? portalUrl(commerce.portalToken) : null;
@@ -254,15 +308,45 @@ export default async function LeadDetailPage({
             })}
           </p>
         </div>
-        <span className="rounded-full bg-[#2f6bed]/10 px-3 py-1 text-[12px] font-bold text-[#2f6bed]">
-          {stageMeta(lead.stage, lead.journeyVariant).label}
-        </span>
+        {lead.status === "afgevallen" ? (
+          <span className="rounded-full bg-cream-200 px-3 py-1 text-[12px] font-bold text-ink-500">
+            {afgerondEvent ? "Demo afgerond" : "Afgevallen"}
+          </span>
+        ) : (
+          <span className="rounded-full bg-[#2f6bed]/10 px-3 py-1 text-[12px] font-bold text-[#2f6bed]">
+            {stageMeta(lead.stage, lead.journeyVariant).label}
+          </span>
+        )}
       </div>
 
       {/* De journey in één oogopslag */}
       <div className="mt-6 rounded-2xl bg-white p-5 shadow-soft ring-1 ring-ink/5">
         <JourneyBar current={lead.stage} variant={lead.journeyVariant} />
       </div>
+
+      {/* Afgerond of afgevallen: wat er gebeurde, en de weg terug. */}
+      {lead.status === "afgevallen" && (
+        <div className="mt-4">
+          <AfgerondPanel
+            leadId={id}
+            afgerond={
+              afgerondEvent
+                ? {
+                    op: afgerondEvent.createdAt.toISOString(),
+                    pdf: afgerondPdf
+                      ? {
+                          id: afgerondPdf.id,
+                          bestandsnaam:
+                            (afgerondPdf.snapshot as { bestandsnaam?: string }).bestandsnaam ?? afgerondPdf.titel,
+                        }
+                      : null,
+                  }
+                : null
+            }
+            demoUrl={lead.demoDomain}
+          />
+        </div>
+      )}
 
       {/* Ligt deze aanvraag stil? Dan gaat dat vóór de gewone volgende stap. */}
       {afleiding.bakje === "opvolgen" && (
@@ -273,6 +357,11 @@ export default async function LeadDetailPage({
             telefoon={lead.telefoon}
             email={lead.email}
             naam={lead.naam}
+            afronden={
+              afrondAdvies ? (
+                <DemoAfronden leadId={id} klant={afrondKlant} voorbereid={voorbereid} nadruk />
+              ) : undefined
+            }
           />
         </div>
       )}
@@ -344,6 +433,17 @@ export default async function LeadDetailPage({
               klantEmail={lead.email}
               alSent={demoVerstuurd}
             />
+
+            {/* Demo afronden — rustig, zolang opvolging nog logisch is. Bij
+                lange stilte staat hij met nadruk in het opvolgblok hierboven. */}
+            {afrondbaar && !afrondAdvies && (
+              <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-cream-100 pt-4">
+                <DemoAfronden leadId={lead.id} klant={afrondKlant} voorbereid={voorbereid} />
+                <p className="min-w-0 flex-1 text-[12px] text-ink-300">
+                  Geen reactie meer verwacht? Sluit de demo netjes af met een PDF en een laatste mail.
+                </p>
+              </div>
+            )}
 
             {/* De opdracht voor het klantproject. Levert alleen tekst op — het
                 bouwen zelf gebeurt in dat aparte project, niet hier. */}

@@ -36,6 +36,40 @@ export async function sendCommerceProof(type, klant, vars = {}, ctaUrl) {
   return { ok: true, id: `stub_${globalThis.__verzondenMails.length}`, naar };
 }
 
+/**
+ * De afsluitmail van een demo. `globalThis.__mailFaalt = true` laat hem
+ * mislukken zoals Resend dat zou doen, om het herstelpad te testen.
+ */
+export async function sendDemoAfsluiting({ to, onderwerp, alineas, bijlage }) {
+  if (globalThis.__mailFaalt) {
+    return { ok: false, error: { code: "PROVIDER_ERROR", message: "Versturen mislukt: Resend onbereikbaar" } };
+  }
+  globalThis.__verzondenMails.push({
+    type: "demo-afsluiting",
+    to,
+    onderwerp,
+    alineas,
+    bijlage: { bestandsnaam: bijlage.bestandsnaam, grootte: bijlage.inhoud.length },
+  });
+  return { ok: true, id: `stub_${globalThis.__verzondenMails.length}` };
+}
+
+/** Zoals in send.tsx: geen ontvanger-parameter, altijd de proefontvanger. */
+export async function sendDemoAfsluitingProef({ klant, onderwerp, alineas, bijlage }) {
+  const { proefOntvanger } = await import("../lib/email/config.ts");
+  const naar = proefOntvanger();
+  globalThis.__verzondenMails.push({
+    type: "demo-afsluiting",
+    to: naar,
+    proef: true,
+    klant,
+    onderwerp,
+    alineas,
+    bijlage: { bestandsnaam: bijlage.bestandsnaam, grootte: bijlage.inhoud.length },
+  });
+  return { ok: true, id: `stub_${globalThis.__verzondenMails.length}`, naar };
+}
+
 /* De overige helpers uit send.tsx, voor het geval een pad ze aanraakt. */
 const recorder =
   (naam) =>

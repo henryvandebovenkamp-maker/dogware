@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, type ReactNode } from "react";
 import { Clock, Mail, Phone } from "lucide-react";
 import { sendReminder, type CommerceState } from "@/app/actions/commerce";
 import { cn } from "@/lib/cn";
@@ -25,12 +25,18 @@ export function OpvolgenPanel({
   telefoon,
   email,
   naam,
+  afronden,
 }: {
   leadId: string;
   reden: string;
   telefoon: string | null;
   email: string;
   naam: string;
+  /**
+   * Na lange stilte: de demo netjes afronden als mogelijke volgende stap.
+   * Nooit automatisch — het is een knop die de beheerder zelf kiest.
+   */
+  afronden?: ReactNode;
 }) {
   const [state, formAction, pending] = useActionState(sendReminder, IDLE);
 
@@ -82,6 +88,16 @@ export function OpvolgenPanel({
             De herinnering gaat pas weg als je erop klikt — er wordt niets
             automatisch verstuurd.
           </p>
+
+          {afronden && (
+            <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-cream-100 pt-4">
+              {afronden}
+              <p className="min-w-0 flex-1 text-[12.5px] leading-relaxed text-ink-500">
+                Blijft het stil? Rond de demo dan netjes af: {naam.split(" ")[0]} krijgt een PDF
+                van de voorbeeldwebsite en een laatste, vriendelijke mail.
+              </p>
+            </div>
+          )}
 
           {state.message && (
             <p

@@ -1,5 +1,6 @@
 import {
   boolean,
+  customType,
   index,
   integer,
   jsonb,
@@ -938,6 +939,12 @@ export const DOCUMENT_TYPES = [
    * corrigeren gebeurt met een tegenboeking die zelf ook een nummer krijgt.
    */
   "CREDIT_NOTE",
+  /**
+   * De visuele PDF van een voorbeeldwebsite, gemaakt bij het afronden van een
+   * demo. Intern (niet in de klantomgeving); het bestand zelf staat in
+   * `document_files`, zodat het blijft bestaan als de demo offline gaat.
+   */
+  "DEMO_PDF",
 ] as const;
 export type DocumentType = (typeof DOCUMENT_TYPES)[number];
 
@@ -1073,6 +1080,31 @@ export const documents = pgTable(
 );
 
 export type DogDocument = typeof documents.$inferSelect;
+
+/** Binaire inhoud (bytea) als Buffer. */
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({
+  dataType: () => "bytea",
+});
+
+/**
+ * Het bestand achter een document, voor documenten die een echt bestand zijn
+ * (nu: de demo-PDF). Bewust in de database en niet bij een externe dienst met
+ * publieke URL's: het is klantmateriaal, alleen de beheerder haalt het op via
+ * een beveiligde route, en het blijft bestaan zolang het document bestaat.
+ */
+export const documentFiles = pgTable("document_files", {
+  documentId: uuid("document_id")
+    .primaryKey()
+    .references(() => documents.id, { onDelete: "cascade" }),
+  bestandsnaam: text("bestandsnaam").notNull(),
+  mime: text("mime").notNull(),
+  grootte: integer("grootte").notNull(),
+  /** SHA-256 van de inhoud, om te kunnen aantonen welk bestand verstuurd is. */
+  sha256: text("sha256").notNull(),
+  inhoud: bytea("inhoud").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+export type DocumentFile = typeof documentFiles.$inferSelect;
 
 export const PAYMENT_TYPES = [
   "DEPOSIT",

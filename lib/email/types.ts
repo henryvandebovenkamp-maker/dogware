@@ -18,6 +18,7 @@ export type MailType =
   | "welcome"
   | "notification"
   | "groei-bericht"
+  | "demo-afsluiting"
   | "test";
 
 export type MailAttachment = {

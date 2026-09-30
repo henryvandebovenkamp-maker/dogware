@@ -10,7 +10,7 @@ import { nextAction, type JourneySnapshot, type NextAction } from "@/lib/journey
  *
  * Dit bestand voegt bewust géén tweede statussysteem toe. De twintig stages in
  * `JOURNEY_STAGES` blijven de enige waarheid; hier worden ze alleen gegroepeerd
- * tot de negen bakjes waarin een mens denkt, en wordt afgeleid wie vandaag
+ * tot de bakjes waarin een mens denkt (plus "afgerond" als archief), en wordt afgeleid wie vandaag
  * aandacht nodig heeft. Alles is puur: geen database, geen tijdzones, geen
  * verrassingen — en daardoor te testen zonder omgeving.
  *
@@ -31,6 +31,7 @@ export const BAKJES = [
   "akkoord",
   "bouw",
   "klant",
+  "afgerond",
 ] as const;
 export type Bakje = (typeof BAKJES)[number];
 
@@ -44,6 +45,7 @@ export const BAKJE_LABEL: Record<Bakje, string> = {
   akkoord: "Akkoord",
   bouw: "Bouw",
   klant: "Klant",
+  afgerond: "Afgerond",
 };
 
 /**
@@ -139,10 +141,11 @@ export function leidAf(a: AanvraagInput, nu: Date): AanvraagAfleiding {
   const dagenSindsDemo = a.demoSentAt ? dagenTussen(a.demoSentAt, nu) : null;
   const klant = a.snapshot.aanbetalingBetaald;
 
-  // Afgevallen: uit beeld, nooit actie.
+  // Afgevallen of afgeronde demo: in het archiefbakje, nooit actie. De stage
+  // blijft staan, zodat heropenen de journey gewoon laat verdergaan.
   if (a.status === "afgevallen") {
     return {
-      bakje: BAKJE_VOOR_STAGE[a.stage],
+      bakje: "afgerond",
       klant,
       actieNodig: false,
       reden: "",
