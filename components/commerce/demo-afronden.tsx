@@ -104,8 +104,13 @@ function Venster({
     setFase("bezig");
     try {
       const res = await fetch(`/api/admin/leads/${leadId}/demo-afronden`, { method: "POST" });
-      // Een time-out of storing van de server geeft geen JSON terug maar een foutpagina.
-      const json = await res.json().catch(() => null);
+      // Gestreamd: lege hartslagregels, en als laatste regel de uitkomst. Een
+      // time-out of storing van de server geeft geen JSON maar een foutpagina.
+      const regels = (await res.text()).trim().split("\n");
+      let json: { ok?: boolean; reden?: string } | null = null;
+      try {
+        json = JSON.parse(regels[regels.length - 1]);
+      } catch {}
       if (!json?.ok) {
         setFout(
           json?.reden ??
@@ -116,7 +121,7 @@ function Venster({
         setFase(data ? "controleren" : "bevestigen");
         return;
       }
-      setData(json);
+      setData(json as unknown as VoorbereideAfronding);
       setFase("controleren");
       router.refresh();
     } catch {

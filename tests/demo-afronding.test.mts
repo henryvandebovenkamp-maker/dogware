@@ -422,3 +422,22 @@ describe("PDF-fouten en gelijktijdigheid: niets verstuurd, niets afgerond", asyn
     assert.equal((await leesLead(lead.id)).status, "demo verstuurd");
   });
 });
+
+describe("de route streamt: hartslag en als laatste regel de uitkomst", async () => {
+  const route = await import("../app/api/admin/leads/[id]/demo-afronden/route.ts");
+
+  it("zonder beheerder: 403; met beheerder: NDJSON waarvan de laatste regel de uitkomst is", async () => {
+    const lead = await demoAanvraag({ demoDomain: null });
+    const params = Promise.resolve({ id: lead.id });
+    alsNiemand();
+    assert.equal((await route.POST(new Request("http://x", { method: "POST" }), { params })).status, 403);
+    alsAdmin();
+    const res = await route.POST(new Request("http://x", { method: "POST" }), { params });
+    assert.equal(res.status, 200);
+    assert.match(res.headers.get("content-type") ?? "", /ndjson/);
+    const regels = (await res.text()).trim().split("\n");
+    const uitkomst = JSON.parse(regels[regels.length - 1]);
+    assert.equal(uitkomst.ok, false);
+    assert.ok(uitkomst.reden);
+  });
+});
