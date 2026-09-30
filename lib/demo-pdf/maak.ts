@@ -48,7 +48,7 @@ async function startBrowser(): Promise<Browser> {
     if (!eigen && process.platform === "linux") {
       const chromium = (await import("@sparticuz/chromium")).default;
       return await puppeteer.launch({
-        args: [...chromium.args, "--hide-scrollbars"],
+        args: [...chromium.args, "--hide-scrollbars", "--lang=nl-NL"],
         executablePath: await chromium.executablePath(),
         headless: true,
       });
@@ -57,7 +57,7 @@ async function startBrowser(): Promise<Browser> {
       executablePath:
         eigen || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
       headless: true,
-      args: ["--no-sandbox", "--hide-scrollbars"],
+      args: ["--no-sandbox", "--hide-scrollbars", "--lang=nl-NL"],
     });
   } catch (err) {
     throw new DemoPdfFout(
@@ -115,6 +115,12 @@ async function scrolDoor(page: Page) {
   await wacht(700);
 }
 
+/** Een Nederlandse bezoeker: taal, datumnotatie en tijdzone zoals de klant ze ziet. */
+async function alsNederlander(page: Page) {
+  await page.setExtraHTTPHeaders({ "Accept-Language": "nl-NL,nl;q=0.9" });
+  await page.emulateTimezone("Europe/Amsterdam");
+}
+
 async function open(page: Page, url: string): Promise<boolean> {
   try {
     const res = await page.goto(url, { waitUntil: "networkidle2", timeout: 45_000 });
@@ -162,6 +168,7 @@ export async function maakDemoPdf(input: {
   const browser = await startBrowser();
   try {
     const page = await browser.newPage();
+    await alsNederlander(page);
     await page.setViewport({ ...DESKTOP, deviceScaleFactor: 1 });
 
     if (!(await open(page, basis.href))) {
@@ -218,6 +225,7 @@ export async function maakDemoPdf(input: {
     const mobiel: string[] = [];
     try {
       const telefoon = await browser.newPage();
+      await alsNederlander(telefoon);
       await telefoon.setViewport({ ...MOBIEL, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
       if (await open(telefoon, basis.href)) {
         await ruimCookieMeldingOp(telefoon);

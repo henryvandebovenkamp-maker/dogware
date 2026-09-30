@@ -92,7 +92,7 @@ export function OpvolgenPanel({
           {afronden && (
             <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-cream-100 pt-4">
               {afronden}
-              <p className="min-w-0 flex-1 text-[12.5px] leading-relaxed text-ink-500">
+              <p className="w-full text-[12.5px] leading-relaxed text-ink-500 sm:w-auto sm:min-w-0 sm:flex-1">
                 Blijft het stil? Rond de demo dan netjes af: {naam.split(" ")[0]} krijgt een PDF
                 van de voorbeeldwebsite en een laatste, vriendelijke mail.
               </p>
