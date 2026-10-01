@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { and, desc, eq, inArray, isNotNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, isNull, lt } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import type { Agreement, Commerce, Lead, PaymentInstallment, PaymentType } from "@/lib/db/schema";
 import { getAdminActor } from "@/lib/admin-auth";
@@ -49,8 +49,15 @@ import {
   pricingLabels,
   readPricing,
   saveDraftContent,
+  setProposalValidity,
   toConfig,
 } from "@/lib/proposals";
+import {
+  eindeVanDag,
+  geldigheidLabel,
+  isVoorstelVerlopen,
+  nieuweGeldigheid,
+} from "@/lib/proposal-geldigheid";
 import {
   acceptProposalBySignature,
   agreementPricing,
@@ -319,7 +326,7 @@ export async function saveProposalDraft(
       ? { bijzonderheden: content.bijzonderheden.slice(0, 4000) || null }
       : {}),
     ...(content.geldigTot !== undefined
-      ? { geldigTot: content.geldigTot ? new Date(`${content.geldigTot}T23:59:59`) : null }
+      ? { geldigTot: content.geldigTot ? (eindeVanDag(content.geldigTot) ?? undefined) : null }
       : {}),
   });
   if (!res.ok) {
@@ -472,6 +479,10 @@ function verzendBezwaar(
     return `Vul eerst de eenmalige investering in — ${direct ? "een opdrachtbevestiging" : "een voorstel"} van € 0,00 versturen we niet.`;
   }
   if (!draft.titel.trim()) return `Geef ${w.deNaam} een titel.`;
+  // Een voorstel dat al verlopen de deur uitgaat, kan de klant niet eens accepteren.
+  if (isVoorstelVerlopen({ status: "SENT", acceptedAt: null, geldigTot: draft.geldigTot })) {
+    return `De geldigheidsdatum van ${w.deNaam} ligt in het verleden. Kies in de editor een nieuwe datum.`;
+  }
   const regelingCheck = checkRegeling(ctx.commerce);
   return regelingCheck.ok ? null : regelingCheck.reden;
 }
@@ -586,6 +597,20 @@ export async function sendReminder(
   // Een directe klant heeft geen demo en geen los voorstel om aan te herinneren.
   if (isDirectJourney(lead.journeyVariant) && (soort === "demo" || soort === "voorstel")) {
     return FOUT("Dit is een directe klant — stuur een herinnering voor de opdrachtbevestiging.");
+  }
+
+  /*
+   * Geen herinnering naar een voorstel dat niet meer te accepteren is: de
+   * klant zou op een doodlopende pagina landen. Eerst de geldigheid verlengen
+   * (of een nieuwe versie maken).
+   */
+  const nogTeTekenen =
+    soort === "voorstel" ||
+    (soort === "overeenkomst" && isDirectJourney(lead.journeyVariant) && !isSigned(await getCurrentAgreement(commerce.id)));
+  if (nogTeTekenen && proposal && isExpired(proposal)) {
+    return FOUT(
+      `${opdrachtWoord(lead.journeyVariant).Naam} is verlopen. Verleng eerst de geldigheid, dan kun je de klant meteen mailen.`,
+    );
   }
 
   // Waar de knop in de mail heen wijst. Bij een demo-herinnering is dat het
@@ -885,6 +910,97 @@ export async function rotatePortalToken(
   return OK("Nieuwe link gemaakt. De oude link werkt niet meer.");
 }
 
+/**
+ * De geldigheid van een verstuurd, nog niet geaccepteerd voorstel verlengen.
+ *
+ * Normaal beheer, zonder databasehandelingen: inhoud, versie en bevroren
+ * prijzen blijven exact wat ze waren — alleen de datum waarvóór de klant kan
+ * accepteren (of, bij een directe klant, tekenen) schuift op. Een
+ * geaccepteerd voorstel heeft geen geldigheid meer en wordt hier nooit
+ * aangeraakt. Wil je iets aan de afspraak zelf veranderen, dan is een nieuwe
+ * versie de weg.
+ */
+export async function extendProposalValidity(
+  _prev: CommerceState,
+  formData: FormData,
+): Promise<CommerceState> {
+  const leadId = String(formData.get("leadId") ?? "");
+  const proposalId = String(formData.get("proposalId") ?? "");
+  const datum = String(formData.get("geldigTot") ?? "");
+  const mailKlant = formData.get("mailKlant") === "on" || formData.get("mailKlant") === "1";
+  const ctx = await adminContext(leadId);
+  if (!ctx) return FOUT("Geen toegang.");
+  const { lead, commerce } = ctx;
+  const w = opdrachtWoord(lead.journeyVariant);
+
+  const nieuw = nieuweGeldigheid(datum);
+  if (!nieuw.ok) return FOUT(nieuw.reden);
+
+  // Het voorstel moet bij déze aanvraag horen — nooit op id alleen.
+  const ditStuk = w.Naam === "Voorstel" ? "Dit voorstel" : "Deze opdrachtbevestiging";
+  if (!/^[0-9a-f-]{36}$/i.test(proposalId)) return FOUT(`${ditStuk} hoort niet bij deze aanvraag.`);
+  const [voorstel] = await getDb()!
+    .select()
+    .from(schema.proposals)
+    .where(and(eq(schema.proposals.id, proposalId), eq(schema.proposals.commerceId, commerce.id)))
+    .limit(1);
+  if (!voorstel) return FOUT(`${ditStuk} hoort niet bij deze aanvraag.`);
+  if (voorstel.acceptedAt || voorstel.status === "ACCEPTED") {
+    return FOUT(`${w.Naam} is al geaccepteerd — de geldigheid speelt dan geen rol meer.`);
+  }
+  if (!["SENT", "VIEWED"].includes(voorstel.status)) {
+    return FOUT(
+      voorstel.status === "DRAFT"
+        ? "Dit is nog een concept. Pas de datum aan in de editor."
+        : "Deze versie is opgevolgd door een nieuwere. Verleng die versie, of maak een nieuwe.",
+    );
+  }
+
+  const bijgewerkt = await setProposalValidity(voorstel.id, commerce.id, nieuw.geldigTot);
+  if (!bijgewerkt) return FOUT(`${w.Naam} is intussen veranderd. Ververs de pagina.`);
+
+  const oud = voorstel.geldigTot ? geldigheidLabel(voorstel.geldigTot) : "geen datum";
+  const nieuwLabel = geldigheidLabel(nieuw.geldigTot);
+  await logJourneyEvent(
+    leadId,
+    "proposal_validity_changed",
+    `Geldigheid van ${w.deNaam} (versie ${voorstel.version}) aangepast naar ${nieuwLabel}`,
+    {
+      actor: "admin",
+      version: voorstel.version,
+      proposalId: voorstel.id,
+      van: voorstel.geldigTot?.toISOString() ?? null,
+      naar: nieuw.geldigTot.toISOString(),
+      wasVerlopen: isExpired(voorstel),
+    },
+  );
+  await logActivity({
+    actorUserId: ctx.actorId,
+    action: "PROPOSAL_VALIDITY_CHANGED",
+    objectType: "lead",
+    objectId: leadId,
+    oldValue: { proposalId: voorstel.id, version: voorstel.version, geldigTot: oud },
+    newValue: { proposalId: voorstel.id, version: voorstel.version, geldigTot: nieuwLabel },
+  });
+
+  let gemaild = false;
+  if (mailKlant && commerce.portalToken) {
+    const direct = isDirectJourney(lead.journeyVariant);
+    gemaild = await mailAndLog(
+      lead,
+      direct ? "agreement-reminder" : "proposal-reminder",
+      { extra: `Je ${w.naam} is geldig tot en met ${nieuwLabel}.` },
+      `${portalUrl(commerce.portalToken)}${direct ? "/overeenkomst" : ""}`,
+    );
+  }
+
+  refresh(leadId);
+  revalidatePath(`/traject/${commerce.portalToken}`);
+  return OK(
+    `Geldig t/m ${nieuwLabel}.${mailKlant ? (gemaild ? " De klant is gemaild." : " De mail kon niet worden verzonden.") : ""}`,
+  );
+}
+
 /* =========================================================================
  * Klant — via de beveiligde link, zonder verplichte login
  * ========================================================================= */
@@ -895,10 +1011,17 @@ async function klantContext(token: string): Promise<KlantContext | null> {
   return resolvePortal(token);
 }
 
-/** Voorstel accepteren. Audittechnisch vastgelegd en idempotent. */
+/**
+ * Voorstel accepteren. Audittechnisch vastgelegd en idempotent.
+ *
+ * `versie` is de voorstelversie die de klant op zijn scherm had. Is er
+ * intussen een nieuwere versie verstuurd, dan accepteren we die nieuwe NIET
+ * stilzwijgend: de klant moet zien waar hij akkoord op geeft.
+ */
 export async function acceptProposal(
   token: string,
   naam: string,
+  versie?: number,
 ): Promise<CommerceState> {
   const ctx = await klantContext(token);
   if (!ctx) return FOUT("Deze link is niet (meer) geldig.");
@@ -917,9 +1040,16 @@ export async function acceptProposal(
 
   const proposal = await getActiveProposal(commerce.id);
   if (!proposal) return FOUT("Er staat geen voorstel klaar.");
-  if (proposal.acceptedAt) return OK(); // al akkoord — idempotent
+  if (proposal.acceptedAt) {
+    // Al akkoord — idempotent. De overeenkomst staat klaar (of komt nu alsnog).
+    await ensureAgreement(commerce, lead, proposal);
+    return OK();
+  }
+  if (versie !== undefined && versie !== proposal.version) {
+    return FOUT("Er staat intussen een nieuwere versie van je voorstel klaar. Ververs de pagina en bekijk die eerst.");
+  }
   if (isExpired(proposal)) {
-    return FOUT("Dit voorstel is verlopen. Neem even contact op, dan maken we een nieuwe versie.");
+    return FOUT("Dit voorstel is niet meer actief. Neem even contact met ons op, dan zorgen we dat je snel verder kunt.");
   }
   const schoon = naam.trim();
   if (schoon.length < 2) return FOUT("Vul je naam in om akkoord te geven.");
@@ -927,7 +1057,12 @@ export async function acceptProposal(
   const fp = await requestFingerprint();
   const nu = new Date();
 
-  await db
+  /*
+   * Atomair: alleen een verstuurde, nog niet geaccepteerde versie. Van twee
+   * gelijktijdige kliks krijgt er precies één een rij terug; de andere stopt
+   * hier zonder tweede tijdlijnregel, tweede mail of overschreven akkoord.
+   */
+  const [geaccepteerd] = await db
     .update(schema.proposals)
     .set({
       status: "ACCEPTED",
@@ -936,7 +1071,20 @@ export async function acceptProposal(
       acceptedIpHash: fp.ipHash,
       acceptedUserAgent: fp.userAgent,
     })
-    .where(eq(schema.proposals.id, proposal.id));
+    .where(
+      and(
+        eq(schema.proposals.id, proposal.id),
+        isNull(schema.proposals.acceptedAt),
+        inArray(schema.proposals.status, ["SENT", "VIEWED"]),
+      ),
+    )
+    .returning({ id: schema.proposals.id });
+  if (!geaccepteerd) {
+    const opnieuw = await getActiveProposal(commerce.id);
+    return opnieuw?.acceptedAt
+      ? OK()
+      : FOUT("Er is intussen iets aan je voorstel veranderd. Ververs de pagina en probeer het opnieuw.");
+  }
 
   await db
     .update(schema.commerce)
@@ -991,6 +1139,11 @@ export type SignInput = {
   agreesMaandbedrag: boolean;
   agreesVoorwaarden: boolean;
   agreesBevoegd: boolean;
+  /**
+   * De overeenkomst die de klant op zijn scherm had. Is die intussen vervangen
+   * door een nieuwe versie, dan tekent hij niet blind de nieuwe.
+   */
+  agreementId?: string;
 };
 
 /** Overeenkomst digitaal ondertekenen. Poortwachter vóór elke betaling. */
@@ -1032,6 +1185,9 @@ export async function signAgreement(token: string, input: SignInput): Promise<Co
     return FOUT(
       `${direct ? "De opdrachtbevestiging" : "Het voorstel"} is intussen gewijzigd. Ververs de pagina en lees de nieuwe versie.`,
     );
+  }
+  if (input.agreementId && input.agreementId !== agreement.id) {
+    return FOUT("De overeenkomst is intussen bijgewerkt. Ververs de pagina en lees de nieuwe versie.");
   }
   if (direct) {
     const bijOvereenkomst = overeenkomstPoort(lead.journeyVariant, proposal, agreement);
@@ -1232,6 +1388,9 @@ export async function signAgreement(token: string, input: SignInput): Promise<Co
  */
 export type BetaalSoort = "deposit" | "final" | "termijn";
 
+/** Na zoveel tijd is een betaling die Mollie nooit bereikte zeker onderbroken. */
+const ONDERBROKEN_NA_MS = 2 * 60_000;
+
 /**
  * Start een betaling. Het bedrag wordt UITSLUITEND hier server-side bepaald;
  * de browser geeft alleen door wélke termijn het betreft.
@@ -1378,15 +1537,35 @@ async function startPaymentInternal(
     .limit(1);
 
   if (bestaand?.status === "PAID") return FOUT("Deze termijn is al betaald.");
-  if (bestaand?.status === "CREATED" && termijn) {
-    return FOUT("Er wordt al een betaling voor deze termijn gestart. Een moment geduld.");
+  if (bestaand?.status === "CREATED" && !bestaand.molliePaymentId) {
+    /*
+     * CREATED zonder Mollie-id is een poging die nog loopt — of die halverwege
+     * is gestorven (time-out, verbinding weg) vóórdat Mollie bereikt werd. Een
+     * verse poging respecteren we. Een oude is nooit bij Mollie aangekomen,
+     * dus er kan ook niets op betaald zijn: die leggen we vast als mislukt,
+     * zodat de klant niet voorgoed op "een moment geduld" blijft hangen.
+     */
+    if (nu.getTime() - bestaand.createdAt.getTime() < ONDERBROKEN_NA_MS) {
+      return FOUT("Er wordt al een betaling voor deze termijn gestart. Een moment geduld.");
+    }
+    await db
+      .update(schema.payments)
+      .set({ status: "FAILED", failureReason: "Onderbroken voordat de betaling bij Mollie werd aangemaakt." })
+      .where(
+        and(
+          eq(schema.payments.id, bestaand.id),
+          eq(schema.payments.status, "CREATED"),
+          isNull(schema.payments.molliePaymentId),
+          lt(schema.payments.createdAt, new Date(nu.getTime() - ONDERBROKEN_NA_MS)),
+        ),
+      );
   }
   if (bestaand?.molliePaymentId && ["OPEN", "PENDING"].includes(bestaand.status)) {
     const live = await getMolliePayment(bestaand.molliePaymentId);
     const url = live?.getCheckoutUrl?.();
     if (url) return { status: "success", checkoutUrl: url };
 
-    if (termijn && live) {
+    if (live) {
       /*
        * Geen checkout meer. Dan eerst de echte stand bij Mollie volgen: is er
        * intussen betaald, dan verwerken we dat en starten we beslist geen
@@ -1401,10 +1580,8 @@ async function startPaymentInternal(
       if (echt === "OPEN" || echt === "PENDING") {
         return FOUT("Je vorige betaling wordt nog verwerkt. Probeer het over een paar minuten opnieuw.");
       }
-      await db
-        .update(schema.payments)
-        .set({ status: echt })
-        .where(and(eq(schema.payments.id, bestaand.id), inArray(schema.payments.status, ["OPEN", "PENDING"])));
+      // Via de gewone verwerking, zodat de tijdlijn het ook één keer laat zien.
+      await processPaymentByMollieId(bestaand.molliePaymentId);
     }
   }
 

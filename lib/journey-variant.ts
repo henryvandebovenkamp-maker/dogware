@@ -1,4 +1,5 @@
 import type { JourneyVariant, ProposalStatus } from "@/lib/db/schema";
+import { isVoorstelVerlopen } from "@/lib/proposal-geldigheid";
 
 /**
  * De route door de journey: met of zonder voorbeeldwebsite.
@@ -93,11 +94,14 @@ export function overeenkomstPoort(
   if (!DEFINITIEF.includes(voorstel.status)) {
     return { ok: false, reden: "Deze opdrachtbevestiging is niet meer geldig. Ververs de pagina." };
   }
-  // Na tekenen is de geldigheidsdatum niet meer relevant; daarvóór wel.
-  if (!voorstel.acceptedAt && voorstel.geldigTot && voorstel.geldigTot.getTime() < nu.getTime()) {
+  /*
+   * Na tekenen (= acceptatie) is de geldigheidsdatum niet meer relevant;
+   * daarvóór wel — tot het einde van de geldigheidsdag, Nederlandse tijd.
+   */
+  if (isVoorstelVerlopen(voorstel, nu)) {
     return {
       ok: false,
-      reden: "Deze opdrachtbevestiging is verlopen. Neem even contact op, dan zetten we een nieuwe versie klaar.",
+      reden: "Deze opdrachtbevestiging is niet meer actief. Neem even contact met ons op, dan zorgen we dat je snel verder kunt.",
     };
   }
   if (overeenkomst) {

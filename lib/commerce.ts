@@ -1,5 +1,5 @@
 import "server-only";
-import { and, eq, inArray, isNull, notInArray, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, ne, notInArray, sql } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import type {
   Commerce,
@@ -149,34 +149,57 @@ export async function processPaymentByMollieId(molliePaymentId: string): Promise
     return;
   }
 
-  await db
+  const velden = {
+    paidAt: nieuweStatus === "PAID" ? (payment.paidAt ?? new Date()) : payment.paidAt,
+    /*
+     * De betaalmethode staat pas ná betaling vast — bij het aanmaken kiest
+     * de klant nog niets. Hem hier vastleggen is de enige manier waarop de
+     * factuur straks de waarheid kan vertellen in plaats van "iDEAL" aan te
+     * nemen.
+     */
+    method:
+      (mollie as unknown as { method?: string | null }).method ?? payment.method,
+    mollieCustomerId:
+      (mollie as unknown as { customerId?: string }).customerId ?? payment.mollieCustomerId,
+    mollieMandateId:
+      (mollie as unknown as { mandateId?: string }).mandateId ?? payment.mollieMandateId,
+    failureReason:
+      nieuweStatus === "PAID"
+        ? null
+        : ((mollie as unknown as { details?: { failureReason?: string } }).details
+            ?.failureReason ?? null),
+  };
+
+  /*
+   * De statusovergang is atomair: alleen de webhook die de status écht
+   * verandert krijgt een rij terug. Mollie stuurt dezelfde webhook gerust
+   * meerdere keren (en soms tegelijk); de gevolgen van een overgang — een
+   * tijdlijnregel, een mail over een mislukte betaling — horen er maar één
+   * keer te zijn.
+   */
+  const [gewijzigd] = await db
     .update(schema.payments)
-    .set({
-      status: nieuweStatus,
-      paidAt: nieuweStatus === "PAID" ? (payment.paidAt ?? new Date()) : payment.paidAt,
-      /*
-       * De betaalmethode staat pas ná betaling vast — bij het aanmaken kiest
-       * de klant nog niets. Hem hier vastleggen is de enige manier waarop de
-       * factuur straks de waarheid kan vertellen in plaats van "iDEAL" aan te
-       * nemen.
-       */
-      method:
-        (mollie as unknown as { method?: string | null }).method ?? payment.method,
-      mollieCustomerId:
-        (mollie as unknown as { customerId?: string }).customerId ?? payment.mollieCustomerId,
-      mollieMandateId:
-        (mollie as unknown as { mandateId?: string }).mandateId ?? payment.mollieMandateId,
-      failureReason:
-        nieuweStatus === "PAID"
-          ? null
-          : ((mollie as unknown as { details?: { failureReason?: string } }).details
-              ?.failureReason ?? null),
-    })
-    .where(eq(schema.payments.id, payment.id));
+    .set({ status: nieuweStatus, ...velden })
+    .where(and(eq(schema.payments.id, payment.id), ne(schema.payments.status, nieuweStatus)))
+    .returning({ id: schema.payments.id });
+  if (!gewijzigd) {
+    await db.update(schema.payments).set(velden).where(eq(schema.payments.id, payment.id));
+  }
 
   if (nieuweStatus !== "PAID") {
+    if (!gewijzigd) return;
     if (["FAILED", "EXPIRED", "CANCELED"].includes(nieuweStatus)) {
       await onPaymentNotPaid(payment, nieuweStatus);
+    } else if (nieuweStatus === "PENDING" && payment.type !== "SUBSCRIPTION") {
+      const ctx = await loadContext(payment.commerceId);
+      if (ctx) {
+        await logJourneyEvent(
+          ctx.lead.id,
+          "payment_pending",
+          `Betaling in behandeling bij de bank (${euroFromCents(payment.amountCents)})`,
+          { actor: "systeem", internal: true, type: payment.type, molliePaymentId },
+        );
+      }
     }
     return;
   }

@@ -51,8 +51,10 @@ const COPY: Record<
   },
   "proposal-reminder": {
     heading: (n) => `Even een herinnering, ${n}`,
-    body: () => [
+    body: (v) => [
       "Je voorstel staat nog steeds voor je klaar. Geen haast — ik wilde het alleen even onder je aandacht brengen, voor het geval het is ondergesneeuwd.",
+      // Bijvoorbeeld de nieuwe geldigheidsdatum na verlengen.
+      ...(v.extra ? [v.extra] : []),
       "Heb je een vraag of wil je iets aangepast zien? Antwoord gerust op deze mail, dan kijk ik er persoonlijk naar.",
     ],
     cta: "Bekijk je voorstel",
@@ -82,8 +84,9 @@ const COPY: Record<
   },
   "agreement-reminder": {
     heading: (n) => `Nog even over de overeenkomst, ${n}`,
-    body: () => [
+    body: (v) => [
       "De samenwerkingsovereenkomst wacht nog op je handtekening. Zodra die er staat, kunnen we echt van start.",
+      ...(v.extra ? [v.extra] : []),
       "Loop je ergens tegenaan of is er iets onduidelijk? Laat het me weten, dan bel ik je gewoon even.",
     ],
     cta: "Overeenkomst tekenen",

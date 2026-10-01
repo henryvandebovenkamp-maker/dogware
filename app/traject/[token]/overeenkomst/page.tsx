@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { and, eq, isNull } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { resolvePortal } from "@/lib/portal-access";
@@ -38,7 +38,8 @@ export default async function OvereenkomstPage({
   const proposal = await getActiveProposal(commerce.id);
   const poort = overeenkomstPoort(lead.journeyVariant, proposal);
   // Een verlopen opdrachtbevestiging mag nog wel gelezen worden; tekenen weigert de actie.
-  if (!proposal || (!poort.ok && !(direct && proposal.sentAt))) notFound();
+  // Nog niet aan de beurt? Dan terug naar het overzicht, dat vertelt wat de volgende stap is.
+  if (!proposal || (!poort.ok && !(direct && proposal.sentAt))) redirect(`/traject/${token}`);
 
   let agreement = await getCurrentAgreement(commerce.id);
   if (!agreement || agreement.status === "SUPERSEDED") {

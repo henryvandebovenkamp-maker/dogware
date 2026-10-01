@@ -15,6 +15,7 @@ import { afspraakOverzicht } from "@/lib/betaalafspraak";
 import { proefOntvanger } from "@/lib/email/config";
 import { ProposalEditor, type EditorData } from "@/components/commerce/proposal-editor";
 import { isDirectJourney } from "@/lib/journey-variant";
+import { kalenderdag } from "@/lib/proposal-geldigheid";
 
 export const metadata: Metadata = {
   title: "Voorstel",
@@ -22,7 +23,8 @@ export const metadata: Metadata = {
 };
 
 const euroInput = (cents: number) => (cents / 100).toFixed(2);
-const dateInput = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : "");
+// De Nederlandse kalenderdag — niet de UTC-datum, die 's avonds een dag kan verschillen.
+const dateInput = (d: Date | null) => (d ? kalenderdag(d) : "");
 
 export default async function VoorstelEditorPage({
   params,

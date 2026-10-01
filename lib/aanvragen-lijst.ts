@@ -1,7 +1,8 @@
 import "server-only";
 import { and, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
-import type { Lead } from "@/lib/db/schema";
+import type { Lead, ProposalStatus } from "@/lib/db/schema";
+import { isVoorstelVerlopen } from "@/lib/proposal-geldigheid";
 import { leidAf, type AanvraagAfleiding } from "@/lib/aanvragen";
 import type { JourneySnapshot } from "@/lib/journey-next";
 import { regelingStand } from "@/lib/payment-plan";
@@ -132,6 +133,8 @@ export async function laadAanvragen(nu: Date = new Date()): Promise<Aanvraag[] |
             sentAt: schema.proposals.sentAt,
             acceptedAt: schema.proposals.acceptedAt,
             status: schema.proposals.status,
+            version: schema.proposals.version,
+            geldigTot: schema.proposals.geldigTot,
           })
           .from(schema.proposals)
           .where(inArray(schema.proposals.commerceId, commerceIds))
@@ -204,6 +207,7 @@ export async function laadAanvragen(nu: Date = new Date()): Promise<Aanvraag[] |
       // De lijst toont geen "bekeken"-nuance; die staat op de detailpagina.
       voorstelBekeken: false,
       voorstelGeaccepteerd: eigenVoorstellen.some((p) => p.acceptedAt),
+      voorstelVerlopen: actiefVoorstelVerlopen(eigenVoorstellen, nu),
       overeenkomstGetekend: eigenOvereenkomsten.some((a) => a.signedAt),
       aanbetalingBetaald: eigenBetalingen.some(
         (p) => p.type === "DEPOSIT" && p.status === "PAID",
@@ -270,4 +274,19 @@ export function alleenKlanten(aanvragen: readonly Aanvraag[]): Aanvraag[] {
 /** Aantal aanvragen dat vandaag om een handeling vraagt. */
 export function telActieNodig(aanvragen: readonly Aanvraag[]): number {
   return aanvragen.filter((a) => a.afleiding.actieNodig).length;
+}
+
+/**
+ * Is het geldende voorstel (zoals getActiveProposal het kiest: het
+ * geaccepteerde, anders het laatst verstuurde) verlopen vóór acceptatie?
+ */
+function actiefVoorstelVerlopen(
+  voorstellen: { status: ProposalStatus; acceptedAt: Date | null; geldigTot: Date | null; version: number }[],
+  nu: Date,
+): boolean {
+  if (voorstellen.some((p) => p.status === "ACCEPTED" || p.acceptedAt)) return false;
+  const actief = voorstellen
+    .filter((p) => p.status === "SENT" || p.status === "VIEWED")
+    .sort((a, b) => b.version - a.version)[0];
+  return actief ? isVoorstelVerlopen(actief, nu) : false;
 }

@@ -7,6 +7,7 @@ import type { JourneyStage, JourneyVariant } from "@/lib/db/schema";
 import { JourneyBar } from "@/components/commerce/journey-bar";
 import { BrandMark } from "@/components/brand";
 import { legalFooterLine } from "@/lib/legal-entity";
+import { branding } from "@/lib/branding";
 import { cn } from "@/lib/cn";
 import type { RegelingLabels } from "@/lib/betaalafspraak";
 import type { SchemaWeergave } from "@/lib/payment-schedule";
@@ -98,8 +99,14 @@ export type DocumentRij = {
 
 export type TijdlijnRij = { id: string; label: string; actor: string; createdAt: string };
 
+// Altijd de Nederlandse kalenderdag: dezelfde op de server en in elke browser.
 const datum = (iso: string) =>
-  new Date(iso).toLocaleDateString("nl-NL", { day: "numeric", month: "long", year: "numeric" });
+  new Date(iso).toLocaleDateString("nl-NL", {
+    timeZone: "Europe/Amsterdam",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
 
 /* ------------------------------------------------------------------ shell -- */
 
@@ -276,7 +283,7 @@ function VolgendeStap({ voorstel, status }: { voorstel: VoorstelData; status: St
     if (voorstel.proef) return;
     setFout(null);
     start(async () => {
-      const res = await acceptProposal(voorstel.token, naam);
+      const res = await acceptProposal(voorstel.token, naam, voorstel.version);
       if (res.status === "error") setFout(res.message ?? "Er ging iets mis.");
       else window.location.reload();
     });
@@ -419,18 +426,7 @@ function VolgendeStap({ voorstel, status }: { voorstel: VoorstelData; status: St
    * geen naamveld: de handtekening is het akkoord.
    */
   if (voorstel.direct) {
-    if (voorstel.verlopen) {
-      return (
-        <Kaart>
-          <Kop>Deze opdrachtbevestiging is verlopen</Kop>
-          <Tekst>
-            De datum waarvóór we hem getekend terug wilden hebben
-            {voorstel.geldigTot ? ` (${datum(voorstel.geldigTot)})` : ""} is verstreken. Geen
-            probleem — laat het even weten, dan zetten we een verse versie voor je klaar.
-          </Tekst>
-        </Kaart>
-      );
-    }
+    if (voorstel.verlopen) return <NietMeerActief stuk="Deze opdrachtbevestiging" />;
     return (
       <Kaart tint="brand">
         <Kop>Je opdrachtbevestiging staat klaar</Kop>
@@ -472,18 +468,12 @@ function VolgendeStap({ voorstel, status }: { voorstel: VoorstelData; status: St
     );
   }
 
-  /* Verlopen voorstel */
-  if (voorstel.verlopen) {
-    return (
-      <Kaart>
-        <Kop>Dit voorstel is verlopen</Kop>
-        <Tekst>
-          De geldigheidsdatum van {voorstel.geldigTot ? datum(voorstel.geldigTot) : "dit voorstel"}{" "}
-          is verstreken. Geen probleem — laat het even weten, dan maken we een verse versie voor je.
-        </Tekst>
-      </Kaart>
-    );
-  }
+  /*
+   * Verlopen vóór acceptatie. Komt hier nooit voor een geaccepteerd voorstel:
+   * dat is hierboven al afgehandeld, en `verlopen` is voor een geaccepteerd
+   * voorstel per definitie onwaar (zie lib/proposal-geldigheid.ts).
+   */
+  if (voorstel.verlopen) return <NietMeerActief stuk="Dit voorstel" />;
 
   /* Voorstel ligt er → accepteren */
   return (
@@ -519,6 +509,22 @@ function VolgendeStap({ voorstel, status }: { voorstel: VoorstelData; status: St
   );
 }
 
+/**
+ * Het voorstel is vóór acceptatie over zijn geldigheid heen. Geen technische
+ * melding en geen schuldvraag — wel een directe weg naar een mens.
+ */
+function NietMeerActief({ stuk }: { stuk: string }) {
+  return (
+    <Kaart>
+      <Kop>{stuk} is niet meer actief</Kop>
+      <Tekst>
+        Neem even contact met ons op, dan zorgen we dat je snel verder kunt. Je kunt Henry bellen
+        of een WhatsApp sturen via {branding.phone}, of mailen naar {branding.replyToEmail}.
+      </Tekst>
+    </Kaart>
+  );
+}
+
 /* ------------------------------------------------------ voorstel in detail */
 
 function VoorstelDetails({ voorstel }: { voorstel: VoorstelData }) {
@@ -531,8 +537,10 @@ function VoorstelDetails({ voorstel }: { voorstel: VoorstelData }) {
         </h2>
         <span className="text-[11.5px] font-semibold text-ink-300">
           Versie {voorstel.version}
+          {/* Na acceptatie speelt de geldigheid geen rol meer; dan ook niet tonen. */}
           {voorstel.geldigTot &&
-            !(voorstel.direct && voorstel.geaccepteerd) &&
+            !voorstel.geaccepteerd &&
+            !voorstel.verlopen &&
             ` · ${voorstel.direct ? "tekenen vóór" : "geldig t/m"} ${datum(voorstel.geldigTot)}`}
         </span>
       </div>

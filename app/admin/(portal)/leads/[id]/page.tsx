@@ -7,6 +7,7 @@ import { getDb, schema } from "@/lib/db";
 import { commissieFase } from "@/lib/commissie";
 import { stageMeta } from "@/lib/journey-stages";
 import { isDirectJourney } from "@/lib/journey-variant";
+import { kalenderdag } from "@/lib/proposal-geldigheid";
 import { getTimeline } from "@/lib/journey";
 import { leidAf } from "@/lib/aanvragen";
 import { nextAction, type JourneySnapshot } from "@/lib/journey-next";
@@ -15,6 +16,7 @@ import {
   freezePricing,
   getActiveProposal,
   getDraftProposal,
+  isExpired,
   listProposals,
   pricingLabels,
   readPricing,
@@ -213,6 +215,7 @@ export default async function LeadDetailPage({
     voorstelVerstuurd: proposals.some((p) => p.sentAt),
     voorstelBekeken: proposals.some((p) => p.firstViewedAt),
     voorstelGeaccepteerd: proposals.some((p) => p.acceptedAt),
+    voorstelVerlopen: actiefVoorstel ? isExpired(actiefVoorstel) : false,
     overeenkomstGetekend: getekend,
     aanbetalingBetaald,
     opleveringKlaar: Boolean(commerce.deliveryReadyAt),
@@ -529,7 +532,13 @@ export default async function LeadDetailPage({
             acceptedAt: p.acceptedAt?.toISOString() ?? null,
             acceptedName: p.acceptedName,
             geldigTot: p.geldigTot?.toISOString() ?? null,
+            createdAt: p.createdAt.toISOString(),
+            verlopen: isExpired(p),
+            // Alleen een verstuurde, nog niet geaccepteerde versie heeft een geldigheid om te beheren.
+            beheerbaar: !p.acceptedAt && (p.status === "SENT" || p.status === "VIEWED"),
+            geldigTotDag: p.geldigTot ? kalenderdag(p.geldigTot) : null,
           }))}
+          vandaag={kalenderdag(new Date())}
           overeenkomst={
             agreement
               ? {

@@ -31,6 +31,7 @@ type Klant = {
  */
 export function AgreementView({
   token,
+  agreementId,
   direct = false,
   chapters,
   versionName,
@@ -46,6 +47,8 @@ export function AgreementView({
   proef = false,
 }: {
   token: string;
+  /** De overeenkomst die hier getoond wordt; ondertekenen hoort bij precies deze. */
+  agreementId?: string;
   /** Basis van de terug-link. Standaard /traject/<token>. */
   pad?: string;
   /**
@@ -99,6 +102,7 @@ export function AgreementView({
       agreesMaandbedrag: vinkjes.agreesMaandbedrag,
       agreesVoorwaarden: vinkjes.agreesVoorwaarden,
       agreesBevoegd: vinkjes.agreesBevoegd,
+      agreementId,
     };
     start(async () => {
       const res = await signAgreement(token, input);

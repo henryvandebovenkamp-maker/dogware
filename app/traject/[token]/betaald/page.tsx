@@ -4,6 +4,7 @@ import { and, desc, eq, inArray } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { resolvePortal } from "@/lib/portal-access";
 import { euroFromCents } from "@/lib/money";
+import { processPaymentByMollieId } from "@/lib/commerce";
 import { BrandMark } from "@/components/brand";
 import { TerugKnop } from "@/components/commerce/return-view";
 
@@ -34,17 +35,38 @@ export default async function BetaaldPage({
   const db = getDb();
   if (!db) notFound();
 
-  const [laatste] = await db
-    .select()
-    .from(schema.payments)
-    .where(
-      and(
-        eq(schema.payments.commerceId, ctx.commerce.id),
-        inArray(schema.payments.type, ["DEPOSIT", "FINAL_PAYMENT", "INSTALLMENT"]),
-      ),
-    )
-    .orderBy(desc(schema.payments.createdAt))
-    .limit(1);
+  const laatsteBetaling = async () =>
+    (
+      await db
+        .select()
+        .from(schema.payments)
+        .where(
+          and(
+            eq(schema.payments.commerceId, ctx.commerce.id),
+            inArray(schema.payments.type, ["DEPOSIT", "FINAL_PAYMENT", "INSTALLMENT"]),
+          ),
+        )
+        .orderBy(desc(schema.payments.createdAt))
+        .limit(1)
+    )[0];
+
+  let laatste = await laatsteBetaling();
+
+  /*
+   * Komt de klant terug vóórdat de webhook er was, dan vragen we de status
+   * zelf bij Mollie op — via exact dezelfde, idempotente verwerking als de
+   * webhook. De terugkeer zelf bewijst niets; Mollie blijft de bron. Lukt dat
+   * opvragen niet, dan blijft de pagina eerlijk "even wachten" zeggen en
+   * handelt de webhook het straks af.
+   */
+  if (laatste?.molliePaymentId && ["OPEN", "PENDING"].includes(laatste.status)) {
+    try {
+      await processPaymentByMollieId(laatste.molliePaymentId);
+      laatste = (await laatsteBetaling()) ?? laatste;
+    } catch {
+      /* de webhook is de vangrails */
+    }
+  }
 
   const betaald = laatste?.status === "PAID";
   const mislukt =

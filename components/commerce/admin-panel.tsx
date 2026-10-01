@@ -17,6 +17,7 @@ import {
 import {
   addInternalNote,
   addTask,
+  extendProposalValidity,
   retryMandate,
   rotatePortalToken,
   sendReminder,
@@ -63,6 +64,13 @@ export type VoorstelRij = {
   acceptedAt: string | null;
   acceptedName: string | null;
   geldigTot: string | null;
+  createdAt: string;
+  /** Verlopen vóór acceptatie. Een geaccepteerde versie is nooit verlopen. */
+  verlopen: boolean;
+  /** Verstuurd en nog niet geaccepteerd: alleen dan valt er geldigheid te beheren. */
+  beheerbaar: boolean;
+  /** De geldigheidsdag als "YYYY-MM-DD" (Nederlandse kalenderdag). */
+  geldigTotDag: string | null;
 };
 
 export type OvereenkomstData = {
@@ -148,12 +156,14 @@ export type BouwData = {
 
 /* ------------------------------------------------------------------- ui --- */
 
+// Altijd Nederlandse tijd: op de server en in elke browser dezelfde dag.
+const TZ = "Europe/Amsterdam";
 const datum = (iso: string | null) =>
   iso
-    ? new Date(iso).toLocaleDateString("nl-NL", { day: "numeric", month: "short", year: "numeric" })
+    ? new Date(iso).toLocaleDateString("nl-NL", { timeZone: TZ, day: "numeric", month: "short", year: "numeric" })
     : "—";
 const datumTijd = (iso: string) =>
-  `${new Date(iso).toLocaleDateString("nl-NL", { day: "numeric", month: "short" })} ${new Date(iso).toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" })}`;
+  `${new Date(iso).toLocaleDateString("nl-NL", { timeZone: TZ, day: "numeric", month: "short" })} ${new Date(iso).toLocaleTimeString("nl-NL", { timeZone: TZ, hour: "2-digit", minute: "2-digit" })}`;
 
 /**
  * De commerciële klantkaart, in rustige inklapbare secties.
@@ -180,6 +190,8 @@ export function CommerceSecties(props: {
   regeling: RegelingLabels;
   /** Het betaalschema na ondertekening; null bij historisch 50/50 of vóór tekenen. */
   schema: SchemaWeergave | null;
+  /** Vandaag als Nederlandse kalenderdag, "YYYY-MM-DD" — ondergrens van het verlengen. */
+  vandaag: string;
 }) {
   const f = props.financieel;
   const stuk = props.direct ? "opdrachtbevestiging" : "voorstel";
@@ -299,9 +311,17 @@ export function CommerceSecties(props: {
       </Sectie>
 
       <Sectie
+        id="voorstel"
         titel={props.direct ? "Opdrachtbevestiging" : "Voorstel"}
         icon={<FileText className="h-4 w-4" />}
-        badge={props.voorstellen.length ? `${props.voorstellen.length} versie(s)` : "nog geen"}
+        badge={
+          props.voorstellen.some((p) => p.verlopen)
+            ? "verlopen"
+            : props.voorstellen.length
+              ? `${props.voorstellen.length} versie(s)`
+              : "nog geen"
+        }
+        open={props.voorstellen.some((p) => p.verlopen)}
       >
         {props.voorstellen.length === 0 ? (
           <Leeg>Er is nog geen {stuk} gemaakt.</Leeg>
@@ -314,23 +334,63 @@ export function CommerceSecties(props: {
                     Versie {p.version}
                     {p.titel ? ` — ${p.titel}` : ""}
                   </span>
-                  <StatusPil status={p.status} />
+                  <span className="flex items-center gap-1.5">
+                    {p.verlopen && (
+                      <span className="rounded-full bg-brand-100 px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide text-brand-600">
+                        verlopen
+                      </span>
+                    )}
+                    <StatusPil status={p.status} />
+                  </span>
                 </div>
-                <p className="mt-1 text-[12px] leading-relaxed text-ink-500">
-                  {p.sentAt ? `Verstuurd ${datum(p.sentAt)}` : "Nog niet verstuurd"}
-                  {p.firstViewedAt && ` · bekeken ${datum(p.firstViewedAt)} (${p.viewCount}×)`}
-                  {p.geldigTot && ` · geldig t/m ${datum(p.geldigTot)}`}
-                </p>
-                {p.acceptedAt && (
-                  <p className="mt-1 text-[12px] font-semibold text-sage-600">
-                    {props.direct ? "Geaccepteerd door ondertekening op" : "Geaccepteerd op"}{" "}
-                    {datumTijd(p.acceptedAt)}
-                    {p.acceptedName ? ` door ${p.acceptedName}` : ""}
-                  </p>
+                <dl className="mt-2 space-y-1 text-[12.5px]">
+                  <Regel label="Aangemaakt" value={datumTijd(p.createdAt)} />
+                  <Regel label="Verstuurd" value={p.sentAt ? datumTijd(p.sentAt) : "nog niet"} />
+                  {p.firstViewedAt && (
+                    <Regel label="Bekeken" value={`${datum(p.firstViewedAt)} (${p.viewCount}×)`} />
+                  )}
+                  <Regel
+                    label="Geldig t/m"
+                    value={
+                      p.acceptedAt
+                        ? "n.v.t. — geaccepteerd"
+                        : p.geldigTot
+                          ? datum(p.geldigTot)
+                          : "geen einddatum"
+                    }
+                  />
+                  {(p.status === "SENT" || p.status === "VIEWED" || p.acceptedAt) && (
+                    <Regel label="Verlopen" value={p.verlopen ? "ja" : "nee"} />
+                  )}
+                  <Regel
+                    label="Geaccepteerd"
+                    value={
+                      p.acceptedAt
+                        ? `${datumTijd(p.acceptedAt)}${p.acceptedName ? ` door ${p.acceptedName}` : ""}${props.direct ? " (door ondertekening)" : ""}`
+                        : "nog niet"
+                    }
+                  />
+                </dl>
+                {p.beheerbaar && (
+                  <GeldigheidForm
+                    leadId={props.leadId}
+                    proposalId={p.id}
+                    vandaag={props.vandaag}
+                    huidig={p.geldigTotDag}
+                    verlopen={p.verlopen}
+                  />
                 )}
               </li>
             ))}
           </ul>
+        )}
+        {!props.voorstellen.some((p) => p.acceptedAt) && props.voorstellen.some((p) => p.sentAt) && (
+          <Link
+            href={`/admin/leads/${props.leadId}/voorstel`}
+            className="mt-3 inline-flex items-center gap-1.5 text-[12.5px] font-bold text-brand hover:text-brand-600"
+          >
+            Iets aan de afspraak veranderen? Nieuwe versie maken →
+          </Link>
         )}
       </Sectie>
 
@@ -669,12 +729,15 @@ const BETAAL_LABEL: Record<string, string> = {
 };
 
 function Sectie({
+  id,
   titel,
   icon,
   badge,
   open,
   children,
 }: {
+  /** Anker, zodat "volgende stap" er rechtstreeks naartoe kan linken. */
+  id?: string;
   titel: string;
   icon: React.ReactNode;
   badge?: string;
@@ -683,6 +746,7 @@ function Sectie({
 }) {
   return (
     <details
+      id={id}
       open={open}
       className="group rounded-2xl bg-white shadow-soft ring-1 ring-ink/5 [&_summary::-webkit-details-marker]:hidden"
     >
@@ -810,6 +874,87 @@ function KopieerLink({ url }: { url: string }) {
         {gekopieerd ? "Gekopieerd" : "Kopieer"}
       </button>
     </div>
+  );
+}
+
+/** Een datum als "YYYY-MM-DD" plus een aantal dagen. */
+function plusDagen(dag: string, dagen: number): string {
+  const [j, m, d] = dag.split("-").map(Number);
+  return new Date(Date.UTC(j, m - 1, d + dagen)).toISOString().slice(0, 10);
+}
+
+/**
+ * De geldigheid van een verstuurde, nog niet geaccepteerde versie verlengen.
+ * Inhoud en bedragen blijven precies zoals verstuurd; alleen de datum schuift.
+ */
+function GeldigheidForm({
+  leadId,
+  proposalId,
+  vandaag,
+  huidig,
+  verlopen,
+}: {
+  leadId: string;
+  proposalId: string;
+  vandaag: string;
+  huidig: string | null;
+  verlopen: boolean;
+}) {
+  const [state, formAction, pending] = useActionState(extendProposalValidity, IDLE);
+  const voorstel = huidig && huidig > plusDagen(vandaag, 14) ? huidig : plusDagen(vandaag, 14);
+  return (
+    <form
+      action={formAction}
+      className={cn(
+        "mt-3 rounded-lg p-3 ring-1",
+        verlopen ? "bg-brand-50 ring-brand/15" : "bg-white ring-ink/5",
+      )}
+    >
+      <input type="hidden" name="leadId" value={leadId} />
+      <input type="hidden" name="proposalId" value={proposalId} />
+      {verlopen && (
+        <p className="mb-2 text-[12px] font-semibold text-brand-600">
+          Verlopen — de klant kan nu niet verder. Verleng de geldigheid, dan kan dat meteen weer.
+        </p>
+      )}
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="text-[12px] font-bold text-ink-700" htmlFor={`geldig-${proposalId}`}>
+          Geldig t/m
+        </label>
+        <input
+          id={`geldig-${proposalId}`}
+          name="geldigTot"
+          type="date"
+          required
+          min={vandaag}
+          max={plusDagen(vandaag, 365)}
+          defaultValue={voorstel}
+          className="rounded-lg border border-cream-200 bg-white px-2.5 py-1.5 text-[12.5px] text-ink-700 outline-none transition focus:border-brand"
+        />
+        <label className="flex items-center gap-1.5 text-[12px] text-ink-500">
+          <input type="checkbox" name="mailKlant" defaultChecked={verlopen} />
+          Klant mailen met de nieuwe datum
+        </label>
+        <button
+          type="submit"
+          disabled={pending}
+          className="inline-flex items-center gap-1.5 rounded-full bg-ink px-3.5 py-1.5 text-[12px] font-bold text-cream transition hover:bg-ink-700 disabled:opacity-60"
+        >
+          <RefreshCw className="h-3.5 w-3.5" />
+          {pending ? "Bezig…" : "Geldigheid verlengen"}
+        </button>
+      </div>
+      {state.message && (
+        <p
+          className={cn(
+            "mt-2 text-[11.5px] font-semibold",
+            state.status === "error" ? "text-brand-600" : "text-sage-600",
+          )}
+        >
+          {state.message}
+        </p>
+      )}
+    </form>
   );
 }
 

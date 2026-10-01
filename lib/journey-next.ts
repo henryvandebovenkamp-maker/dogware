@@ -37,6 +37,7 @@ export type NextActionKey =
   | "voorstel-bewerken"
   | "voorstel-versturen"
   | "voorstel-herinneren"
+  | "geldigheid-verlengen"
   | "overeenkomst-herinneren"
   | "aanbetaling-herinneren"
   | "oplevering-klaarzetten"
@@ -65,6 +66,12 @@ export type JourneySnapshot = {
   voorstelVerstuurd: boolean;
   voorstelBekeken: boolean;
   voorstelGeaccepteerd: boolean;
+  /**
+   * Is het geldende, nog niet geaccepteerde voorstel over zijn geldigheid
+   * heen? Een geaccepteerd voorstel is nooit verlopen. Leeg = nee, zodat
+   * bestaande aanroepen ongewijzigd blijven werken.
+   */
+  voorstelVerlopen?: boolean;
   overeenkomstGetekend: boolean;
   aanbetalingBetaald: boolean;
   opleveringKlaar: boolean;
@@ -166,6 +173,7 @@ export function nextAction(s: JourneySnapshot, leadId: string): NextAction {
    * betalen, bouwen, opleveren) zijn voor beide routes gelijk.
    */
   if (s.variant === "direct") {
+    if (s.voorstelVerstuurd && s.voorstelVerlopen) return verlopenAction(base, "De opdrachtbevestiging");
     if (s.voorstelVerstuurd) {
       return {
         situatie: "De opdrachtbevestiging is verstuurd; de klant heeft nog niet getekend.",
@@ -202,6 +210,8 @@ export function nextAction(s: JourneySnapshot, leadId: string): NextAction {
       waitingOn: "klant",
     };
   }
+
+  if (s.voorstelVerstuurd && s.voorstelVerlopen) return verlopenAction(base, "Het voorstel");
 
   if (s.voorstelVerstuurd) {
     return {
@@ -263,6 +273,20 @@ export function nextAction(s: JourneySnapshot, leadId: string): NextAction {
     volgende: "Zodra de klant aangeeft door te willen, maak je het voorstel.",
     cta: { label: "Klant wil doorgaan", action: "demo-akkoord" },
     waitingOn: "klant",
+  };
+}
+
+/**
+ * Het voorstel is verlopen vóór acceptatie. De klant kan nu niets; een
+ * herinnering zou hem naar een doodlopende pagina sturen. Aan zet: de
+ * beheerder, met één handeling — verlengen (of een nieuwe versie).
+ */
+function verlopenAction(base: string, stuk: string): NextAction {
+  return {
+    situatie: `${stuk} is verlopen voordat de klant akkoord gaf.`,
+    volgende: "Verleng de geldigheid (de klant kan dan meteen verder), of maak een nieuwe versie als er iets aan de afspraak verandert.",
+    cta: { label: "Geldigheid verlengen", action: "geldigheid-verlengen", href: `${base}#voorstel` },
+    waitingOn: "admin",
   };
 }
 

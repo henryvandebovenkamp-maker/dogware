@@ -85,6 +85,7 @@ export function overeenkomstVoorKlant(agreement: Agreement, proposal: Proposal, 
   const { chapters, versionName } = renderAgreement(agreement, proposal, lead.journeyVariant);
   const regeling = agreementPricing(agreement).betaalregeling;
   return {
+    agreementId: agreement.id,
     direct,
     chapters,
     versionName,

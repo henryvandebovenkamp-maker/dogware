@@ -1,5 +1,5 @@
 import "server-only";
-import { and, desc, eq, inArray, ne, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import type { Commerce, Lead, Proposal } from "@/lib/db/schema";
 import {
@@ -10,6 +10,7 @@ import {
 import { newPortalToken } from "@/lib/portal-access";
 import { normalizePlan, type BetaalRegeling, type PlanConfig } from "@/lib/payment-plan";
 import { berekenAfspraak, regelingLabels } from "@/lib/betaalafspraak";
+import { isVoorstelVerlopen, standaardGeldigTot, vervaltOp } from "@/lib/proposal-geldigheid";
 
 /**
  * Voorstellen met versiebeheer.
@@ -250,8 +251,15 @@ export async function createOrGetDraft(
     .orderBy(desc(schema.proposals.version))
     .limit(1);
 
-  const geldigTot = new Date();
-  geldigTot.setDate(geldigTot.getDate() + 30);
+  /*
+   * Geldig tot het einde van de dag, over 30 dagen. Een vervolgversie neemt
+   * de datum van de vorige alleen over als die later ligt: anders zou een
+   * nieuwe versie van een verlopen voorstel al verlopen geboren worden.
+   */
+  const standaard = standaardGeldigTot();
+  const vorigeEinde = vorige ? vervaltOp(vorige) : null;
+  const geldigTot =
+    vorigeEinde && vorigeEinde.getTime() > standaard.getTime() ? vorigeEinde : standaard;
 
   const [created] = await db
     .insert(schema.proposals)
@@ -266,7 +274,7 @@ export async function createOrGetDraft(
       werkzaamheden: vorige?.werkzaamheden ?? [],
       modules: vorige?.modules ?? defaultModulesFromLead(lead),
       bijzonderheden: vorige?.bijzonderheden ?? null,
-      geldigTot: vorige?.geldigTot ?? geldigTot,
+      geldigTot,
       pricing: freezePricing(commerce) as unknown as Record<string, unknown>,
       createdByUserId,
     })
@@ -380,9 +388,45 @@ export async function trackProposalViewed(proposalId: string): Promise<void> {
   }
 }
 
-/** Is dit voorstel verlopen? */
+/**
+ * Is dit voorstel verlopen? Alleen een nog niet geaccepteerd voorstel kan
+ * verlopen, en pas na het einde van de geldigheidsdag (Nederlandse tijd). Zie
+ * lib/proposal-geldigheid.ts.
+ */
 export function isExpired(p: Proposal, now = new Date()): boolean {
-  return Boolean(p.geldigTot && p.geldigTot.getTime() < now.getTime());
+  return isVoorstelVerlopen(p, now);
+}
+
+/**
+ * Verlengt (of verkort) de geldigheid van een verstuurd, nog niet
+ * geaccepteerd voorstel.
+ *
+ * Dit is de enige wijziging die op een verstuurde versie mag: de
+ * geldigheidsdatum is geen onderdeel van de afspraak waar de klant akkoord op
+ * geeft — inhoud en bevroren prijzen blijven onaangeroerd. Atomair: een
+ * voorstel dat intussen geaccepteerd, opgevolgd of van een ander dossier is,
+ * levert null op en verandert niet.
+ */
+export async function setProposalValidity(
+  proposalId: string,
+  commerceId: string,
+  geldigTot: Date,
+): Promise<Proposal | null> {
+  const db = getDb();
+  if (!db) return null;
+  const [bijgewerkt] = await db
+    .update(schema.proposals)
+    .set({ geldigTot, updatedAt: new Date() })
+    .where(
+      and(
+        eq(schema.proposals.id, proposalId),
+        eq(schema.proposals.commerceId, commerceId),
+        isNull(schema.proposals.acceptedAt),
+        inArray(schema.proposals.status, ["SENT", "VIEWED"]),
+      ),
+    )
+    .returning();
+  return bijgewerkt ?? null;
 }
 
 /* ---------------------------------------------------------------- labels -- */
