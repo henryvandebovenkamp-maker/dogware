@@ -5,7 +5,7 @@ import { NeedPage } from "@/components/landing/need-page";
 import { BRANCHES, BRANCHE_BY_PATH } from "@/lib/branches";
 import { NEEDS, NEED_BY_PATH } from "@/lib/needs";
 import { absoluteUrl, branding } from "@/lib/branding";
-import { PLATFORM_PRIJS } from "@/lib/tarieven";
+import { vanafAanbod } from "@/lib/tarieven";
 
 /**
  * Eén dynamische route voor álle landingspagina's:
@@ -82,15 +82,9 @@ export default async function LandingPage({
       url: absoluteUrl(`/${slug}`),
       image: absoluteUrl(branding.logo.full),
       inLanguage: "nl-NL",
-      // De vaste, eenmalige prijs voor het bouwen en inrichten. Een maandprijs
-      // hoort hier niet: die verschilt per bedrijf.
-      offers: {
-        "@type": "Offer",
-        price: PLATFORM_PRIJS.bedrag,
-        priceCurrency: PLATFORM_PRIJS.valuta,
-        availability: "https://schema.org/InStock",
-        url: absoluteUrl("/demo"),
-      },
+      // Alleen de vanafprijs voor een professionele website. Uitbreidingen en
+      // een maandprijs horen hier niet: die verschillen per bedrijf.
+      offers: vanafAanbod(absoluteUrl("/demo")),
       provider: {
         "@type": "Organization",
         name: branding.name,

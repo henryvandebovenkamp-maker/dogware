@@ -45,8 +45,9 @@ import { FinalCta } from "@/components/sections/final-cta";
  * die blijft altijd voor het hele vak spreken.
  *
  * De prijs (`#tarieven`) staat direct na de belofte "één keer goed geregeld,
- * daarna onderhouden": dat is precies wat de eenmalige investering en de
- * maandelijkse kosten zijn. Een compacte prijsregel onder "Zo werkt het" en
+ * daarna onderhouden": dat is precies wat de investering (vanaf een
+ * professionele website, uit te breiden per bedrijf) en de maandelijkse
+ * kosten zijn. Een compacte prijsregel onder "Zo werkt het" en
  * het menu-item Tarieven zorgen dat niemand er ver voor hoeft te scrollen.
  *
  * Het verhaal van Henry (`#verhaal`) staat bewust helemaal onderaan, vlak voor

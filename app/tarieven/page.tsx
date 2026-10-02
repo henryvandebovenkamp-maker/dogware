@@ -7,10 +7,10 @@ import { Reveal } from "@/components/reveal";
 import { Faq } from "@/components/landing/faq";
 import { MaandKosten, PrijsCta, PrijsKaart } from "@/components/sections/pricing";
 import { absoluteUrl, branding } from "@/lib/branding";
-import { MAX_TERMIJNEN_PUBLIEK, PLATFORM_PRIJS, TARIEVEN_FAQ } from "@/lib/tarieven";
+import { MAX_TERMIJNEN_PUBLIEK, TARIEVEN_FAQ, VANAF_PRIJS, VANAF_ZIN, vanafAanbod } from "@/lib/tarieven";
 
 const TITEL = "Tarieven";
-const OMSCHRIJVING = `Een compleet DogWare-platform met website bouwen en inrichten kost ${PLATFORM_PRIJS.label}. Betalen kan in overleg in maximaal ${MAX_TERMIJNEN_PUBLIEK} termijnen. De maandelijkse kosten staan vooraf in je persoonlijke voorstel.`;
+const OMSCHRIJVING = `${VANAF_ZIN}. Uit te breiden met online boeken, betalingen, een klantomgeving en meer, samengesteld voor jouw bedrijf. Je ziet alle bedragen vooraf in je persoonlijke voorstel.`;
 
 export const metadata: Metadata = {
   title: `${TITEL} — wat kost DogWare?`,
@@ -32,30 +32,25 @@ export const metadata: Metadata = {
 };
 
 /**
- * De tarievenpagina. Geen verkooppraat: het bedrag, wat erin zit, hoe je het
- * kunt spreiden, hoe de maandelijkse kosten werken en waarom daar geen vast
- * bedrag bij staat. Dezelfde bouwstenen als de prijssectie op de homepage.
+ * De tarievenpagina. Geen verkooppraat: de vanafprijs, wat erin zit, waarmee
+ * het meegroeit, hoe je kunt spreiden, hoe de maandelijkse kosten werken en
+ * waarom er geen pakketten zijn. Dezelfde bouwstenen als de prijssectie op de
+ * homepage.
  */
 export default function TarievenPage() {
   const jsonLd = [
     {
       "@context": "https://schema.org",
       "@type": "Service",
-      name: `${branding.name}-platform bouwen en inrichten`,
+      name: `Professionele website en ${branding.name}-platform`,
       serviceType: "Website en bedrijfsplatform voor hondenprofessionals",
       description: OMSCHRIJVING,
       url: absoluteUrl("/tarieven"),
       areaServed: { "@type": "Country", name: "Nederland" },
       provider: { "@type": "Organization", name: branding.name, url: branding.siteUrl },
-      // Alleen de vaste, eenmalige prijs. De maandelijkse kosten verschillen
+      // Alleen de vanafprijs. Uitbreidingen en maandelijkse kosten verschillen
       // per bedrijf en staan daarom bewust niet in de structured data.
-      offers: {
-        "@type": "Offer",
-        price: PLATFORM_PRIJS.bedrag,
-        priceCurrency: PLATFORM_PRIJS.valuta,
-        availability: "https://schema.org/InStock",
-        url: absoluteUrl("/tarieven"),
-      },
+      offers: vanafAanbod(absoluteUrl("/tarieven")),
     },
     {
       "@context": "https://schema.org",
@@ -81,7 +76,7 @@ export default function TarievenPage() {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <SiteHeader />
       <main className="relative z-10 flex-1">
-        {/* 1–2. Het bedrag en wat erin zit */}
+        {/* 1–2. De vanafprijs, wat erin zit en waarmee het meegroeit */}
         <section className="relative overflow-hidden pb-16 pt-28 sm:pb-20 sm:pt-36">
           <div className="pointer-events-none absolute inset-0 -z-10">
             <div className="absolute left-1/2 top-20 h-96 w-[48rem] -translate-x-1/2 rounded-full bg-brand-100/50 blur-3xl" />
@@ -93,9 +88,9 @@ export default function TarievenPage() {
                 Wat kost DogWare?
               </h1>
               <p className="max-w-2xl text-pretty text-base leading-relaxed text-ink-500 sm:text-lg">
-                Eén bedrag voor je complete platform, de mogelijkheid om het te spreiden, en de
-                maandelijkse kosten vooraf zwart op wit. Zo weet je precies waar je aan toe bent
-                voordat je klant wordt.
+                Je begint met een professionele website vanaf {VANAF_PRIJS.label}. Wil je meer,
+                dan stellen we DogWare samen rond wat jouw bedrijf nodig heeft. Alle bedragen
+                staan vooraf zwart op wit, zodat je weet waar je aan toe bent.
               </p>
             </div>
             <Reveal className="mx-auto mt-12 max-w-5xl">
@@ -115,8 +110,9 @@ export default function TarievenPage() {
                   titel={`Betalen in maximaal ${MAX_TERMIJNEN_PUBLIEK} termijnen`}
                 >
                   <p>
-                    De investering van {PLATFORM_PRIJS.label} hoeft niet in één keer. In overleg
-                    verdelen we het bedrag over maximaal {MAX_TERMIJNEN_PUBLIEK} termijnen.
+                    Kies je voor een uitgebreidere oplossing? Dan hoeft de investering niet in
+                    één keer. In overleg verdelen we het bedrag over maximaal{" "}
+                    {MAX_TERMIJNEN_PUBLIEK} termijnen.
                   </p>
                   <p>
                     Dat is gewoon een betaalafspraak tussen jou en ons, geen lening of
@@ -128,7 +124,7 @@ export default function TarievenPage() {
                 <Blok
                   icon={<Layers className="h-6 w-6" />}
                   tint="brand"
-                  titel="Waarom geen standaard maandabonnement?"
+                  titel="Waarom geen vaste pakketten?"
                 >
                   <p>
                     Omdat niet ieder hondenbedrijf dezelfde onderdelen gebruikt. Een hondenschool
@@ -136,8 +132,8 @@ export default function TarievenPage() {
                     hondenpension.
                   </p>
                   <p>
-                    Een standaardpakket betekent al snel betalen voor wat je niet gebruikt. Wij
-                    spreken liever vooraf een bedrag af dat past bij hoe jij werkt.
+                    Een standaardpakket betekent al snel betalen voor wat je niet gebruikt. Bij
+                    DogWare begin je bij wat je nodig hebt, en groeit het mee met je bedrijf.
                   </p>
                 </Blok>
               </Reveal>
@@ -158,7 +154,7 @@ export default function TarievenPage() {
               intro="Vertel in een paar minuten iets over je bedrijf. Je krijgt een kosteloos voorbeeld van jouw eigen omgeving en daarna een persoonlijk voorstel met de investering, de betaalafspraak en de maandelijkse kosten."
             />
             <div className="mt-10">
-              <PrijsCta secundair={{ href: "/#oplossingen", label: "Bekijk wat DogWare voor mij kan doen" }} />
+              <PrijsCta secundair={{ href: "/#oplossingen", label: "Ontdek alle mogelijkheden" }} />
             </div>
             <p className="mx-auto mt-8 flex max-w-lg items-center justify-center gap-2 text-center text-[14px] text-ink-500">
               <MessageCircleHeart className="h-4 w-4 shrink-0 text-brand" />
