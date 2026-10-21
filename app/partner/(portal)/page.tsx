@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requirePartner } from "@/lib/auth/session";
 import { referralLinkFor } from "@/lib/referral";
 import { stageKlantLabel } from "@/lib/journey-stages";
@@ -41,6 +42,7 @@ export default async function PartnerDashboard() {
   ]);
   const link = referralLinkFor(partner.referralCode);
   const voornaam = user.naam.split(" ")[0];
+  const bankgegevensOntbreken = !partner.rekeninghouder || !partner.ibanEnc;
 
   return (
     <div>
@@ -102,6 +104,20 @@ export default async function PartnerDashboard() {
             <Bedrag label="Beschikbaar voor uitbetaling" cents={uitbetalingen.totaal.beschikbaar} tone="brand" />
             <Bedrag label="Uitbetaald" cents={uitbetalingen.totaal.uitbetaald} tone="sage" />
           </div>
+          {bankgegevensOntbreken && uitbetalingen.totaal.beschikbaar > 0 && (
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-brand/10 p-4 ring-1 ring-brand/20">
+              <p className="text-[13px] text-ink-700">
+                <span className="font-bold text-ink">Vul je bankgegevens in</span> — dan
+                kunnen we je commissie overmaken.
+              </p>
+              <Link
+                href="/partner/profiel"
+                className="rounded-full bg-brand px-4 py-2 text-[12px] font-bold text-white hover:bg-brand-600"
+              >
+                Naar Profiel
+              </Link>
+            </div>
+          )}
           <ul className="mt-3 space-y-2.5">
             {uitbetalingen.regels.map((r) => (
               <CommissieRij key={r.leadId} r={r} />
