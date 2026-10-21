@@ -29,6 +29,7 @@ import {
 import { datumLang } from "@/lib/payment-plan";
 import { COMMERCE_SUBJECTS, sendCommerceMail } from "@/lib/email/send";
 import { portalUrl } from "@/lib/portal-access";
+import { commissieNaBetaling } from "@/lib/partner-commissies";
 
 /**
  * Verwerkingslaag voor de commerciële journey.
@@ -222,6 +223,13 @@ export async function processPaymentByMollieId(molliePaymentId: string): Promise
     .where(eq(schema.payments.id, payment.id))
     .limit(1);
   await onPaymentPaid(vers ?? payment);
+
+  /*
+   * Komt hiermee een partnercommissie vrij? Alleen bij de eenmalige
+   * investering — een maandincasso maakt geen commissie uitbetaalbaar. De
+   * functie gooit nooit, dus de klantbetaling blijft altijd staan.
+   */
+  if (payment.type !== "SUBSCRIPTION") await commissieNaBetaling(payment.commerceId);
 }
 
 /**

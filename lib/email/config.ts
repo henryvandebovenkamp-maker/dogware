@@ -44,6 +44,8 @@ const SENDER_BY_TYPE: Record<MailType, SenderKind> = {
   "partner-activated": "transactional",
   "partner-demo-sent": "transactional",
   "partner-milestone": "transactional",
+  "partner-commissie": "transactional",
+  "email-wijziging": "transactional",
   "demo-ready": "transactional",
   welcome: "transactional",
   notification: "transactional",

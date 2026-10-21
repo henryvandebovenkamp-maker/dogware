@@ -94,3 +94,24 @@ export const sendGroeiBericht = recorder("groei-bericht");
 export const sendContactNotification = recorder("contact-notification");
 export const sendContactConfirmation = recorder("contact-confirmation");
 export const sendPartnerMilestone = recorder("partner-milestone");
+
+/**
+ * Commissie- en e-mailwijzigingsberichten. `globalThis.__mailFaalt = true`
+ * laat ze mislukken, om te toetsen dat een mislukte mail nooit een foutieve
+ * status oplevert.
+ */
+export async function sendPartnerCommissie(to, partnerFirstName, moment, bedrag, companyName, uitbetaling) {
+  if (globalThis.__mailFaalt) {
+    return { ok: false, error: { code: "PROVIDER_ERROR", message: "Versturen mislukt: Resend onbereikbaar" } };
+  }
+  globalThis.__verzondenMails.push({ type: "partner-commissie", to, naam: partnerFirstName, moment, bedrag, companyName, uitbetaling });
+  return { ok: true, id: `stub_${globalThis.__verzondenMails.length}` };
+}
+
+export async function sendEmailWijziging(to, voornaam, moment, nieuwAdres, bevestigUrl) {
+  if (globalThis.__mailFaalt) {
+    return { ok: false, error: { code: "PROVIDER_ERROR", message: "Versturen mislukt: Resend onbereikbaar" } };
+  }
+  globalThis.__verzondenMails.push({ type: "email-wijziging", to, naam: voornaam, moment, nieuwAdres, ctaUrl: bevestigUrl });
+  return { ok: true, id: `stub_${globalThis.__verzondenMails.length}` };
+}

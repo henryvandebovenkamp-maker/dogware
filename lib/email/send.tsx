@@ -21,6 +21,14 @@ import {
   type PartnerMilestone,
 } from "./templates/partner-milestone";
 import { PartnerInviteEmail } from "./templates/partner-invite";
+import {
+  PartnerCommissieEmail,
+  type PartnerCommissieMoment,
+} from "./templates/partner-commissie";
+import {
+  EmailWijzigingEmail,
+  type EmailWijzigingMoment,
+} from "./templates/email-wijziging";
 import { PartnerAddedEmail } from "./templates/partner-added";
 import { MagicLoginEmail } from "./templates/magic-login";
 import {
@@ -312,6 +320,86 @@ export async function sendPartnerMilestone(
       `${wie} ${kern[milestone]}\n\n` +
       `Je partneromgeving: ${branding.siteUrl}/partner\n\n` +
       `Met kwispelende groet,\nHenry van de Bovenkamp\nDogWare\n${branding.phone}`,
+  });
+}
+
+/**
+ * Commissiebericht aan de partner: beschikbaar voor uitbetaling, of
+ * daadwerkelijk uitbetaald. Zonder klantbedragen; zie de template.
+ *
+ * "uitbetaald" mag uitsluitend worden aangeroepen nadat de overschrijving met
+ * datum en referentie is vastgelegd (lib/partner-commissies.ts bewaakt dat).
+ */
+export async function sendPartnerCommissie(
+  to: string,
+  partnerFirstName: string,
+  moment: PartnerCommissieMoment,
+  bedrag: string,
+  companyName?: string,
+  uitbetaling?: { datum: string; referentie: string; ibanGemaskeerd?: string },
+): Promise<MailResult> {
+  const wie = companyName?.trim();
+  return sendMail("partner-commissie", {
+    to,
+    subject:
+      moment === "uitbetaald"
+        ? `Je commissie van ${bedrag} is uitbetaald`
+        : `Je commissie van ${bedrag} is beschikbaar \u{1F389}`,
+    react: (
+      <PartnerCommissieEmail
+        partnerFirstName={partnerFirstName}
+        moment={moment}
+        bedrag={bedrag}
+        companyName={companyName}
+        uitbetaling={uitbetaling}
+      />
+    ),
+    text:
+      `Hi ${partnerFirstName},\n\n` +
+      (moment === "uitbetaald"
+        ? `Je commissie van ${bedrag}${wie ? ` voor ${wie}` : ""} is uitbetaald.` +
+          (uitbetaling
+            ? `\nOvergemaakt op: ${uitbetaling.datum}\nKenmerk: ${uitbetaling.referentie}` +
+              (uitbetaling.ibanGemaskeerd ? `\nNaar rekening: ${uitbetaling.ibanGemaskeerd}` : "")
+            : "")
+        : `${wie ?? "De klant die jij aanbracht"} heeft de eenmalige investering volledig voldaan. Je commissie van ${bedrag} is beschikbaar voor uitbetaling. Controleer je bankgegevens in je partneromgeving onder Profiel.`) +
+      `\n\nJe partneromgeving: ${branding.siteUrl}/partner\n\n` +
+      `Met kwispelende groet,\nHenry van de Bovenkamp\nDogWare`,
+  });
+}
+
+/** Berichten rond het wijzigen van het e-mailadres van een account. */
+export async function sendEmailWijziging(
+  to: string,
+  voornaam: string,
+  moment: EmailWijzigingMoment,
+  nieuwAdres: string,
+  bevestigUrl?: string,
+  geldigDagen?: number,
+): Promise<MailResult> {
+  const onderwerp: Record<EmailWijzigingMoment, string> = {
+    bevestigen: "Bevestig je nieuwe e-mailadres voor DogWare",
+    aangevraagd: "Wijziging van je DogWare-e-mailadres aangevraagd",
+    gewijzigd: "Je DogWare-e-mailadres is gewijzigd",
+  };
+  const tekst: Record<EmailWijzigingMoment, string> = {
+    bevestigen: `Bevestig dat ${nieuwAdres} van jou is: ${bevestigUrl}\n\nDeze link is ${geldigDagen ?? 7} dagen geldig en werkt één keer. Niet aangevraagd? Negeer deze mail.`,
+    aangevraagd: `Er is gevraagd het e-mailadres van je DogWare-account te wijzigen naar ${nieuwAdres}. Dit gaat pas in na bevestiging vanaf dat adres. Klopt dit niet? Antwoord op deze mail.`,
+    gewijzigd: `Je DogWare-account gebruikt vanaf nu ${nieuwAdres}. Je persoonlijke link, aanbrengingen en commissies zijn ongewijzigd.`,
+  };
+  return sendMail("email-wijziging", {
+    to,
+    subject: onderwerp[moment],
+    react: (
+      <EmailWijzigingEmail
+        voornaam={voornaam}
+        moment={moment}
+        nieuwAdres={nieuwAdres}
+        bevestigUrl={bevestigUrl}
+        geldigDagen={geldigDagen}
+      />
+    ),
+    text: `Hoi ${voornaam},\n\n${tekst[moment]}\n\nHartelijke groet,\nHenry van de Bovenkamp\nDogWare`,
   });
 }
 

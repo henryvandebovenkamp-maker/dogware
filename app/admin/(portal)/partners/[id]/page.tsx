@@ -1,12 +1,20 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { and, count, countDistinct, desc, eq } from "drizzle-orm";
+import { and, count, countDistinct, desc, eq, or } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { referralLinkFor } from "@/lib/referral";
 import { euro, getPartnerCommission } from "@/lib/partner-data";
-import { decryptField } from "@/lib/crypto-field";
+import { decryptField, maskIban } from "@/lib/crypto-field";
+import { getAdminActor } from "@/lib/admin-auth";
+import { hasFinanceGrant } from "@/lib/finance-auth";
+import { openEmailWijziging } from "@/lib/email-wijziging";
+import { commissieOverzichtAdmin, type CommissieRegel } from "@/lib/partner-commissies";
+import { COMMISSIE_STATUS_LABEL } from "@/lib/commissie";
+import { euroFromCents } from "@/lib/money";
 import { LeadStatusBadge } from "../../leads/status-badge";
 import { PartnerAdminActions } from "./partner-actions";
+import { PartnerCommissies, type CommissieKaart } from "./commissies";
+import { PartnerEmailWijzigen } from "./email-wijzigen";
 
 export const metadata = { title: "Partner" };
 
@@ -40,7 +48,10 @@ export default async function PartnerDetailPage({
   if (!row) notFound();
   const { partner, user } = row;
 
-  const [[clickStats], leads, activity, commissie] = await Promise.all([
+  const actor = await getAdminActor();
+  const financieelBevoegd = actor ? await hasFinanceGrant(actor.id) : false;
+
+  const [[clickStats], leads, activity, commissie, commissieRegels, emailWijziging] = await Promise.all([
     db
       .select({
         clicks: count(),
@@ -64,20 +75,36 @@ export default async function PartnerDetailPage({
       .select()
       .from(schema.activityLog)
       .where(
-        and(
-          eq(schema.activityLog.objectType, "partner"),
-          eq(schema.activityLog.objectId, id),
+        or(
+          and(
+            eq(schema.activityLog.objectType, "partner"),
+            eq(schema.activityLog.objectId, id),
+          ),
+          // Een e-mailwijziging hoort bij het account; ook hier zichtbaar.
+          and(
+            eq(schema.activityLog.objectType, "user"),
+            eq(schema.activityLog.objectId, user.id),
+          ),
         ),
       )
       .orderBy(desc(schema.activityLog.createdAt))
-      .limit(15),
+      .limit(20),
     /*
      * Dezelfde berekening als in het partnerportaal (lib/partner-data.ts), dus
      * de partner ziet nooit een ander getal dan de beheerder. Hij telt op de
      * vastgelegde koppeling bij de aanvraag — nooit op bezoeken of cookies.
      */
     getPartnerCommission(id, partner.commissionCents),
+    commissieOverzichtAdmin(id, { financieelBevoegd }),
+    openEmailWijziging(user.id),
   ]);
+
+  const partnerIban = partner.ibanEnc ? decryptField(partner.ibanEnc) : "";
+  const bankBekend =
+    partner.rekeninghouder && partnerIban
+      ? { naam: partner.rekeninghouder, ibanGemaskeerd: maskIban(partnerIban) }
+      : null;
+  const kaarten = commissieRegels.map((r) => commissieKaart(r, partner.commissionCents));
 
   const referralLink = referralLinkFor(partner.referralCode);
   const conversie =
@@ -148,9 +175,29 @@ export default async function PartnerDetailPage({
         ))}
       </div>
       <p className="mt-2 text-[12px] text-ink-300">
-        Verdiend vanaf de bouwfase, gereserveerd vanaf akkoord. Uitbetaling
-        gebeurt buiten DogWare om; hier staat alleen wat verschuldigd is.
+        Verdiend vanaf de bouwfase, gereserveerd vanaf akkoord. Uitbetaalbaar
+        zodra de klant de eenmalige investering volledig heeft betaald
+        (gecontroleerd bij Mollie). De uitbetaling zelf loop je hieronder af.
       </p>
+
+      {/* Commissies & uitbetalingen */}
+      <div className="mt-5 rounded-2xl bg-white p-5 shadow-soft ring-1 ring-ink/5">
+        <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="text-sm font-extrabold text-ink">Commissies &amp; uitbetalingen</h2>
+          <span className="text-[11px] text-ink-300">
+            {financieelBevoegd
+              ? "Je bent financieel bevoegd: je kunt goedkeuren en uitbetalen."
+              : "Goedkeuren en uitbetalen: alleen een financieel bevoegde beheerder."}
+          </span>
+        </div>
+        <PartnerCommissies kaarten={kaarten} financieelBevoegd={financieelBevoegd} bankBekend={bankBekend} />
+        <p className="mt-3 text-[11px] text-ink-300">
+          Mollie wordt alleen gebruikt om de betalingen van de klant te
+          verifiëren. De commissie zelf gaat per bankoverschrijving; DogWare legt
+          vast wie voorbereidde, wie goedkeurde en wanneer er met welk kenmerk is
+          overgemaakt.
+        </p>
+      </div>
 
       {/* Referral-link */}
       <div className="mt-5 rounded-2xl bg-white p-5 shadow-soft ring-1 ring-ink/5">
@@ -201,7 +248,12 @@ export default async function PartnerDetailPage({
         ) : (
           <dl className="grid gap-x-6 gap-y-1.5 sm:grid-cols-2">
             <PayRow label="Rekeninghouder" value={partner.rekeninghouder} />
-            <PayRow label="IBAN" value={partner.ibanEnc ? decryptField(partner.ibanEnc) : null} mono />
+            {/* Volledig IBAN alleen voor wie ook mag uitbetalen; anders gemaskeerd. */}
+            <PayRow
+              label="IBAN"
+              value={partnerIban ? (financieelBevoegd ? partnerIban : maskIban(partnerIban)) : null}
+              mono
+            />
             <PayRow label="BIC" value={partner.bicEnc ? decryptField(partner.bicEnc) : null} mono />
             <PayRow label="Land" value={partner.land} />
             <PayRow
@@ -235,6 +287,23 @@ export default async function PartnerDetailPage({
           currentCode={partner.referralCode}
           accountActief={user.status === "ACTIVE"}
         />
+        <div className="mt-5 lg:w-1/3">
+          <PartnerEmailWijzigen
+            partnerId={partner.id}
+            huidig={user.email}
+            openstaand={
+              emailWijziging
+                ? {
+                    nieuw: emailWijziging.newEmail,
+                    verloopt: emailWijziging.expiresAt.toLocaleDateString("nl-NL", {
+                      day: "numeric",
+                      month: "long",
+                    }),
+                  }
+                : null
+            }
+          />
+        </div>
       </div>
 
       {/* Gekoppelde aanvragen */}
@@ -302,3 +371,64 @@ export default async function PartnerDetailPage({
     </div>
   );
 }
+
+/* ---------- Commissiekaart: serverdata → wat de kaart toont ---------- */
+
+function datum(d: Date | null | undefined): string {
+  return d
+    ? d.toLocaleDateString("nl-NL", { day: "numeric", month: "long", year: "numeric", timeZone: "Europe/Amsterdam" })
+    : "—";
+}
+
+function commissieKaart(r: CommissieRegel, partnerCommissionCents: number): CommissieKaart {
+  const c = r.commissie;
+  const bedragCents = c?.amountCents ?? partnerCommissionCents;
+  const naam = (id: string | null | undefined) => (id ? (r.namen[id] ?? "onbekend") : "—");
+
+  const s = r.stand;
+  const betaling = !s
+    ? { tekst: "Nog geen commerciële afspraak", volledig: false }
+    : !s.getekend
+      ? { tekst: "Overeenkomst nog niet getekend", volledig: false }
+      : s.volledigBetaald
+        ? {
+            tekst: `Volledig betaald — ${euroFromCents(s.betaaldCents)} van ${euroFromCents(s.totaalCents)}`,
+            volledig: true,
+          }
+        : {
+            tekst: `${euroFromCents(s.betaaldCents)} van ${euroFromCents(s.totaalCents)} betaald — ${euroFromCents(s.openstaandCents)} open${s.lopend ? ` (${s.lopend} lopend)` : ""}`,
+            volledig: false,
+          };
+
+  const feiten: { label: string; waarde: string }[] = [];
+  if (!c) feiten.push({ label: "Registratie", waarde: "Nog niet geregistreerd" });
+  if (c?.payableAt) feiten.push({ label: "Uitbetaalbaar sinds", waarde: datum(c.payableAt) });
+  if (c?.preparedAt) feiten.push({ label: "Voorbereid", waarde: `${datum(c.preparedAt)} · ${naam(c.preparedByUserId)}` });
+  if (c?.approvedAt) feiten.push({ label: "Goedgekeurd", waarde: `${datum(c.approvedAt)} · ${naam(c.approvedByUserId)}` });
+  if (c?.status === "UITBETAALD") {
+    feiten.push({ label: "Uitbetaald op", waarde: datum(c.paidAt) });
+    feiten.push({ label: "Bedrag", waarde: euroFromCents(c.paidAmountCents ?? c.amountCents) });
+    feiten.push({ label: "Kenmerk", waarde: c.paymentReference ?? "—" });
+    feiten.push({ label: "Vastgelegd door", waarde: naam(c.paidByUserId) });
+    if (r.ibanGemaskeerd) feiten.push({ label: "Naar rekening", waarde: r.ibanGemaskeerd });
+  }
+
+  return {
+    leadId: r.leadId,
+    bedrijfsnaam: r.bedrijfsnaam,
+    commissieId: c?.id ?? null,
+    status: c?.status ?? null,
+    statusLabel: c ? COMMISSIE_STATUS_LABEL[c.status] : "Nog niet geregistreerd",
+    bedrag: euroFromCents(bedragCents),
+    bedragInvoer: (bedragCents / 100).toFixed(2).replace(".", ","),
+    betaling,
+    feiten,
+    payableMailVerstuurd: Boolean(c?.payableMailSentAt),
+    paidMailVerstuurd: Boolean(c?.paidMailSentAt),
+    begunstigde:
+      c?.payeeName && r.ibanGemaskeerd
+        ? { naam: c.payeeName, ibanGemaskeerd: r.ibanGemaskeerd, ibanVoluit: r.ibanVoluit }
+        : null,
+  };
+}
+

@@ -1262,6 +1262,132 @@ export const paymentInstallments = pgTable(
 export type PaymentInstallment = typeof paymentInstallments.$inferSelect;
 
 /* =========================================================================
+ * Partnercommissies — registratie en uitbetaling
+ *
+ * Tot nu toe was een commissie uitsluitend een AFLEIDING uit de journey-stage
+ * (lib/commissie.ts): je zag wat verschuldigd was, maar nergens stond of het
+ * al betaald was, door wie, wanneer en met welke referentie. Deze tabel is
+ * die administratie. De afleiding blijft bestaan voor de tellers; geld loopt
+ * vanaf nu uitsluitend via deze rij.
+ *
+ * Eén rij per aanvraag (unieke index op lead_id): één aanbreng kan nooit twee
+ * commissies opleveren. Elke statusovergang is een voorwaardelijke update
+ * (WHERE status = vorige), zodat een dubbelklik of een gelijktijdige
+ * webhook nooit twee keer dezelfde stap zet.
+ * ========================================================================= */
+
+export const COMMISSIE_STATUSES = [
+  /** Aanbreng is klant, maar de eenmalige investering is nog niet volledig betaald. */
+  "WACHT_OP_BETALING",
+  /** Klant heeft volledig betaald (geverifieerd bij Mollie): klaar om uit te betalen. */
+  "UITBETAALBAAR",
+  /** Admin heeft bedrag en bankgegevens klaargezet; wacht op financiële goedkeuring. */
+  "VOORBEREID",
+  /** Financieel bevoegde heeft goedgekeurd; de bankoverschrijving mag de deur uit. */
+  "GOEDGEKEURD",
+  /** Overschrijving aantoonbaar uitgevoerd (datum + referentie vastgelegd). */
+  "UITBETAALD",
+  /** Vervalt: de klant haakte af of de afspraak is ingetrokken. */
+  "VERVALLEN",
+] as const;
+export type CommissieStatus = (typeof COMMISSIE_STATUSES)[number];
+
+export const partnerCommissions = pgTable(
+  "partner_commissions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    partnerId: uuid("partner_id")
+      .notNull()
+      .references(() => partners.id, { onDelete: "restrict" }),
+    leadId: uuid("lead_id")
+      .notNull()
+      .references(() => leads.id, { onDelete: "restrict" }),
+    /** Het bedrag zoals afgesproken op het moment van registreren, in centen. */
+    amountCents: integer("amount_cents").notNull(),
+    status: text("status").$type<CommissieStatus>().notNull().default("WACHT_OP_BETALING"),
+
+    /** Wanneer de klant aantoonbaar volledig betaald had (Mollie-gecontroleerd). */
+    payableAt: timestamp("payable_at", { withTimezone: true }),
+    /** Momentopname van die controle: totaal, betaald, en per betaling de Mollie-uitkomst. */
+    payableCheck: jsonb("payable_check").$type<Record<string, unknown>>(),
+
+    preparedAt: timestamp("prepared_at", { withTimezone: true }),
+    preparedByUserId: uuid("prepared_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    /**
+     * De begunstigde zoals bij het voorbereiden vastgelegd. Een bevroren kopie:
+     * wijzigt de partner daarna zijn bankgegevens, dan verandert een al
+     * goedgekeurde overschrijving niet stilletjes mee. IBAN versleuteld (enc:…).
+     */
+    payeeName: text("payee_name"),
+    payeeIbanEnc: text("payee_iban_enc"),
+
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+    approvedByUserId: uuid("approved_by_user_id").references(() => users.id, { onDelete: "set null" }),
+
+    /** De datum waarop de bank de overschrijving uitvoerde (door de admin ingevuld). */
+    paidAt: timestamp("paid_at", { withTimezone: true }),
+    paidByUserId: uuid("paid_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    paidAmountCents: integer("paid_amount_cents"),
+    /** Betalingskenmerk of transactiereferentie van de bank. */
+    paymentReference: text("payment_reference"),
+
+    /** Eenmalige mails aan de partner — gezet ná een geslaagde verzending. */
+    payableMailSentAt: timestamp("payable_mail_sent_at", { withTimezone: true }),
+    paidMailSentAt: timestamp("paid_mail_sent_at", { withTimezone: true }),
+
+    cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+    cancelReason: text("cancel_reason"),
+
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("partner_commissions_lead_idx").on(t.leadId),
+    index("partner_commissions_partner_idx").on(t.partnerId, t.status),
+  ],
+);
+
+export type PartnerCommission = typeof partnerCommissions.$inferSelect;
+
+/* =========================================================================
+ * E-mailadres wijzigen — pas actief na bevestiging vanaf het nieuwe adres
+ *
+ * Het e-mailadres is bij DogWare de inlog (passwordless). Een wijziging
+ * zonder bevestiging zou de login overdragen aan wie het adres intypte.
+ * Daarom: aanvraag → bevestigingslink naar het NIEUWE adres → pas na klik
+ * wordt users.email bijgewerkt. Het account, de rollen, het partner-ID, de
+ * referralcode en alle koppelingen blijven exact hetzelfde.
+ * ========================================================================= */
+
+export const emailChanges = pgTable(
+  "email_changes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    oldEmail: text("old_email").notNull(),
+    newEmail: text("new_email").notNull(),
+    /** Alleen de hash; de kale token gaat één keer mee in de mail. */
+    tokenHash: text("token_hash").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+    cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+    requestedByUserId: uuid("requested_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    reason: text("reason"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("email_changes_token_idx").on(t.tokenHash),
+    index("email_changes_user_idx").on(t.userId, t.createdAt),
+  ],
+);
+
+export type EmailChange = typeof emailChanges.$inferSelect;
+
+/* =========================================================================
  * Site-instellingen (singleton) — door de Super Admin beheerd
  * ========================================================================= */
 

@@ -7,6 +7,7 @@ import type { User, UserRole } from "@/lib/db/schema";
 import { generateToken, hashToken } from "./crypto";
 import { ROLE_HOME, primaryRole } from "@/lib/roles";
 import { HQ_OWNER_ROLE } from "@/lib/hq/access";
+import { FINANCE_ROLE } from "@/lib/finance-role";
 
 const SESSION_COOKIE = "dw_session";
 
@@ -92,7 +93,8 @@ export async function revokeAllSessions(userId: string): Promise<void> {
  * hoort niet in de gewone rollenwereld thuis: hij mag de sessieduur niet
  * beïnvloeden, nergens als label opduiken en niet via roleMayAccess() of het
  * omgevingswisselaartje zichtbaar worden. Uitsluitend lib/hq-auth.ts vraagt
- * er expliciet naar.
+ * er expliciet naar. Hetzelfde geldt voor de financiële bevoegdheid
+ * (FINANCE_APPROVER): die leest alleen lib/finance-auth.ts.
  */
 export async function getCurrentUser(): Promise<SessionUser | null> {
   const db = getDb();
@@ -107,7 +109,8 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
       roles: sql<UserRole[]>`coalesce(
         (select json_agg(ur.role) from user_roles ur
           where ur.user_id = ${schema.users.id}
-            and ur.role <> ${HQ_OWNER_ROLE}),
+            and ur.role <> ${HQ_OWNER_ROLE}
+            and ur.role <> ${FINANCE_ROLE}),
         '[]'::json
       )`,
     })

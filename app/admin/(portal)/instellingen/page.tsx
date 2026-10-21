@@ -45,8 +45,9 @@ export default async function InstellingenPage() {
         <div className="rounded-2xl bg-white p-5 shadow-soft ring-1 ring-ink/5">
           <h2 className="text-sm font-extrabold text-ink">Toekomstige instellingen</h2>
           <p className="mt-2 text-[13px] leading-relaxed text-ink-500">
-            Commissiepercentages, uitbetalingen en partnerlevels worden in een
-            volgende fase ingericht.
+            Commissiepercentages en partnerlevels worden in een volgende fase
+            ingericht. Uitbetalingen van commissies loop je af op de pagina van
+            de partner (Partners → partner → Commissies &amp; uitbetalingen).
           </p>
         </div>
       </div>

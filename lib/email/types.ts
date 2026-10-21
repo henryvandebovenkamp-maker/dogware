@@ -13,6 +13,8 @@ export type MailType =
   | "partner-activated"
   | "partner-demo-sent"
   | "partner-milestone"
+  | "partner-commissie"
+  | "email-wijziging"
   | "magic-login"
   | "demo-ready"
   | "welcome"

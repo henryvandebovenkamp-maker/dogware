@@ -8,6 +8,7 @@ import {
   getPartnerLeads,
   getPartnerStats,
 } from "@/lib/partner-data";
+import { commissieOverzichtPartner, type PartnerCommissieRegel } from "@/lib/partner-commissies";
 import { ShareLink } from "@/components/partner/share-link";
 import {
   GlyphAgenda,
@@ -32,10 +33,11 @@ export default async function PartnerDashboard() {
     );
   }
 
-  const [stats, leads, commissie] = await Promise.all([
+  const [stats, leads, commissie, uitbetalingen] = await Promise.all([
     getPartnerStats(partner.id),
     getPartnerLeads(partner.id),
     getPartnerCommission(partner.id, partner.commissionCents),
+    commissieOverzichtPartner(partner.id, partner.commissionCents),
   ]);
   const link = referralLinkFor(partner.referralCode);
   const voornaam = user.naam.split(" ")[0];
@@ -89,6 +91,30 @@ export default async function PartnerDashboard() {
           via jou een website afneemt.
         </p>
       </div>
+
+      {/* Commissies — wat er is opgebouwd en waar het staat */}
+      {uitbetalingen.regels.length > 0 && (
+        <section className="mt-6">
+          <h2 className="mb-3 text-sm font-extrabold text-ink">Jouw commissies</h2>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <Bedrag label="Opgebouwd" cents={uitbetalingen.totaal.opgebouwd} tone="ink" />
+            <Bedrag label="Wacht op betaling klant" cents={uitbetalingen.totaal.wacht} tone="ink" />
+            <Bedrag label="Beschikbaar voor uitbetaling" cents={uitbetalingen.totaal.beschikbaar} tone="brand" />
+            <Bedrag label="Uitbetaald" cents={uitbetalingen.totaal.uitbetaald} tone="sage" />
+          </div>
+          <ul className="mt-3 space-y-2.5">
+            {uitbetalingen.regels.map((r) => (
+              <CommissieRij key={r.leadId} r={r} />
+            ))}
+          </ul>
+          <p className="mt-2 text-[12px] text-ink-300">
+            Een commissie wordt beschikbaar zodra de klant de eenmalige
+            investering volledig heeft betaald. Zorg dat je bankgegevens onder
+            Profiel kloppen; je krijgt een bericht zodra het bedrag is
+            overgemaakt.
+          </p>
+        </section>
+      )}
 
       {/* Lopende aanvragen met journey-stap */}
       <section className="mt-6">
@@ -171,3 +197,38 @@ function Stat({
     </div>
   );
 }
+
+function Bedrag({ label, cents, tone }: { label: string; cents: number; tone: "ink" | "sage" | "brand" }) {
+  const toneClass =
+    tone === "brand" ? "text-brand" : tone === "sage" ? "text-sage-600" : "text-ink";
+  return (
+    <div className="rounded-2xl bg-white p-4 shadow-soft ring-1 ring-ink/5">
+      <p className={`text-xl font-extrabold tracking-tight ${toneClass}`}>{euro(cents)}</p>
+      <p className="text-[11px] font-semibold text-ink-500">{label}</p>
+    </div>
+  );
+}
+
+const GROEP_TINT: Record<PartnerCommissieRegel["groep"], string> = {
+  wacht: "bg-gold/10 text-ink-700",
+  beschikbaar: "bg-brand/10 text-brand-600",
+  uitbetaald: "bg-sage-100 text-sage-600",
+  vervallen: "bg-cream-100 text-ink-300",
+};
+
+function CommissieRij({ r }: { r: PartnerCommissieRegel }) {
+  return (
+    <li className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-white p-4 shadow-soft ring-1 ring-ink/5">
+      <span className="min-w-0">
+        <span className="block truncate text-[14px] font-bold text-ink">{r.bedrijfsnaam}</span>
+        <span className="block text-[12px] text-ink-500">
+          {euro(r.amountCents)}
+          {r.paidAt &&
+            ` · overgemaakt op ${r.paidAt.toLocaleDateString("nl-NL", { day: "numeric", month: "long", year: "numeric" })}`}
+        </span>
+      </span>
+      <span className={`rounded-full px-3 py-1 text-[11px] font-bold ${GROEP_TINT[r.groep]}`}>{r.label}</span>
+    </li>
+  );
+}
+

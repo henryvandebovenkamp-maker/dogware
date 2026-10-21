@@ -11,6 +11,7 @@ import { normalizeReferralCode, referralLinkFor } from "@/lib/referral";
 import { logActivity } from "@/lib/audit";
 import { logJourneyEvent, logReferralGekoppeld } from "@/lib/journey";
 import { sendPartnerInvite, sendPartnerAdded } from "@/lib/email/send";
+import { annuleerEmailWijziging, vraagEmailWijzigingAan } from "@/lib/email-wijziging";
 import {
   activatePartner,
   inspectEmail,
@@ -489,3 +490,93 @@ export async function reassignLead(
   revalidatePath(`/admin/leads/${leadId}`);
   return { status: "success", message: "Toewijzing aangepast en vastgelegd in de auditlog." };
 }
+
+/* ---------- E-mailadres wijzigen (zelfde partner, zelfde account) ---------- */
+
+/**
+ * Vraag een nieuw e-mailadres aan voor het account achter deze partner. Het
+ * partner-ID, de referralcode en alle koppelingen blijven ongewijzigd; het
+ * adres zelf verandert pas nadat de partner het vanaf het nieuwe adres heeft
+ * bevestigd (zie lib/email-wijziging.ts).
+ *
+ * Een beheerdersaccount wordt via deze weg nooit gewijzigd: anders zou een
+ * beheerder de login van een andere beheerder kunnen omleiden.
+ */
+export async function requestPartnerEmailChange(
+  _prev: PartnerActionState,
+  formData: FormData,
+): Promise<PartnerActionState> {
+  const actor = await requireAdminActor();
+  if (!actor) return { status: "error", message: "Geen toegang." };
+  const db = getDb();
+  if (!db) return { status: "error", message: "Database niet geconfigureerd." };
+
+  const partnerId = String(formData.get("partnerId") ?? "");
+  const [partner] = await db
+    .select({ id: schema.partners.id, userId: schema.partners.userId })
+    .from(schema.partners)
+    .where(eq(schema.partners.id, partnerId))
+    .limit(1);
+  if (!partner) return { status: "error", message: "Partner niet gevonden." };
+
+  const rollen = await db
+    .select({ role: schema.userRoles.role })
+    .from(schema.userRoles)
+    .where(eq(schema.userRoles.userId, partner.userId));
+  const [user] = await db
+    .select({ role: schema.users.role })
+    .from(schema.users)
+    .where(eq(schema.users.id, partner.userId))
+    .limit(1);
+  if (user?.role === "SUPER_ADMIN" || rollen.some((r) => r.role === "SUPER_ADMIN")) {
+    return { status: "error", message: "Dit account is ook beheerder; wijzig het adres niet via het partnerbeheer." };
+  }
+
+  const r = await vraagEmailWijzigingAan({
+    userId: partner.userId,
+    nieuwEmail: String(formData.get("email") ?? ""),
+    actorUserId: actor.id,
+    reden: String(formData.get("reason") ?? ""),
+  });
+  if (r.ok) {
+    // Ook zichtbaar in de activiteit van de partner zelf.
+    await logActivity({
+      actorUserId: actor.id,
+      action: "PARTNER_EMAIL_CHANGE_REQUESTED",
+      objectType: "partner",
+      objectId: partnerId,
+      newValue: { email: normalizeEmail(String(formData.get("email") ?? "")) },
+    });
+  }
+  revalidatePath(`/admin/partners/${partnerId}`);
+  return { status: r.ok ? "success" : "error", message: r.melding };
+}
+
+export async function cancelPartnerEmailChange(
+  _prev: PartnerActionState,
+  formData: FormData,
+): Promise<PartnerActionState> {
+  const actor = await requireAdminActor();
+  if (!actor) return { status: "error", message: "Geen toegang." };
+  const db = getDb();
+  if (!db) return { status: "error", message: "Database niet geconfigureerd." };
+  const partnerId = String(formData.get("partnerId") ?? "");
+  const [partner] = await db
+    .select({ userId: schema.partners.userId })
+    .from(schema.partners)
+    .where(eq(schema.partners.id, partnerId))
+    .limit(1);
+  if (!partner) return { status: "error", message: "Partner niet gevonden." };
+  const r = await annuleerEmailWijziging(partner.userId, actor.id);
+  if (r.ok) {
+    await logActivity({
+      actorUserId: actor.id,
+      action: "PARTNER_EMAIL_CHANGE_CANCELLED",
+      objectType: "partner",
+      objectId: partnerId,
+    });
+  }
+  revalidatePath(`/admin/partners/${partnerId}`);
+  return { status: r.ok ? "success" : "error", message: r.melding };
+}
+
