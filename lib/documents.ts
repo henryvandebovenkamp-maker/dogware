@@ -13,6 +13,7 @@ import { isInvoiceType } from "@/lib/db/schema";
 import { legalEntity, entityReady } from "@/lib/legal-entity";
 import { logJourneyEvent } from "@/lib/journey";
 import { isUniekeSchending } from "@/lib/db-errors";
+import { leesInhoud } from "@/lib/opdrachten/bedragen";
 import {
   betaalmethodeLabel,
   euroFromCents,
@@ -189,6 +190,7 @@ export type DocumentInput = {
   molliePaymentId?: string | null;
   creditsDocumentId?: string | null;
   creditReason?: string | null;
+  extraOrderId?: string | null;
 };
 
 /**
@@ -235,6 +237,7 @@ export async function registerDocument(input: DocumentInput): Promise<DogDocumen
           molliePaymentId: input.molliePaymentId ?? null,
           creditsDocumentId: input.creditsDocumentId ?? null,
           creditReason: input.creditReason ?? null,
+          extraOrderId: input.extraOrderId ?? null,
         })
         .returning();
       return created ?? null;
@@ -324,7 +327,11 @@ export async function registerInvoiceForPayment(
         ? "INVOICE_FINAL"
         : payment.type === "INSTALLMENT"
           ? "INVOICE_INSTALLMENT"
-          : "INVOICE_SUBSCRIPTION";
+          : payment.type === "EXTRA_DEPOSIT"
+            ? "INVOICE_EXTRA_DEPOSIT"
+            : payment.type === "EXTRA_FINAL"
+              ? "INVOICE_EXTRA_FINAL"
+              : "INVOICE_SUBSCRIPTION";
 
   const [lead] = await db
     .select()
@@ -348,7 +355,13 @@ export async function registerInvoiceForPayment(
           .limit(1)
       )[0]
     : undefined;
-  const basis = omschrijvingVoor(payment);
+  /*
+   * Aanvullende opdracht: de omschrijving is de opdracht zelf, en de bedragen
+   * komen uit de bij akkoord bevroren termijn — zo tellen aanbetaling en
+   * eindbetaling samen exact op tot de afgesproken prijs.
+   */
+  const extra = payment.extraOrderId ? await extraTermijn(payment, ctx.commerceId) : null;
+  const basis = extra ? { titel: extra.titel, toelichting: extra.toelichting } : omschrijvingVoor(payment);
   /*
    * Bij het betaalschema zegt de factuur precies welke termijn hij dekt —
    * "Termijn 3 van 6" — zodat klant en boekhouder hem zonder uitleg kunnen
@@ -375,7 +388,18 @@ export async function registerInvoiceForPayment(
    * teruggerekend uit wat Mollie bevestigde.
    */
   const regel =
-    termijn && termijn.amountInclVatCents === payment.amountCents
+    extra && extra.termijn.inclVatCents === payment.amountCents
+      ? {
+          omschrijving: titel,
+          toelichting,
+          aantal: 1,
+          prijsExVatCents: extra.termijn.exVatCents,
+          vatPercent: extra.vatPercent,
+          regelExVatCents: extra.termijn.exVatCents,
+          regelVatCents: extra.termijn.vatCents,
+          regelInclVatCents: extra.termijn.inclVatCents,
+        }
+      : termijn && termijn.amountInclVatCents === payment.amountCents
       ? {
           omschrijving: titel,
           toelichting,
@@ -427,6 +451,7 @@ export async function registerInvoiceForPayment(
     paidAt: payment.paidAt ?? null,
     paymentMethod: payment.method ?? null,
     molliePaymentId: payment.molliePaymentId,
+    extraOrderId: payment.extraOrderId ?? null,
   });
 
   // Alleen bij een écht nieuwe factuur op de tijdlijn — anders zou een tweede
@@ -436,10 +461,35 @@ export async function registerInvoiceForPayment(
       ctx.leadId,
       "invoice_created",
       `Factuur ${doc.nummer} aangemaakt (${euroFromCents(totalen.inclCents)})`,
-      { actor: "systeem", nummer: doc.nummer, documentId: doc.id },
+      { actor: "systeem", nummer: doc.nummer, documentId: doc.id, extraOrderId: payment.extraOrderId ?? undefined },
     );
   }
   return doc;
+}
+
+/**
+ * De bevroren termijn van een aanvullende opdracht, voor de factuur. Alleen
+ * een opdracht van dit dossier; anders null (en valt de factuur terug op het
+ * ontvangen bedrag).
+ */
+async function extraTermijn(payment: Payment, commerceId: string) {
+  const db = getDb();
+  if (!db || !payment.extraOrderId) return null;
+  const [order] = await db
+    .select()
+    .from(schema.extraOrders)
+    .where(and(eq(schema.extraOrders.id, payment.extraOrderId), eq(schema.extraOrders.commerceId, commerceId)))
+    .limit(1);
+  const inhoud = order ? leesInhoud(order.acceptedSnapshot) : null;
+  if (!order || !inhoud) return null;
+  const eind = payment.type === "EXTRA_FINAL";
+  const t = eind ? inhoud.bedragen.eindbetaling : inhoud.bedragen.aanbetaling;
+  return {
+    titel: `Aanvullende opdracht: ${inhoud.titel}`,
+    toelichting: `${eind ? "Eindbetaling bij oplevering" : "Aanbetaling bij akkoord"} (${t.percent}%)`,
+    termijn: t,
+    vatPercent: inhoud.bedragen.vatPercent,
+  };
 }
 
 /**
@@ -512,6 +562,7 @@ export async function createCreditNote(
     creditsDocumentId: origineel.id,
     creditReason: reden.trim(),
     visibleToCustomer: origineel.visibleToCustomer,
+    extraOrderId: origineel.extraOrderId,
   });
   if (!nota) return { ok: false, message: "De creditnota kon niet worden vastgelegd." };
 

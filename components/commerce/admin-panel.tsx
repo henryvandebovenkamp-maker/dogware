@@ -726,6 +726,8 @@ const BETAAL_LABEL: Record<string, string> = {
   SUBSCRIPTION: "Abonnement",
   MANUAL_CORRECTION: "Correctie",
   REFUND: "Terugbetaling",
+  EXTRA_DEPOSIT: "Aanvullende opdracht — aanbetaling",
+  EXTRA_FINAL: "Aanvullende opdracht — eindbetaling",
 };
 
 function Sectie({

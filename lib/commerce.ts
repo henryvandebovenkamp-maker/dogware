@@ -229,7 +229,9 @@ export async function processPaymentByMollieId(molliePaymentId: string): Promise
    * investering — een maandincasso maakt geen commissie uitbetaalbaar. De
    * functie gooit nooit, dus de klantbetaling blijft altijd staan.
    */
-  if (payment.type !== "SUBSCRIPTION") await commissieNaBetaling(payment.commerceId);
+  if (payment.type !== "SUBSCRIPTION" && !payment.extraOrderId) {
+    await commissieNaBetaling(payment.commerceId);
+  }
 }
 
 /**
@@ -379,6 +381,18 @@ async function onPaymentPaid(payment: Payment): Promise<void> {
     vatPercent: commerce.vatPercent,
     bedrijfsnaam: lead.bedrijfsnaam,
   });
+
+  /*
+   * Een termijn van een aanvullende opdracht. Die heeft zijn eigen status en
+   * mails, en raakt de journey en de commerciële status van de website nooit:
+   * de klant blijft "live & actief". Dynamisch geïmporteerd om een
+   * importkringloop te vermijden (de opdrachtlaag gebruikt mailAndLog hier).
+   */
+  if (payment.extraOrderId) {
+    const { opdrachtBetalingBetaald } = await import("@/lib/opdrachten/service");
+    await opdrachtBetalingBetaald(payment, { commerce, lead });
+    return;
+  }
 
   /*
    * Hoort deze betaling bij een termijn uit het betaalschema, dan gaat die
@@ -626,8 +640,13 @@ async function onPaymentNotPaid(payment: Payment, status: string): Promise<void>
   await logJourneyEvent(
     ctx.lead.id,
     "payment_failed",
-    `Betaling ${labels[status] ?? status.toLowerCase()} (${euroFromCents(payment.amountCents)})`,
-    { actor: "systeem", type: payment.type, molliePaymentId: payment.molliePaymentId },
+    `${payment.extraOrderId ? "Betaling aanvullende opdracht" : "Betaling"} ${labels[status] ?? status.toLowerCase()} (${euroFromCents(payment.amountCents)})`,
+    {
+      actor: "systeem",
+      type: payment.type,
+      molliePaymentId: payment.molliePaymentId,
+      extraOrderId: payment.extraOrderId ?? undefined,
+    },
   );
   // Bewust géén nieuwe status: een mislukte poging zet de journey niet terug.
   // De klant kan het gewoon opnieuw proberen; de CTA blijft staan.

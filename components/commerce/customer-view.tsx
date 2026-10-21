@@ -99,6 +99,17 @@ export type DocumentRij = {
 
 export type TijdlijnRij = { id: string; label: string; actor: string; createdAt: string };
 
+/** Een aanvullende opdracht in het overzicht. */
+export type OpdrachtRij = {
+  id: string;
+  titel: string;
+  status: string;
+  /** Wordt er nu iets van de klant gevraagd (akkoord of een betaling)? */
+  actie: string | null;
+  bedrag: string;
+  href: string;
+};
+
 // Altijd de Nederlandse kalenderdag: dezelfde op de server en in elke browser.
 const datum = (iso: string) =>
   new Date(iso).toLocaleDateString("nl-NL", {
@@ -127,6 +138,7 @@ export function TrajectShell({
   status,
   documenten,
   tijdlijn,
+  opdrachten = [],
 }: {
   voornaam: string;
   bedrijfsnaam: string;
@@ -138,6 +150,7 @@ export function TrajectShell({
   status?: StatusData;
   documenten: DocumentRij[];
   tijdlijn: TijdlijnRij[];
+  opdrachten?: OpdrachtRij[];
 }) {
   const proef = Boolean(voorstel?.proef);
   return (
@@ -175,6 +188,39 @@ export function TrajectShell({
             <VolgendeStap voorstel={voorstel} status={status} />
             <VoorstelDetails voorstel={voorstel} />
           </>
+        )}
+
+        {opdrachten.length > 0 && (
+          <section className="mt-10">
+            <h2 className="text-[13px] font-bold uppercase tracking-[0.12em] text-ink-300">
+              Aanvullende opdrachten
+            </h2>
+            <ul className="mt-3 space-y-2">
+              {opdrachten.map((o) => (
+                <li key={o.id}>
+                  <a
+                    href={o.href}
+                    className={cn(
+                      "flex items-center gap-3 rounded-xl bg-white px-4 py-3.5 shadow-soft ring-1 transition hover:-translate-y-0.5 hover:shadow-lift",
+                      o.actie ? "ring-brand/30" : "ring-ink/5",
+                    )}
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[14px] font-bold text-ink">{o.titel}</span>
+                      <span className="block text-[12px] text-ink-500">
+                        {o.status} · {o.bedrag}
+                      </span>
+                    </span>
+                    {o.actie && (
+                      <span className="shrink-0 rounded-full bg-brand px-3 py-1 text-[12px] font-bold text-white">
+                        {o.actie}
+                      </span>
+                    )}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </section>
         )}
 
         {documenten.length > 0 && (

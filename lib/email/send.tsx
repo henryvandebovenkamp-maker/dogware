@@ -578,6 +578,13 @@ export const COMMERCE_SUBJECTS: Record<CommerceMailType, string> = {
   "installment-received": "Je termijn is ontvangen",
   "installment-failed": "Je betaling is niet gelukt",
   "installments-complete": "Alles betaald — dank je wel!",
+  "opdracht-sent": "Je nieuwe opdracht staat klaar",
+  "opdracht-reminder": "Je opdracht staat nog voor je klaar",
+  "opdracht-accepted": "Akkoord ontvangen — nu de aanbetaling",
+  "opdracht-deposit-received": "Je aanbetaling is ontvangen",
+  "opdracht-build-started": "We zijn begonnen met bouwen",
+  "opdracht-delivered": "Je opdracht is opgeleverd",
+  "opdracht-completed": "Je opdracht is afgerond — dank je wel!",
 };
 
 /**

@@ -27,7 +27,14 @@ export type CommerceMailType =
   | "installment-reminder"
   | "installment-received"
   | "installment-failed"
-  | "installments-complete";
+  | "installments-complete"
+  | "opdracht-sent"
+  | "opdracht-reminder"
+  | "opdracht-accepted"
+  | "opdracht-deposit-received"
+  | "opdracht-build-started"
+  | "opdracht-delivered"
+  | "opdracht-completed";
 
 const COPY: Record<
   CommerceMailType,
@@ -243,6 +250,72 @@ const COPY: Record<
     ],
     cta: "Bekijk je omgeving",
   },
+  /*
+   * Aanvullende opdrachten — een uitbreiding voor een klant die al live is.
+   * Kort en concreet: wat we bouwen, wat het kost en wat de volgende stap is.
+   * `titel` is de naam van de opdracht, `extra` de regel over het maandbedrag.
+   */
+  "opdracht-sent": {
+    heading: (n) => `Je nieuwe opdracht staat klaar, ${n}`,
+    body: (v) => [
+      `Zoals besproken heb ik de opdracht${v.titel ? ` "${v.titel}"` : ""} voor je klaargezet. Je ziet precies wat ik ga bouwen en wat het kost${v.amount ? ` (${v.amount})` : ""}.`,
+      ...(v.extra ? [v.extra] : []),
+      "Het is een korte opdrachtbevestiging, geen nieuwe overeenkomst: je bestaande afspraken blijven gewoon staan. Klopt alles? Dan geef je in je eigen omgeving met één klik akkoord.",
+    ],
+    cta: "Bekijk je opdracht",
+  },
+  "opdracht-reminder": {
+    heading: (n) => `Even een herinnering, ${n}`,
+    body: (v) => [
+      `De opdracht${v.titel ? ` "${v.titel}"` : ""} staat nog voor je klaar. Geen haast — ik wilde hem alleen even onder je aandacht brengen.`,
+      ...(v.extra ? [v.extra] : []),
+      "Wil je iets anders of heb je een vraag? Antwoord gerust op deze mail.",
+    ],
+    cta: "Bekijk je opdracht",
+  },
+  "opdracht-accepted": {
+    heading: (n) => `Dank je wel voor je akkoord, ${n}`,
+    body: (v) => [
+      `Je akkoord op${v.titel ? ` "${v.titel}"` : " de opdracht"} is vastgelegd. Leuk dat we dit samen gaan doen!`,
+      `Om te kunnen starten vragen we de aanbetaling van ${v.amount}. Zodra Mollie die bevestigt, plan ik de bouw in.`,
+      ...(v.extra ? [v.extra] : []),
+    ],
+    cta: "Betaal aanbetaling",
+  },
+  "opdracht-deposit-received": {
+    heading: (n) => `Aanbetaling ontvangen, ${n}`,
+    body: (v) => [
+      `We hebben je aanbetaling van ${v.amount}${v.titel ? ` voor "${v.titel}"` : ""} ontvangen. Dank je wel! De factuur staat in je omgeving.`,
+      "Ik plan de bouw in en laat je weten zodra ik begin.",
+    ],
+    cta: "Bekijk je opdracht",
+  },
+  "opdracht-build-started": {
+    heading: (n) => `We zijn begonnen, ${n}`,
+    body: (v) => [
+      `Vanaf vandaag bouw ik aan${v.titel ? ` "${v.titel}"` : " je opdracht"}.`,
+      ...(v.extra ? [v.extra] : []),
+      "Je website blijft gewoon online en werkt zoals altijd. Je hoort van me zodra er iets te zien is.",
+    ],
+    cta: "Bekijk je opdracht",
+  },
+  "opdracht-delivered": {
+    heading: (n) => `Het is klaar, ${n}!`,
+    body: (v) => [
+      `${v.titel ? `"${v.titel}"` : "Je opdracht"} is opgeleverd. Benieuwd wat je ervan vindt.`,
+      `Om de opdracht af te ronden staat de eindbetaling van ${v.amount} voor je klaar.`,
+      ...(v.extra ? [v.extra] : []),
+    ],
+    cta: "Betaal eindbetaling",
+  },
+  "opdracht-completed": {
+    heading: (n) => `Helemaal afgerond, ${n} 🐾`,
+    body: (v) => [
+      `We hebben je eindbetaling${v.amount ? ` van ${v.amount}` : ""} ontvangen. Daarmee is${v.titel ? ` "${v.titel}"` : " de opdracht"} volledig afgerond. Dank je wel!`,
+      v.extra ?? "Je website en je abonnement lopen gewoon door zoals je gewend bent.",
+    ],
+    cta: "Bekijk je omgeving",
+  },
   "charge-failed": {
     heading: (n) => `Even een seintje, ${n}`,
     body: () => [
@@ -257,7 +330,7 @@ const COPY: Record<
  * `regeling` is de zin over de gekozen betaalregeling. Leeg bij 50/50: dan
  * blijft de mail letterlijk zoals hij altijd was.
  */
-export type CommerceMailVars = { amount?: string; extra?: string; regeling?: string };
+export type CommerceMailVars = { amount?: string; extra?: string; regeling?: string; titel?: string };
 type Vars = CommerceMailVars;
 
 export function CommerceEmail({
@@ -360,6 +433,13 @@ const SIGN: Record<CommerceMailType, { groet: string; regel?: string }> = {
   "installment-received": { groet: "Hartelijke groet," },
   "installment-failed": { groet: "Met vriendelijke groet," },
   "installments-complete": { groet: "Hartelijke groet,", regel: "Meer tijd voor de honden. Daar doen we het voor." },
+  "opdracht-sent": { groet: "Hartelijke groet,", regel: "Ik denk graag met je mee." },
+  "opdracht-reminder": { groet: "Hartelijke groet," },
+  "opdracht-accepted": { groet: "Hartelijke groet,", regel: "Wat fijn dat we verder bouwen." },
+  "opdracht-deposit-received": { groet: "Hartelijke groet," },
+  "opdracht-build-started": { groet: "Hartelijke groet," },
+  "opdracht-delivered": { groet: "Hartelijke groet,", regel: "Wat leuk om je dit te laten zien." },
+  "opdracht-completed": { groet: "Hartelijke groet,", regel: "Meer tijd voor de honden. Daar doen we het voor." },
 };
 
 /**
@@ -386,4 +466,9 @@ const TOONT_ENTITEIT: CommerceMailType[] = [
   "installment-received",
   "installment-failed",
   "installments-complete",
+  "opdracht-sent",
+  "opdracht-accepted",
+  "opdracht-deposit-received",
+  "opdracht-delivered",
+  "opdracht-completed",
 ];

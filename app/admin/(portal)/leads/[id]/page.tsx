@@ -41,6 +41,9 @@ import { LeadAdminForm } from "./lead-admin-form";
 import { ReassignForm } from "./reassign-form";
 import { StageControl, DemoPanel } from "./journey-controls";
 import { PartnerActivatePanel } from "./partner-activate";
+import { isOpdrachtVerlopen, listOpdrachten } from "@/lib/opdrachten/service";
+import { leesInhoud } from "@/lib/opdrachten/bedragen";
+import { NieuweOpdrachtKnop, OpdrachtVoortgang, StatusPil } from "@/components/commerce/opdrachten-admin";
 import { BouwpromptKnop } from "./bouwprompt-knop";
 import { AfgerondPanel, DemoAfronden, type VoorbereideAfronding } from "@/components/commerce/demo-afronden";
 import { demoPdfsVan } from "@/lib/demo-afronding";
@@ -118,6 +121,7 @@ export default async function LeadDetailPage({
     documents,
     betaald,
     payments,
+    opdrachten,
   ] = await Promise.all([
     lead.affiliatePartnerId
       ? db
@@ -165,6 +169,7 @@ export default async function LeadDetailPage({
       .from(schema.payments)
       .where(eq(schema.payments.commerceId, commerce.id))
       .orderBy(desc(schema.payments.createdAt)),
+    listOpdrachten(commerce.id),
   ]);
 
   /**
@@ -392,6 +397,59 @@ export default async function LeadDetailPage({
         <div className="mt-4">
           <NextActionPanel leadId={id} next={volgende} />
         </div>
+      )}
+
+      {/* Aanvullende opdrachten — uitbreidingen naast de oorspronkelijke
+          journey. Blijft beschikbaar als die journey helemaal rond is. */}
+      {(lead.status === "klant geworden" || opdrachten.length > 0) && (
+        <section id="opdrachten" className="mt-4 scroll-mt-6">
+          <div className="rounded-2xl bg-white p-5 shadow-soft ring-1 ring-ink/5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="text-[13px] font-bold uppercase tracking-wide text-ink-300">Aanvullende opdrachten</h2>
+                <p className="mt-0.5 text-[12.5px] text-ink-300">
+                  Uitbreidingen met een eigen akkoord, betalingen en voortgang. De klantstatus blijft ongewijzigd.
+                </p>
+              </div>
+              <NieuweOpdrachtKnop leadId={id} klein />
+            </div>
+            {opdrachten.length > 0 && (
+              <ul className="mt-4 divide-y divide-cream-100 border-t border-cream-100">
+                {opdrachten.map((o) => {
+                  const inhoud = leesInhoud(o.acceptedSnapshot);
+                  const prijs = inhoud?.bedragen.exVatCents ?? o.priceExVatCents;
+                  return (
+                    <li key={o.id}>
+                      <Link
+                        href={`/admin/leads/${id}/opdrachten/${o.id}`}
+                        className="-mx-2 block rounded-xl px-2 py-3 transition hover:bg-cream-100/60"
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span className="min-w-0 truncate text-[14px] font-bold text-ink">
+                            {o.volgnummer}. {o.titel.trim() || "Nieuwe opdracht"}
+                          </span>
+                          <span className="flex items-center gap-2">
+                            {prijs > 0 && (
+                              <span className="text-[12.5px] tabular-nums text-ink-500">
+                                {euroFromCents(prijs)} excl. btw
+                                {o.monthlyDeltaCents !== 0 &&
+                                  ` · ${o.monthlyDeltaCents > 0 ? "+" : "−"}${euroFromCents(Math.abs(o.monthlyDeltaCents))} p/m`}
+                              </span>
+                            )}
+                            <StatusPil status={o.status} verlopen={isOpdrachtVerlopen(o)} />
+                          </span>
+                        </div>
+                        <div className="mt-2">
+                          <OpdrachtVoortgang status={o.status} compact />
+                        </div>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        </section>
       )}
 
       {direct ? (

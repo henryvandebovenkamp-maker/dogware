@@ -945,6 +945,14 @@ export const DOCUMENT_TYPES = [
    * `document_files`, zodat het blijft bestaan als de demo offline gaat.
    */
   "DEMO_PDF",
+  /**
+   * Aanvullende opdracht bij een bestaande klant: de geaccepteerde
+   * opdrachtbevestiging (inhoud, bedragen en akkoord, bevroren) en de facturen
+   * van de twee termijnen. Gekoppeld via `extraOrderId`.
+   */
+  "EXTRA_ORDER",
+  "INVOICE_EXTRA_DEPOSIT",
+  "INVOICE_EXTRA_FINAL",
 ] as const;
 export type DocumentType = (typeof DOCUMENT_TYPES)[number];
 
@@ -954,6 +962,8 @@ export const INVOICE_DOCUMENT_TYPES = [
   "INVOICE_FINAL",
   "INVOICE_SUBSCRIPTION",
   "INVOICE_INSTALLMENT",
+  "INVOICE_EXTRA_DEPOSIT",
+  "INVOICE_EXTRA_FINAL",
   "CREDIT_NOTE",
 ] as const;
 
@@ -1062,6 +1072,8 @@ export const documents = pgTable(
     creditedByDocumentId: uuid("credited_by_document_id"),
     /** Waarom er gecrediteerd is — verplicht bij het aanmaken van de nota. */
     creditReason: text("credit_reason"),
+    /** De aanvullende opdracht waar dit stuk bij hoort. Geen FK, net als `paymentId`. */
+    extraOrderId: uuid("extra_order_id"),
   },
   (t) => [
     uniqueIndex("documents_nummer_idx").on(t.nummer),
@@ -1076,6 +1088,7 @@ export const documents = pgTable(
       .on(t.paymentId)
       .where(sql`${t.paymentId} is not null`),
     index("documents_status_idx").on(t.status, t.issuedAt),
+    index("documents_extra_order_idx").on(t.extraOrderId),
   ],
 );
 
@@ -1114,6 +1127,13 @@ export const PAYMENT_TYPES = [
   "SUBSCRIPTION",
   "MANUAL_CORRECTION",
   "REFUND",
+  /**
+   * De twee termijnen van een aanvullende opdracht (zie `extraOrders`). Bewust
+   * eigen types: ze tellen niet mee in het betaalde bedrag van de oorspronkelijke
+   * opdracht, in de partnercommissie of in de journey van de website.
+   */
+  "EXTRA_DEPOSIT",
+  "EXTRA_FINAL",
 ] as const;
 export type PaymentType = (typeof PAYMENT_TYPES)[number];
 
@@ -1174,6 +1194,8 @@ export const payments = pgTable(
      * betalingen van vóór het betaalschema en bij abonnementsincasso's.
      */
     installmentId: uuid("installment_id"),
+    /** De aanvullende opdracht waar deze termijn bij hoort. Geen FK, net als `installmentId`. */
+    extraOrderId: uuid("extra_order_id"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
@@ -1190,6 +1212,16 @@ export const payments = pgTable(
     uniqueIndex("payments_installment_active_idx")
       .on(t.installmentId)
       .where(sql`${t.installmentId} is not null and ${t.status} in ('CREATED', 'OPEN', 'PENDING')`),
+    /*
+     * Aanvullende opdracht: per termijn hooguit één lopende betaling (tegen de
+     * dubbelklik) en hooguit één betaalde (tegen dubbel betalen).
+     */
+    uniqueIndex("payments_extra_active_idx")
+      .on(t.extraOrderId, t.type)
+      .where(sql`${t.extraOrderId} is not null and ${t.status} in ('CREATED', 'OPEN', 'PENDING')`),
+    uniqueIndex("payments_extra_paid_idx")
+      .on(t.extraOrderId, t.type)
+      .where(sql`${t.extraOrderId} is not null and ${t.status} = 'PAID'`),
   ],
 );
 
@@ -1260,6 +1292,151 @@ export const paymentInstallments = pgTable(
 );
 
 export type PaymentInstallment = typeof paymentInstallments.$inferSelect;
+
+/* =========================================================================
+ * Aanvullende opdrachten — uitbreidingen voor klanten die al live zijn
+ *
+ * Een eigen, kleine opdracht naast de oorspronkelijke journey: een korte
+ * opdrachtbevestiging, een expliciet akkoord, twee termijnen via Mollie en
+ * eventueel een aangepast maandbedrag. Bewust GEEN tweede voorstel-, factuur-
+ * of betaalsysteem: betalingen staan in `payments`, facturen in `documents`
+ * en gebeurtenissen in `journey_events` — alleen met `extra_order_id` erbij.
+ *
+ * Een aanvullende opdracht raakt `leads.stage` en `commerce.status` nooit aan:
+ * de website blijft "live & actief", hoeveel opdrachten er ook lopen.
+ * ========================================================================= */
+
+export const EXTRA_ORDER_STATUSES = [
+  "CONCEPT",
+  "VERZONDEN",
+  "AKKOORD",
+  "AANBETAALD",
+  "IN_UITVOERING",
+  "OPGELEVERD",
+  "EINDBETAALD",
+  "AFGEROND",
+  /** Ingetrokken door de beheerder, alleen zolang er niets betaald is. */
+  "INGETROKKEN",
+] as const;
+export type ExtraOrderStatus = (typeof EXTRA_ORDER_STATUSES)[number];
+
+/** Wanneer een gewijzigd maandbedrag ingaat. */
+export const MAAND_INGANG = ["oplevering", "datum"] as const;
+export type MaandIngang = (typeof MAAND_INGANG)[number];
+
+export const extraOrders = pgTable(
+  "extra_orders",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    leadId: uuid("lead_id")
+      .notNull()
+      .references(() => leads.id, { onDelete: "cascade" }),
+    commerceId: uuid("commerce_id")
+      .notNull()
+      .references(() => commerce.id, { onDelete: "cascade" }),
+    /** Volgnummer per klant: "Opdracht 2". Uniek per klant. */
+    volgnummer: integer("volgnummer").notNull(),
+    status: text("status").$type<ExtraOrderStatus>().notNull().default("CONCEPT"),
+    /** Laatst verstuurde versie (0 = nog nooit verstuurd). */
+    version: integer("version").notNull().default(0),
+
+    // Inhoud — vrij te bewerken zolang de opdracht concept is.
+    titel: text("titel").notNull().default(""),
+    omschrijving: text("omschrijving"),
+    werkzaamheden: jsonb("werkzaamheden").$type<string[]>().notNull().default([]),
+    /** Eenmalige prijs excl. btw, in centen. */
+    priceExVatCents: integer("price_ex_vat_cents").notNull().default(0),
+    vatPercent: integer("vat_percent").notNull().default(21),
+    depositPercent: integer("deposit_percent").notNull().default(50),
+    /**
+     * Wijziging van het maandbedrag excl. btw, in centen (+ of −; 0 = geen).
+     * Een verschil en geen nieuw totaal: zo lopen twee gelijktijdige opdrachten
+     * die elk iets toevoegen niet over elkaar heen.
+     */
+    monthlyDeltaCents: integer("monthly_delta_cents").notNull().default(0),
+    maandIngang: text("maand_ingang").$type<MaandIngang>().notNull().default("oplevering"),
+    /** "YYYY-MM-DD" bij maandIngang = "datum". */
+    maandIngangDatum: text("maand_ingang_datum"),
+    /** Verwachte oplevering, vrij ("YYYY-MM-DD") of leeg. */
+    verwachteOplevering: text("verwachte_oplevering"),
+    geldigTot: timestamp("geldig_tot", { withTimezone: true }),
+    /** Uitsluitend voor beheerders. Komt nooit in een klantweergave of mail. */
+    interneNotitie: text("interne_notitie"),
+
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+    remindedAt: timestamp("reminded_at", { withTimezone: true }),
+    firstViewedAt: timestamp("first_viewed_at", { withTimezone: true }),
+
+    // Akkoord — audittechnisch traceerbaar, op een vaste versie.
+    acceptedAt: timestamp("accepted_at", { withTimezone: true }),
+    acceptedVersion: integer("accepted_version"),
+    acceptedName: text("accepted_name"),
+    acceptedIpHash: text("accepted_ip_hash"),
+    acceptedUserAgent: text("accepted_user_agent"),
+    agreesOpdracht: boolean("agrees_opdracht").notNull().default(false),
+    agreesMaandbedrag: boolean("agrees_maandbedrag").notNull().default(false),
+    /** Bevroren inhoud + bedragen van de geaccepteerde versie. Bron voor betalen en factureren. */
+    acceptedSnapshot: jsonb("accepted_snapshot").$type<Record<string, unknown>>(),
+
+    // Voortgang
+    depositPaidAt: timestamp("deposit_paid_at", { withTimezone: true }),
+    buildStartedAt: timestamp("build_started_at", { withTimezone: true }),
+    deliveredAt: timestamp("delivered_at", { withTimezone: true }),
+    finalPaidAt: timestamp("final_paid_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+    cancelReason: text("cancel_reason"),
+
+    // Maandbedrag — wanneer en van/naar wat het abonnement is aangepast.
+    maandToegepastAt: timestamp("maand_toegepast_at", { withTimezone: true }),
+    maandVanCents: integer("maand_van_cents"),
+    maandNaarCents: integer("maand_naar_cents"),
+
+    createdByUserId: uuid("created_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("extra_orders_lead_seq_idx").on(t.leadId, t.volgnummer),
+    index("extra_orders_commerce_idx").on(t.commerceId, t.createdAt),
+    index("extra_orders_status_idx").on(t.status),
+  ],
+);
+
+export type ExtraOrder = typeof extraOrders.$inferSelect;
+
+export const EXTRA_ORDER_VERSION_STATUSES = ["VERZONDEN", "VERVANGEN", "GEACCEPTEERD", "INGETROKKEN"] as const;
+export type ExtraOrderVersionStatus = (typeof EXTRA_ORDER_VERSION_STATUSES)[number];
+
+/**
+ * Elke verstuurde versie, onveranderlijk. Wordt een opdracht na versturen
+ * aangepast, dan gaat de vorige versie naar VERVANGEN en ontstaat er bij
+ * opnieuw versturen een nieuwe. Zo blijft altijd te zien welke tekst en welke
+ * bedragen de klant op welk moment voor zich had.
+ */
+export const extraOrderVersions = pgTable(
+  "extra_order_versions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    extraOrderId: uuid("extra_order_id")
+      .notNull()
+      .references(() => extraOrders.id, { onDelete: "cascade" }),
+    leadId: uuid("lead_id")
+      .notNull()
+      .references(() => leads.id, { onDelete: "cascade" }),
+    version: integer("version").notNull(),
+    status: text("status").$type<ExtraOrderVersionStatus>().notNull().default("VERZONDEN"),
+    /** Inhoud + server-side berekende bedragen, zoals verstuurd. */
+    inhoud: jsonb("inhoud").$type<Record<string, unknown>>().notNull(),
+    geldigTot: timestamp("geldig_tot", { withTimezone: true }),
+    sentAt: timestamp("sent_at", { withTimezone: true }).notNull().defaultNow(),
+    sentByUserId: uuid("sent_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    closedAt: timestamp("closed_at", { withTimezone: true }),
+  },
+  (t) => [uniqueIndex("extra_order_versions_seq_idx").on(t.extraOrderId, t.version)],
+);
+
+export type ExtraOrderVersion = typeof extraOrderVersions.$inferSelect;
 
 /* =========================================================================
  * Partnercommissies — registratie en uitbetaling

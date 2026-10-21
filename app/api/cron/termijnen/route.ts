@@ -1,6 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { runTermijnRonde } from "@/lib/payment-reminders";
+import { runOpdrachtRonde } from "@/lib/opdrachten/service";
 
 /**
  * Dagelijkse termijnronde (Vercel Cron, zie vercel.json).
@@ -21,7 +22,9 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const uitkomst = await runTermijnRonde();
+    // Ook de aanvullende opdrachten: een gewijzigd maandbedrag met een vaste
+    // ingangsdatum gaat hier in, op het bestaande abonnement.
+    const uitkomst = { ...(await runTermijnRonde()), ...(await runOpdrachtRonde()) };
     console.log(JSON.stringify({ evt: "cron.termijnen", at: new Date().toISOString(), ...uitkomst }));
     return NextResponse.json({ ok: true, ...uitkomst });
   } catch (err) {

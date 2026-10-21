@@ -14,6 +14,9 @@ import { trackProposalViewed } from "@/lib/proposals";
 import { TrajectShell } from "@/components/commerce/customer-view";
 import { isDirectJourney } from "@/lib/journey-variant";
 import { ensureSchedule, loadSchemaWeergave } from "@/lib/payment-schedule";
+import { isOpdrachtVerlopen, listOpdrachten } from "@/lib/opdrachten/service";
+import { OPDRACHT_STATUS_LABEL, leesInhoud } from "@/lib/opdrachten/bedragen";
+import type { OpdrachtRij } from "@/components/commerce/customer-view";
 
 export const metadata: Metadata = {
   title: "Jouw nieuwe website met DogWare",
@@ -49,6 +52,40 @@ export default async function TrajectPage({
   const openstaand = snap ? computeOutstanding(snap.config, betaald) : 0;
 
   const documenten = await listDocuments(commerce.id, "klant");
+
+  /*
+   * Aanvullende opdrachten. Een concept dat nog nooit verstuurd is bestaat
+   * voor de klant niet; een ingetrokken opdracht zonder akkoord ook niet.
+   */
+  const opdrachten: OpdrachtRij[] = (await listOpdrachten(commerce.id))
+    .filter((o) => !(o.status === "CONCEPT" && o.version === 0))
+    .filter((o) => !(o.status === "INGETROKKEN" && !o.acceptedAt))
+    .map((o) => {
+      const verlopen = isOpdrachtVerlopen(o);
+      const inhoud = leesInhoud(o.acceptedSnapshot);
+      return {
+        id: o.id,
+        titel: o.titel.trim() || `Opdracht ${o.volgnummer}`,
+        status:
+          o.status === "CONCEPT"
+            ? "Wordt aangepast"
+            : verlopen
+              ? "Verlopen"
+              : o.status === "VERZONDEN"
+                ? "Wacht op je akkoord"
+                : OPDRACHT_STATUS_LABEL[o.status],
+        actie:
+          o.status === "VERZONDEN" && !verlopen
+            ? "Bekijken"
+            : o.status === "AKKOORD"
+              ? "Betalen"
+              : o.status === "OPGELEVERD"
+                ? "Betalen"
+                : null,
+        bedrag: `${euroFromCents(inhoud?.bedragen.exVatCents ?? o.priceExVatCents)} excl. btw`,
+        href: `/traject/${token}/opdracht/${o.id}`,
+      };
+    });
   const tijdlijn = await getTimeline(lead.id, "klant", 40);
 
   /*
@@ -77,6 +114,7 @@ export default async function TrajectPage({
         tekst="Zodra het klaarstaat krijg je van ons bericht. Je hoeft nu even niets te doen."
         documenten={[]}
         tijdlijn={tijdlijn.map(naarRij)}
+        opdrachten={opdrachten}
       />
     );
   }
@@ -96,6 +134,7 @@ export default async function TrajectPage({
         isFactuur: isInvoiceType(d.type),
       }))}
       tijdlijn={tijdlijn.map(naarRij)}
+      opdrachten={opdrachten}
       voorstel={voorstelVoorKlant(proposal, snap!, {
         direct,
         token,

@@ -257,6 +257,42 @@ export async function createMollieSubscription(params: {
   }
 }
 
+/**
+ * Past het bedrag van het BESTAANDE abonnement aan. Bewust geen tweede
+ * abonnement ernaast: twee lopende abonnementen betekent twee incasso's per
+ * maand. Mollie past het nieuwe bedrag toe op de eerstvolgende incasso.
+ */
+export async function updateMollieSubscriptionAmount(params: {
+  mollieCustomerId: string;
+  subscriptionId: string;
+  amountCents: number;
+}): Promise<{ ok: true } | { ok: false; message: string }> {
+  const c = getClient();
+  if (!c) return { ok: false, message: "Betalen is nog niet geconfigureerd." };
+  try {
+    const bestaand = await c.customerSubscriptions.get(params.subscriptionId, {
+      customerId: params.mollieCustomerId,
+    });
+    if (bestaand.status !== "active" && bestaand.status !== "pending") {
+      return { ok: false, message: `Het abonnement bij Mollie is niet actief (${bestaand.status}).` };
+    }
+    await c.customerSubscriptions.update(params.subscriptionId, {
+      customerId: params.mollieCustomerId,
+      amount: centsToMollie(params.amountCents),
+    });
+    return { ok: true };
+  } catch (err) {
+    console.error(
+      JSON.stringify({
+        evt: "mollie.subscription_update_error",
+        at: new Date().toISOString(),
+        error: err instanceof Error ? err.message : "onbekend",
+      }),
+    );
+    return { ok: false, message: "Het abonnement kon niet worden bijgewerkt bij Mollie." };
+  }
+}
+
 /** Haal de actuele status van een payment op bij Mollie (bron van waarheid). */
 export async function getMolliePayment(molliePaymentId: string) {
   const c = getClient();
